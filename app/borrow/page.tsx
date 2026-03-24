@@ -35,6 +35,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       title="Borrow"
       subtitle="Choose an available vehicle and record who is driving it."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
+      backHref="/dashboard"
     >
       <section className="panel">
         <h2>Borrow a vehicle</h2>

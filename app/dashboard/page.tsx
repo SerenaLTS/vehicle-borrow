@@ -63,6 +63,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <Link className="primaryButton" href="/return">
             Return a vehicle
           </Link>
+          <Link className="ghostButton" href="/history">
+            View history
+          </Link>
         </div>
       </section>
 

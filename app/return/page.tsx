@@ -35,6 +35,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
       title="Return"
       subtitle="Close out a loan and update the odometer."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
+      backHref="/dashboard"
     >
       <section className="panel">
         <h2>Return a vehicle</h2>

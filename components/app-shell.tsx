@@ -6,14 +6,22 @@ type AppShellProps = {
   title: string;
   subtitle: string;
   userLabel: string;
+  backHref?: string;
+  backLabel?: string;
   children: ReactNode;
 };
 
-export function AppShell({ title, subtitle, userLabel, children }: AppShellProps) {
+export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Back to dashboard", children }: AppShellProps) {
   return (
     <div className="pageShell">
       <aside className="sidebar">
         <div className="sidebarTop">
+          {backHref ? (
+            <Link className="backLink" href={backHref}>
+              {backLabel}
+            </Link>
+          ) : null}
+
           <div>
             <p className="eyebrow">Vehicle Borrow</p>
             <h1>{title}</h1>
@@ -25,13 +33,6 @@ export function AppShell({ title, subtitle, userLabel, children }: AppShellProps
             <LogoutButton />
           </div>
         </div>
-
-        <nav className="nav">
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/borrow">Borrow</Link>
-          <Link href="/return">Return</Link>
-          <Link href="/history">History</Link>
-        </nav>
       </aside>
 
       <main className="content">{children}</main>
