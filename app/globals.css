@@ -152,13 +152,14 @@ button {
   min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid var(--line);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+  border: none;
   width: fit-content;
 }
 
 .backLink:hover {
-  border-color: rgba(31, 107, 82, 0.35);
+  filter: brightness(1.03);
 }
 
 .sidebarFooter {
@@ -173,6 +174,12 @@ button {
   margin: 0;
   font-size: 0.94rem;
   color: var(--muted);
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .content {
@@ -442,6 +449,14 @@ th {
   }
 
   .sidebarFooter .ghostButton {
+    width: 100%;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+
+  .headerActions > * {
     width: 100%;
   }
 

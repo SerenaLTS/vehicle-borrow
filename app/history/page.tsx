@@ -29,6 +29,7 @@ export default async function HistoryPage() {
       subtitle="Review recent loan records and export a CSV copy."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
+      backLabel="Dashboard"
     >
       <section className="sectionHeader">
         <div>

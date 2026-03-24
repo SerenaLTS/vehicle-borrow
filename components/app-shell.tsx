@@ -16,12 +16,6 @@ export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Ba
     <div className="pageShell">
       <aside className="sidebar">
         <div className="sidebarTop">
-          {backHref ? (
-            <Link className="backLink" href={backHref}>
-              {backLabel}
-            </Link>
-          ) : null}
-
           <div>
             <p className="eyebrow">Vehicle Borrow</p>
             <h1>{title}</h1>
@@ -30,7 +24,14 @@ export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Ba
 
           <div className="sidebarFooter">
             <p className="signedInAs">{userLabel}</p>
-            <LogoutButton />
+            <div className="headerActions">
+              {backHref ? (
+                <Link className="backLink" href={backHref}>
+                  {backLabel}
+                </Link>
+              ) : null}
+              <LogoutButton />
+            </div>
           </div>
         </div>
       </aside>
