@@ -40,6 +40,26 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       subtitle="Track the current borrowing status of company vehicles."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
     >
+      <section className="sectionHeader">
+        <div>
+          <h2>Quick actions</h2>
+          <p className="muted">Choose what you want to do next.</p>
+        </div>
+        <div className="actionsRow">
+          <Link className="secondaryButton" href="/borrow">
+            Borrow a vehicle
+          </Link>
+          <Link className="primaryButton" href="/return">
+            Return a vehicle
+          </Link>
+          <Link className="ghostButton" href="/history">
+            View history
+          </Link>
+        </div>
+      </section>
+
+      {message ? <p className="message">{message}</p> : null}
+
       <section className="statsGrid">
         <article className="statCard">
           <p className="statLabel">Vehicles you currently have</p>
@@ -56,20 +76,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <h2>Your active loans</h2>
           <p className="muted">These are the vehicles currently under your responsibility.</p>
         </div>
-        <div className="actionsRow">
-          <Link className="secondaryButton" href="/borrow">
-            Borrow a vehicle
-          </Link>
-          <Link className="primaryButton" href="/return">
-            Return a vehicle
-          </Link>
-          <Link className="ghostButton" href="/history">
-            View history
-          </Link>
-        </div>
       </section>
-
-      {message ? <p className="message">{message}</p> : null}
 
       {loans.length === 0 ? (
         <div className="emptyState">You do not have any vehicles borrowed right now.</div>
