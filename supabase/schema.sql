@@ -4,7 +4,7 @@ create table if not exists public.vehicles (
   id uuid primary key default gen_random_uuid(),
   plate_number text not null unique,
   model text not null,
-  status text not null default 'available' check (status in ('available', 'borrowed', 'maintenance')),
+  status text not null default 'available' check (status in ('available', 'borrowed', 'maintenance', 'retired')),
   current_holder_user_id uuid references auth.users (id),
   created_at timestamptz not null default timezone('utc', now())
 );
@@ -24,12 +24,66 @@ create table if not exists public.vehicle_loans (
   returned_at timestamptz
 );
 
+create table if not exists public.user_roles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  email text not null,
+  is_admin boolean not null default false,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
 create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
 create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
 
 alter table public.vehicles enable row level security;
 alter table public.vehicle_loans enable row level security;
+alter table public.user_roles enable row level security;
+
+create or replace function public.handle_user_role_sync()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  insert into public.user_roles (user_id, email)
+  values (new.id, coalesce(new.email, ''))
+  on conflict (user_id) do update
+  set email = excluded.email,
+      updated_at = timezone('utc', now());
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_role_sync on auth.users;
+create trigger on_auth_user_role_sync
+after insert or update of email on auth.users
+for each row execute procedure public.handle_user_role_sync();
+
+insert into public.user_roles (user_id, email)
+select id, coalesce(email, '')
+from auth.users
+on conflict (user_id) do update
+set email = excluded.email,
+    updated_at = timezone('utc', now());
+
+create or replace function public.is_admin(p_user_id uuid default auth.uid())
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_roles
+    where user_id = coalesce(p_user_id, auth.uid())
+      and is_admin = true
+  );
+$$;
+
+grant execute on function public.is_admin(uuid) to authenticated;
 
 drop policy if exists "Authenticated users can read vehicles" on public.vehicles;
 create policy "Authenticated users can read vehicles"
@@ -44,6 +98,13 @@ on public.vehicle_loans
 for select
 to authenticated
 using (true);
+
+drop policy if exists "Users can read roles" on public.user_roles;
+create policy "Users can read roles"
+on public.user_roles
+for select
+to authenticated
+using (user_id = auth.uid() or public.is_admin());
 
 create or replace function public.borrow_vehicle(
   p_vehicle_id uuid,
@@ -177,4 +238,22 @@ values
   ('ABC-101', 'Toyota Corolla', 'available'),
   ('ABC-202', 'Hyundai i30', 'available'),
   ('ABC-303', 'Ford Ranger', 'maintenance')
+on conflict (plate_number) do nothing;
+
+insert into public.vehicles (plate_number, model, status)
+values
+  ('FDI-80U', 'T9 Haven', 'available'),
+  ('EOP16B', 'TOYOTA ALPHARD', 'available'),
+  ('FSI02M', 'T9 PHEV', 'available'),
+  ('FSI02T', 'T9 PHEV', 'available'),
+  ('FWA79M', 'T9 PHEV', 'available'),
+  ('FWG16E', 'T9 PHEV', 'available'),
+  ('FYJ16A', 'T9 PHEV', 'available'),
+  ('CSJ516', 'T9 Haven', 'available'),
+  ('T9UTE', 'T9 Haven', 'available'),
+  ('FWF88F', 'T9 Osprey X', 'available'),
+  ('FZK92L', 'T9 PHEV', 'available'),
+  ('FZK92K', 'T9 PHEV', 'available'),
+  ('FWG16T', 'T9 Osprey X', 'available'),
+  ('2DP4JQ', 'T9 Haven', 'available')
 on conflict (plate_number) do nothing;

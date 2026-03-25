@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { createClient } from "@/lib/supabase/server";
+import { getIsAdmin } from "@/lib/user-roles";
 import { formatDisplayName } from "@/lib/utils";
 import { borrowVehicle } from "@/app/borrow/actions";
 import type { Vehicle } from "@/lib/types";
@@ -21,6 +22,8 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     redirect("/");
   }
 
+  const isAdmin = await getIsAdmin(supabase, user.id);
+
   const { data } = await supabase
     .from("vehicles")
     .select("id, plate_number, model, status, current_holder_user_id")
@@ -37,6 +40,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
+      adminHref={isAdmin ? "/admin" : undefined}
     >
       <section className="panel">
         <h2>Borrow a vehicle</h2>

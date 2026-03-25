@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { createClient } from "@/lib/supabase/server";
+import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 
@@ -20,6 +21,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   if (!user) {
     redirect("/");
   }
+
+  const isAdmin = await getIsAdmin(supabase, user.id);
 
   const [{ data: activeLoans }, { count: totalFleetCount }] = await Promise.all([
     supabase
@@ -39,6 +42,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       title="Dashboard"
       subtitle="Track the current borrowing status of company vehicles."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
+      adminHref={isAdmin ? "/admin" : undefined}
     >
       <section className="sectionHeader">
         <div>
@@ -55,6 +59,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <Link className="ghostButton" href="/history">
             View history
           </Link>
+          {isAdmin ? (
+            <Link className="ghostButton" href="/admin">
+              Admin
+            </Link>
+          ) : null}
         </div>
       </section>
 

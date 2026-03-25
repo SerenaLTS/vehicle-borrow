@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
+import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { returnVehicle } from "@/app/return/actions";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
@@ -20,6 +21,8 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
     redirect("/");
   }
 
+  const isAdmin = await getIsAdmin(supabase, user.id);
+
   const { data } = await supabase
     .from("vehicle_loans")
     .select("id, vehicle_id, borrowed_by_user_id, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles(plate_number, model)")
@@ -37,6 +40,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
+      adminHref={isAdmin ? "/admin" : undefined}
     >
       <section className="panel">
         <h2>Return a vehicle</h2>

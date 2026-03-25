@@ -349,6 +349,11 @@ textarea {
   color: var(--danger);
 }
 
+.pill-retired {
+  background: rgba(76, 84, 102, 0.14);
+  color: #4c5466;
+}
+
 .message {
   margin-top: 16px;
   padding: 14px 16px;

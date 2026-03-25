@@ -96,7 +96,18 @@ You can manage vehicles directly in Supabase:
    - `model`
    - `status`
 
-The schema file already inserts three sample vehicles. You can keep them, edit them, or delete them.
+The schema file already inserts three sample vehicles. You can keep them, edit them, or mark them as `retired` if you do not want them to appear in borrowing.
+
+## Admin setup
+
+This project uses a `public.user_roles` table to track admins.
+
+1. Run the latest [`supabase/schema.sql`](./supabase/schema.sql) in Supabase SQL Editor.
+2. Open `Table Editor -> user_roles`.
+3. Find the user by email.
+4. Set `is_admin` to `true` for anyone who should access `/admin`.
+
+New auth users are synced into `user_roles` automatically.
 
 ## Important behavior
 
@@ -104,6 +115,7 @@ The schema file already inserts three sample vehicles. You can keep them, edit t
 - When the same user returns it, the loan record is closed and the vehicle goes back to `available`.
 - History is never deleted, so exports remain available.
 - Vehicles in `maintenance` do not appear in the borrow page.
+- Vehicles in `retired` do not appear in the borrow page and should be used instead of deleting vehicles that already have history.
 
 ## Useful commands
 

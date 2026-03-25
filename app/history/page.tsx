@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
+import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 
@@ -14,6 +15,8 @@ export default async function HistoryPage() {
   if (!user) {
     redirect("/");
   }
+
+  const isAdmin = await getIsAdmin(supabase, user.id);
 
   const { data } = await supabase
     .from("vehicle_loans")
@@ -30,6 +33,7 @@ export default async function HistoryPage() {
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
+      adminHref={isAdmin ? "/admin" : undefined}
     >
       <section className="sectionHeader">
         <div>

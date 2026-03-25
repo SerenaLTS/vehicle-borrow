@@ -8,10 +8,11 @@ type AppShellProps = {
   userLabel: string;
   backHref?: string;
   backLabel?: string;
+  adminHref?: string;
   children: ReactNode;
 };
 
-export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Back to dashboard", children }: AppShellProps) {
+export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Back to dashboard", adminHref, children }: AppShellProps) {
   return (
     <div className="pageShell">
       <aside className="sidebar">
@@ -25,6 +26,11 @@ export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Ba
           <div className="sidebarFooter">
             <p className="signedInAs">{userLabel}</p>
             <div className="headerActions">
+              {adminHref ? (
+                <Link className="ghostButton" href={adminHref}>
+                  Admin
+                </Link>
+              ) : null}
               {backHref ? (
                 <Link className="backLink" href={backHref}>
                   {backLabel}
