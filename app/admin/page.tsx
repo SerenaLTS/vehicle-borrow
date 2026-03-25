@@ -1,11 +1,17 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDisplayName } from "@/lib/utils";
 import type { Vehicle } from "@/lib/types";
 
-export default async function AdminPage() {
+type AdminPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const params = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,6 +34,8 @@ export default async function AdminPage() {
 
   const userRoles = (roles ?? []) as UserRole[];
   const fleet = (vehicles ?? []) as Vehicle[];
+  const message = typeof params.message === "string" ? params.message : null;
+  const error = typeof params.error === "string" ? params.error : null;
 
   return (
     <AppShell
@@ -38,6 +46,9 @@ export default async function AdminPage() {
       backLabel="Dashboard"
       adminHref="/admin"
     >
+      {message ? <p className="message">{message}</p> : null}
+      {error ? <p className="message error">{error}</p> : null}
+
       <section className="panel">
         <h2>How admin access works</h2>
         <div className="vehicleMeta">
@@ -45,6 +56,35 @@ export default async function AdminPage() {
           <span>Set `is_admin` to true for any user who should access this page.</span>
           <span>Do not edit admin access in code. This page only reads the database flag.</span>
         </div>
+      </section>
+
+      <section className="panel">
+        <h2>Add vehicle</h2>
+        <form action={createVehicle}>
+          <div className="formGrid">
+            <label className="fieldLabel">
+              Plate number
+              <input name="plateNumber" placeholder="ABC123" required />
+            </label>
+            <label className="fieldLabel">
+              Model
+              <input name="model" placeholder="T9 PHEV" required />
+            </label>
+          </div>
+
+          <label className="fieldLabel">
+            Status
+            <select defaultValue="available" name="status" required>
+              <option value="available">available</option>
+              <option value="maintenance">maintenance</option>
+              <option value="retired">retired</option>
+            </select>
+          </label>
+
+          <button className="primaryButton" type="submit">
+            Add vehicle
+          </button>
+        </form>
       </section>
 
       <section className="sectionHeader">
@@ -79,30 +119,60 @@ export default async function AdminPage() {
 
       <section className="sectionHeader">
         <div>
-          <h2>Fleet</h2>
-          <p className="muted">Use this list to confirm which vehicles are active, under maintenance, borrowed, or retired.</p>
+          <h2>Fleet manager</h2>
+          <p className="muted">Edit vehicle details here. Borrowed vehicles can keep their model updated, but their status stays system-controlled until returned.</p>
         </div>
       </section>
 
-      <div className="tableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Plate</th>
-              <th>Model</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fleet.map((vehicle) => (
-              <tr key={vehicle.id}>
-                <td>{vehicle.plate_number}</td>
-                <td>{vehicle.model}</td>
-                <td>{vehicle.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="cardsGrid">
+        {fleet.map((vehicle) => (
+          <article className="vehicleCard" key={vehicle.id}>
+            <h3>{vehicle.plate_number}</h3>
+            <p className="muted">Current status: {vehicle.status}</p>
+
+            <form action={updateVehicle}>
+              <input name="vehicleId" type="hidden" value={vehicle.id} />
+
+              <label className="fieldLabel">
+                Model
+                <input defaultValue={vehicle.model} name="model" required />
+              </label>
+
+              {vehicle.status === "borrowed" ? (
+                <div className="fieldLabel">
+                  <span>Status</span>
+                  <p className="muted">borrowed</p>
+                </div>
+              ) : (
+                <label className="fieldLabel">
+                  Status
+                  <select defaultValue={vehicle.status} name="status" required>
+                    <option value="available">available</option>
+                    <option value="maintenance">maintenance</option>
+                    <option value="retired">retired</option>
+                  </select>
+                </label>
+              )}
+
+              <div className="actionsRow">
+                <button className="primaryButton" type="submit">
+                  Save changes
+                </button>
+              </div>
+            </form>
+
+            {vehicle.status !== "borrowed" ? (
+              <form action={retireVehicle}>
+                <input name="vehicleId" type="hidden" value={vehicle.id} />
+                <button className="ghostButton" type="submit">
+                  Mark as retired
+                </button>
+              </form>
+            ) : (
+              <p className="muted">Return this vehicle before retiring it.</p>
+            )}
+          </article>
+        ))}
       </div>
     </AppShell>
   );

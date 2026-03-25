@@ -92,6 +92,21 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "Admins can insert vehicles" on public.vehicles;
+create policy "Admins can insert vehicles"
+on public.vehicles
+for insert
+to authenticated
+with check (public.is_admin());
+
+drop policy if exists "Admins can update vehicles" on public.vehicles;
+create policy "Admins can update vehicles"
+on public.vehicles
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 drop policy if exists "Authenticated users can read loans" on public.vehicle_loans;
 create policy "Authenticated users can read loans"
 on public.vehicle_loans
