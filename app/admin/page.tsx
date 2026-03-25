@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDisplayName } from "@/lib/utils";
@@ -29,7 +30,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const [{ data: roles }, { data: vehicles }] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
-    supabase.from("vehicles").select("id, plate_number, model, status, current_holder_user_id").order("plate_number"),
+    supabase.from("vehicles").select("id, plate_number, model, status").order("plate_number"),
   ]);
 
   const userRoles = (roles ?? []) as UserRole[];
@@ -81,9 +82,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </select>
           </label>
 
-          <button className="primaryButton" type="submit">
-            Add vehicle
-          </button>
+          <SubmitButton className="primaryButton" idleLabel="Add vehicle" pendingLabel="Adding..." />
         </form>
       </section>
 
@@ -155,18 +154,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               )}
 
               <div className="actionsRow">
-                <button className="primaryButton" type="submit">
-                  Save changes
-                </button>
+                <SubmitButton className="primaryButton" idleLabel="Save changes" pendingLabel="Saving..." />
               </div>
             </form>
 
             {vehicle.status !== "borrowed" ? (
               <form action={retireVehicle}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
-                <button className="ghostButton" type="submit">
-                  Mark as retired
-                </button>
+                <SubmitButton className="ghostButton" idleLabel="Mark as retired" pendingLabel="Retiring..." />
               </form>
             ) : (
               <p className="muted">Return this vehicle before retiring it.</p>

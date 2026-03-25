@@ -46,6 +46,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.8;
+}
+
 .authPage {
   display: grid;
   place-items: center;
@@ -372,6 +377,25 @@ textarea {
   border-radius: 20px;
   text-align: center;
   color: var(--muted);
+}
+
+.skeletonBlock {
+  min-height: 180px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.48)),
+    var(--panel);
+  background-size: 220% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
 }
 
 .tableWrap {

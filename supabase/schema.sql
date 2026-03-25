@@ -35,6 +35,8 @@ create table if not exists public.user_roles (
 create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
 create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
 create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
+create index if not exists idx_vehicles_status_plate_number on public.vehicles (status, plate_number);
+create index if not exists idx_user_roles_email on public.user_roles (email);
 
 alter table public.vehicles enable row level security;
 alter table public.vehicle_loans enable row level security;
@@ -247,13 +249,6 @@ end;
 $$;
 
 grant execute on function public.return_vehicle(uuid, integer, text) to authenticated;
-
-insert into public.vehicles (plate_number, model, status)
-values
-  ('ABC-101', 'Toyota Corolla', 'available'),
-  ('ABC-202', 'Hyundai i30', 'available'),
-  ('ABC-303', 'Ford Ranger', 'maintenance')
-on conflict (plate_number) do nothing;
 
 insert into public.vehicles (plate_number, model, status)
 values

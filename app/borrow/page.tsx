@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
+import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDisplayName } from "@/lib/utils";
@@ -26,7 +27,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
   const { data } = await supabase
     .from("vehicles")
-    .select("id, plate_number, model, status, current_holder_user_id")
+    .select("id, plate_number, model, status")
     .eq("status", "available")
     .order("plate_number");
 
@@ -90,9 +91,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
               <textarea name="borrowNotes" placeholder="Optional booking notes" />
             </label>
 
-            <button className="primaryButton" type="submit">
-              Confirm borrow
-            </button>
+            <SubmitButton className="primaryButton" idleLabel="Confirm borrow" pendingLabel="Saving..." />
           </form>
         )}
 
