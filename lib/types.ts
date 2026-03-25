@@ -10,6 +10,7 @@ export type LoanRow = {
   id: string;
   vehicle_id: string;
   borrowed_by_user_id: string;
+  borrower_email: string;
   driver_name: string;
   purpose: string;
   start_odometer: number;

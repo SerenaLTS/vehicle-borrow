@@ -20,7 +20,7 @@ export default async function HistoryPage() {
 
   const { data } = await supabase
     .from("vehicle_loans")
-    .select("id, vehicle_id, borrowed_by_user_id, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+    .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false })
     .limit(200);
 
@@ -53,6 +53,7 @@ export default async function HistoryPage() {
             <thead>
               <tr>
                 <th>Vehicle</th>
+                <th>Borrower</th>
                 <th>Driver</th>
                 <th>Purpose</th>
                 <th>Borrowed</th>
@@ -67,6 +68,7 @@ export default async function HistoryPage() {
                   <td>
                     {loan.vehicle?.plate_number} <span className="muted">{loan.vehicle?.model}</span>
                   </td>
+                  <td>{loan.borrower_email}</td>
                   <td>{loan.driver_name}</td>
                   <td>{loan.purpose}</td>
                   <td>{formatDateTime(loan.borrowed_at)}</td>
