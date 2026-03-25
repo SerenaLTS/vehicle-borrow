@@ -18,7 +18,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("vehicle_loans")
-    .select("driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, borrower_email, vehicle:vehicles(plate_number, model)")
+    .select("driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, borrower_email, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false });
 
   if (error) {

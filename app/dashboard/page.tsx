@@ -27,11 +27,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const [{ data: activeLoans }, { count: totalFleetCount }] = await Promise.all([
     supabase
       .from("vehicle_loans")
-      .select("id, vehicle_id, borrowed_by_user_id, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles(plate_number, model)")
+      .select("id, vehicle_id, borrowed_by_user_id, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
       .eq("borrowed_by_user_id", user.id)
       .is("returned_at", null)
       .order("borrowed_at", { ascending: false }),
-    supabase.from("vehicles").select("*", { count: "exact", head: true }),
+    supabase.from("vehicles").select("id", { count: "exact", head: true }),
   ]);
 
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);

@@ -20,7 +20,7 @@ export default async function HistoryPage() {
 
   const { data } = await supabase
     .from("vehicle_loans")
-    .select("id, vehicle_id, borrowed_by_user_id, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles(plate_number, model)")
+    .select("id, vehicle_id, borrowed_by_user_id, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false })
     .limit(200);
 

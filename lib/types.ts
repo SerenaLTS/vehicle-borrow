@@ -25,15 +25,21 @@ export type LoanRow = {
 };
 
 export type RawLoanRow = Omit<LoanRow, "vehicle"> & {
-  vehicle: Array<{
-    plate_number: string;
-    model: string;
-  }> | null;
+  vehicle:
+    | {
+        plate_number: string;
+        model: string;
+      }
+    | Array<{
+        plate_number: string;
+        model: string;
+      }>
+    | null;
 };
 
 export function normalizeLoan(row: RawLoanRow): LoanRow {
   return {
     ...row,
-    vehicle: row.vehicle?.[0] ?? null,
+    vehicle: Array.isArray(row.vehicle) ? row.vehicle[0] ?? null : row.vehicle,
   };
 }
