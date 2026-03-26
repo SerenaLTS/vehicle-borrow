@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
@@ -5,8 +6,8 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
-import { formatDisplayName } from "@/lib/utils";
-import type { Vehicle } from "@/lib/types";
+import { formatDateTime, formatDisplayName } from "@/lib/utils";
+import { normalizeLoan, type RawLoanRow, type Vehicle } from "@/lib/types";
 
 type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -31,11 +32,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const [{ data: roles }, { data: vehicles }] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
-    supabase.from("vehicles").select("id, plate_number, model, status, comments").order("plate_number"),
+    supabase.from("vehicles").select("id, plate_number, model, status, comments, current_holder_user_id").order("plate_number"),
   ]);
+
+  const vehicleIds = (vehicles ?? []).map((vehicle) => vehicle.id);
+  const { data: activeLoanData } =
+    vehicleIds.length > 0
+      ? await supabase
+          .from("vehicle_loans")
+          .select(
+            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
+          )
+          .in("vehicle_id", vehicleIds)
+          .is("returned_at", null)
+      : { data: [] };
 
   const userRoles = (roles ?? []) as UserRole[];
   const fleet = (vehicles ?? []) as Vehicle[];
+  const activeLoans = ((activeLoanData ?? []) as RawLoanRow[]).map(normalizeLoan);
+  const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
   const message = typeof params.message === "string" ? params.message : null;
   const error = typeof params.error === "string" ? params.error : null;
 
@@ -131,61 +146,86 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </section>
 
       <div className="cardsGrid">
-        {fleet.map((vehicle) => (
-          <article className="vehicleCard" key={vehicle.id}>
-            <StatusPill status={vehicle.status} />
-            <h3>{vehicle.plate_number}</h3>
-            <p className="muted">{vehicle.model}</p>
+        {fleet.map((vehicle) => {
+          const activeLoan = activeLoanByVehicleId.get(vehicle.id);
 
-            <form action={updateVehicle}>
-              <input name="vehicleId" type="hidden" value={vehicle.id} />
+          return (
+            <article className="vehicleCard" key={vehicle.id}>
+              <div className="vehicleCardHeader">
+                <Link className="vehicleCardLink" href={`/admin/vehicles/${vehicle.id}`}>
+                  <StatusPill status={vehicle.status} />
+                  <h3>{vehicle.plate_number}</h3>
+                  <p className="muted">{vehicle.model}</p>
+                </Link>
+                <Link className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
+                  View records
+                </Link>
+              </div>
 
-              <label className="fieldLabel">
-                Model
-                <input defaultValue={vehicle.model} name="model" required />
-              </label>
-
-              {vehicle.status === "borrowed" ? (
-                <div className="fieldLabel">
-                  <span>Status</span>
-                  <p className="muted">borrowed</p>
+              {activeLoan ? (
+                <div className="vehicleMeta borrowedSummary">
+                  <span>
+                    <strong>Borrower</strong>
+                    {activeLoan.borrower_email}
+                  </span>
+                  <span>
+                    <strong>Borrowed at</strong>
+                    {formatDateTime(activeLoan.borrowed_at)}
+                  </span>
+                  <span>
+                    <strong>Driver</strong>
+                    {activeLoan.driver_name || "-"}
+                  </span>
                 </div>
-              ) : (
+              ) : null}
+
+              <form action={updateVehicle}>
+                <input name="vehicleId" type="hidden" value={vehicle.id} />
+
+                <label className="fieldLabel">
+                  Model
+                  <input defaultValue={vehicle.model} name="model" required />
+                </label>
+
                 <label className="fieldLabel">
                   Status
-                  <select defaultValue={vehicle.status} name="status" required>
-                    <option value="available">available</option>
-                    <option value="booked">booked</option>
-                    <option value="maintenance">maintenance</option>
-                    <option value="retired">retired</option>
-                  </select>
+                  {vehicle.status === "borrowed" ? (
+                    <p className="muted">borrowed</p>
+                  ) : (
+                    <select defaultValue={vehicle.status} name="status" required>
+                      <option value="available">available</option>
+                      <option value="booked">booked</option>
+                      <option value="maintenance">maintenance</option>
+                      <option value="retired">retired</option>
+                    </select>
+                  )}
                 </label>
-              )}
 
-              <label className="fieldLabel">
-                Comments
-                <textarea
-                  defaultValue={vehicle.comments ?? ""}
-                  name="comments"
-                  placeholder="Booking details, issues, handover notes..."
-                />
-              </label>
+                <label className="fieldLabel">
+                  Comments
+                  <textarea
+                    defaultValue={vehicle.comments ?? ""}
+                    name="comments"
+                    placeholder="Booking details, issues, handover notes..."
+                  />
+                </label>
 
-              <div className="actionsRow">
-                <SubmitButton className="primaryButton" idleLabel="Save changes" pendingLabel="Saving..." />
-              </div>
-            </form>
-
-            {vehicle.status !== "borrowed" ? (
-              <form action={retireVehicle}>
-                <input name="vehicleId" type="hidden" value={vehicle.id} />
-                <SubmitButton className="ghostButton" idleLabel="Mark as retired" pendingLabel="Retiring..." />
+                <div className="actionsRow">
+                  <SubmitButton className="primaryButton" idleLabel="Save changes" pendingLabel="Saving..." />
+                </div>
               </form>
-            ) : (
-              <p className="muted">Return this vehicle before retiring it.</p>
-            )}
-          </article>
-        ))}
+
+              {vehicle.status !== "borrowed" ? (
+                <form action={retireVehicle}>
+                  <input name="vehicleId" type="hidden" value={vehicle.id} />
+                  <SubmitButton className="ghostButton" idleLabel="Mark as retired" pendingLabel="Retiring..." />
+                </form>
+              ) : (
+                <p className="muted">Return this vehicle before retiring it.</p>
+              )}
+            </article>
+          );
+        })}
       </div>
     </AppShell>
   );

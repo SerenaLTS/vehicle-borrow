@@ -228,6 +228,10 @@ button:disabled {
   margin: 28px 0 14px;
 }
 
+.compactSectionHeader {
+  margin: 0 0 18px;
+}
+
 .sectionHeader h2,
 .panel h2,
 .heroCard h2 {
@@ -245,6 +249,29 @@ button:disabled {
   display: grid;
   gap: 8px;
   margin-top: 16px;
+}
+
+.vehicleCardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vehicleCardLink {
+  display: grid;
+  gap: 8px;
+}
+
+.vehicleCardLink:hover h3 {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
+
+.borrowedSummary strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .detailList {
@@ -449,6 +476,12 @@ th {
   .actionsRow {
     display: flex;
     flex-wrap: wrap;
+  }
+
+  .vehicleCardHeader {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
   }
 }
 
