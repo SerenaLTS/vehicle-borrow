@@ -23,13 +23,27 @@ create table if not exists public.vehicle_loans (
   borrower_email text not null,
   driver_name text not null,
   purpose text not null,
-  start_odometer integer not null check (start_odometer >= 0),
-  end_odometer integer check (end_odometer is null or end_odometer >= start_odometer),
+  start_odometer integer check (start_odometer is null or start_odometer >= 0),
+  end_odometer integer check (end_odometer is null or start_odometer is null or end_odometer >= start_odometer),
   borrow_notes text,
   return_notes text,
   borrowed_at timestamptz not null default timezone('utc', now()),
   returned_at timestamptz
 );
+
+alter table public.vehicle_loans
+drop constraint if exists vehicle_loans_start_odometer_check;
+
+alter table public.vehicle_loans
+add constraint vehicle_loans_start_odometer_check
+check (start_odometer is null or start_odometer >= 0);
+
+alter table public.vehicle_loans
+drop constraint if exists vehicle_loans_end_odometer_check;
+
+alter table public.vehicle_loans
+add constraint vehicle_loans_end_odometer_check
+check (end_odometer is null or start_odometer is null or end_odometer >= start_odometer);
 
 create table if not exists public.user_roles (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -134,7 +148,7 @@ create or replace function public.borrow_vehicle(
   p_vehicle_id uuid,
   p_driver_name text,
   p_purpose text,
-  p_start_odometer integer,
+  p_start_odometer integer default null,
   p_borrow_notes text default null
 )
 returns public.vehicle_loans

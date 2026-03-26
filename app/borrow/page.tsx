@@ -85,7 +85,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
             <label className="fieldLabel">
               Current odometer (km)
-              <input min="0" name="startOdometer" required type="number" />
+              <input min="0" name="startOdometer" type="number" />
             </label>
 
             <label className="fieldLabel">

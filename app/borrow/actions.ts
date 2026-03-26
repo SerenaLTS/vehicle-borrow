@@ -8,10 +8,11 @@ export async function borrowVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "");
   const customDriverName = String(formData.get("driverName") ?? "").trim();
   const purpose = String(formData.get("purpose") ?? "").trim();
-  const startOdometer = Number(formData.get("startOdometer") ?? 0);
+  const startOdometerValue = String(formData.get("startOdometer") ?? "").trim();
+  const startOdometer = startOdometerValue ? Number(startOdometerValue) : null;
   const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
 
-  if (!vehicleId || !purpose || Number.isNaN(startOdometer) || startOdometer < 0) {
+  if (!vehicleId || !purpose || (startOdometer !== null && (Number.isNaN(startOdometer) || startOdometer < 0))) {
     redirect("/borrow?error=Please complete all required fields.");
   }
 

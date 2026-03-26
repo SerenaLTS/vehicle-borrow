@@ -14,7 +14,7 @@ export type LoanRow = {
   borrower_email: string;
   driver_name: string;
   purpose: string;
-  start_odometer: number;
+  start_odometer: number | null;
   end_odometer: number | null;
   borrow_notes: string | null;
   return_notes: string | null;

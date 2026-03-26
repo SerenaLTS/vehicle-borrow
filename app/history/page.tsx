@@ -73,7 +73,7 @@ export default async function HistoryPage() {
                   <td>{loan.purpose}</td>
                   <td>{formatDateTime(loan.borrowed_at)}</td>
                   <td>{formatDateTime(loan.returned_at)}</td>
-                  <td>{loan.start_odometer.toLocaleString()}</td>
+                  <td>{loan.start_odometer?.toLocaleString() ?? "-"}</td>
                   <td>{loan.end_odometer?.toLocaleString() ?? "-"}</td>
                 </tr>
               ))}

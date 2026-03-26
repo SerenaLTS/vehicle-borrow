@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <span>Driver: {loan.driver_name}</span>
                 <span>Purpose: {loan.purpose}</span>
                 <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                <span>Start odometer: {loan.start_odometer.toLocaleString()} km</span>
+                <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
               </div>
             </article>
           ))}
