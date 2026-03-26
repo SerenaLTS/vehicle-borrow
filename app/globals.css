@@ -349,6 +349,11 @@ textarea {
   color: var(--warning);
 }
 
+.pill-booked {
+  background: rgba(39, 96, 160, 0.14);
+  color: #275fa0;
+}
+
 .pill-maintenance {
   background: rgba(160, 58, 45, 0.14);
   color: var(--danger);

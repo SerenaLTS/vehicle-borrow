@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
@@ -30,7 +31,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const [{ data: roles }, { data: vehicles }] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
-    supabase.from("vehicles").select("id, plate_number, model, status").order("plate_number"),
+    supabase.from("vehicles").select("id, plate_number, model, status, comments").order("plate_number"),
   ]);
 
   const userRoles = (roles ?? []) as UserRole[];
@@ -77,9 +78,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Status
             <select defaultValue="available" name="status" required>
               <option value="available">available</option>
+              <option value="booked">booked</option>
               <option value="maintenance">maintenance</option>
               <option value="retired">retired</option>
             </select>
+          </label>
+
+          <label className="fieldLabel">
+            Comments
+            <textarea name="comments" placeholder="Booked for next week, service notes, or anything the team should know" />
           </label>
 
           <SubmitButton className="primaryButton" idleLabel="Add vehicle" pendingLabel="Adding..." />
@@ -126,8 +133,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <div className="cardsGrid">
         {fleet.map((vehicle) => (
           <article className="vehicleCard" key={vehicle.id}>
+            <StatusPill status={vehicle.status} />
             <h3>{vehicle.plate_number}</h3>
-            <p className="muted">Current status: {vehicle.status}</p>
+            <p className="muted">{vehicle.model}</p>
 
             <form action={updateVehicle}>
               <input name="vehicleId" type="hidden" value={vehicle.id} />
@@ -147,11 +155,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Status
                   <select defaultValue={vehicle.status} name="status" required>
                     <option value="available">available</option>
+                    <option value="booked">booked</option>
                     <option value="maintenance">maintenance</option>
                     <option value="retired">retired</option>
                   </select>
                 </label>
               )}
+
+              <label className="fieldLabel">
+                Comments
+                <textarea
+                  defaultValue={vehicle.comments ?? ""}
+                  name="comments"
+                  placeholder="Booking details, issues, handover notes..."
+                />
+              </label>
 
               <div className="actionsRow">
                 <SubmitButton className="primaryButton" idleLabel="Save changes" pendingLabel="Saving..." />

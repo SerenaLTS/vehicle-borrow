@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
 
-type AdminVehicleStatus = "available" | "maintenance" | "retired";
+type AdminVehicleStatus = "available" | "booked" | "maintenance" | "retired";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -27,13 +27,14 @@ async function requireAdmin() {
 }
 
 function isEditableStatus(value: string): value is AdminVehicleStatus {
-  return value === "available" || value === "maintenance" || value === "retired";
+  return value === "available" || value === "booked" || value === "maintenance" || value === "retired";
 }
 
 export async function createVehicle(formData: FormData) {
   const plateNumber = String(formData.get("plateNumber") ?? "").trim().toUpperCase();
   const model = String(formData.get("model") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
+  const comments = String(formData.get("comments") ?? "").trim() || null;
 
   if (!plateNumber || !model || !isEditableStatus(status)) {
     redirect("/admin?error=Please complete all vehicle fields.");
@@ -44,6 +45,7 @@ export async function createVehicle(formData: FormData) {
     plate_number: plateNumber,
     model,
     status,
+    comments,
   });
 
   if (error) {
@@ -60,6 +62,7 @@ export async function updateVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
+  const comments = String(formData.get("comments") ?? "").trim() || null;
 
   if (!vehicleId || !model) {
     redirect("/admin?error=Please complete all vehicle fields before saving.");
@@ -86,11 +89,12 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     existingVehicle.status === "borrowed"
-      ? { model }
+      ? { model, comments }
       : {
           model,
           status,
-          current_holder_user_id: status === "available" ? null : null,
+          comments,
+          current_holder_user_id: null,
         };
 
   const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);

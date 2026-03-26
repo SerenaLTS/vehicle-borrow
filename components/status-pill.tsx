@@ -1,5 +1,5 @@
 type StatusPillProps = {
-  status: "available" | "borrowed" | "maintenance" | "retired";
+  status: "available" | "booked" | "borrowed" | "maintenance" | "retired";
 };
 
 export function StatusPill({ status }: StatusPillProps) {
