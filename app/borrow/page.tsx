@@ -27,11 +27,13 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
   const { data } = await supabase
     .from("vehicles")
-    .select("id, plate_number, model, status")
-    .eq("status", "available")
+    .select("id, plate_number, model, status, comments")
+    .in("status", ["available", "booked"])
     .order("plate_number");
 
   const vehicles = (data ?? []) as Vehicle[];
+  const availableVehicles = vehicles.filter((vehicle) => vehicle.status === "available");
+  const bookedVehicles = vehicles.filter((vehicle) => vehicle.status === "booked");
   const error = typeof params.error === "string" ? params.error : null;
 
   return (
@@ -45,9 +47,9 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     >
       <section className="panel">
         <h2>Borrow a vehicle</h2>
-        <p className="muted">Only vehicles marked available will appear here.</p>
+        <p className="muted">Only vehicles marked available can be borrowed. Vehicles marked booked are shown below for visibility.</p>
 
-        {vehicles.length === 0 ? (
+        {availableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles are available right now.</div>
         ) : (
           <form action={borrowVehicle}>
@@ -62,7 +64,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 <option disabled value="">
                   Select a vehicle
                 </option>
-                {vehicles.map((vehicle) => (
+                {availableVehicles.map((vehicle) => (
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.plate_number} • {vehicle.model}
                   </option>
@@ -106,7 +108,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       </section>
 
       <div className="cardsGrid">
-        {vehicles.map((vehicle) => (
+        {availableVehicles.map((vehicle) => (
           <article className="vehicleCard" key={vehicle.id}>
             <StatusPill status="available" />
             <h3>{vehicle.plate_number}</h3>
@@ -114,6 +116,28 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
           </article>
         ))}
       </div>
+
+      {bookedVehicles.length > 0 ? (
+        <>
+          <section className="sectionHeader">
+            <div>
+              <h2>Booked</h2>
+              <p className="muted">These vehicles are currently reserved and cannot be borrowed from this page.</p>
+            </div>
+          </section>
+
+          <div className="cardsGrid">
+            {bookedVehicles.map((vehicle) => (
+              <article className="vehicleCard" key={vehicle.id}>
+                <StatusPill status="booked" />
+                <h3>{vehicle.plate_number}</h3>
+                <p className="muted">{vehicle.model}</p>
+                {vehicle.comments ? <div className="vehicleMeta"><span>{vehicle.comments}</span></div> : null}
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
     </AppShell>
   );
 }
