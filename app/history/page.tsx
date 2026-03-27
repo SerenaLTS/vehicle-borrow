@@ -20,7 +20,7 @@ export default async function HistoryPage() {
 
   const { data } = await supabase
     .from("vehicle_loans")
-    .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+    .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false })
     .limit(200);
 
@@ -57,6 +57,7 @@ export default async function HistoryPage() {
                 <th>Driver</th>
                 <th>Purpose</th>
                 <th>Borrowed</th>
+                <th>Expected return</th>
                 <th>Returned</th>
                 <th>Start KM</th>
                 <th>End KM</th>
@@ -72,6 +73,7 @@ export default async function HistoryPage() {
                   <td>{loan.driver_name}</td>
                   <td>{loan.purpose}</td>
                   <td>{formatDateTime(loan.borrowed_at)}</td>
+                  <td>{formatDateTime(loan.expected_return_at)}</td>
                   <td>{formatDateTime(loan.returned_at)}</td>
                   <td>{loan.start_odometer?.toLocaleString() ?? "-"}</td>
                   <td>{loan.end_odometer?.toLocaleString() ?? "-"}</td>

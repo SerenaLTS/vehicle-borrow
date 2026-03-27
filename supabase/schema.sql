@@ -28,8 +28,11 @@ create table if not exists public.vehicle_loans (
   borrow_notes text,
   return_notes text,
   borrowed_at timestamptz not null default timezone('utc', now()),
+  expected_return_at timestamptz,
   returned_at timestamptz
 );
+
+alter table public.vehicle_loans add column if not exists expected_return_at timestamptz;
 
 alter table public.vehicle_loans
 drop constraint if exists vehicle_loans_start_odometer_check;
@@ -53,15 +56,36 @@ create table if not exists public.user_roles (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.vehicle_bookings (
+  id uuid primary key default gen_random_uuid(),
+  vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+  booked_by_user_id uuid not null references auth.users (id),
+  booked_by_email text not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  comments text,
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint vehicle_bookings_time_check check (ends_at > starts_at)
+);
+
+alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_time_check;
+alter table public.vehicle_bookings
+add constraint vehicle_bookings_time_check
+check (ends_at > starts_at);
+
 create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
 create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
 create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
 create index if not exists idx_vehicles_status_plate_number on public.vehicles (status, plate_number);
 create index if not exists idx_user_roles_email on public.user_roles (email);
+create index if not exists idx_vehicle_bookings_vehicle_id on public.vehicle_bookings (vehicle_id);
+create index if not exists idx_vehicle_bookings_starts_at on public.vehicle_bookings (starts_at);
+create index if not exists idx_vehicle_bookings_vehicle_window on public.vehicle_bookings (vehicle_id, starts_at, ends_at);
 
 alter table public.vehicles enable row level security;
 alter table public.vehicle_loans enable row level security;
 alter table public.user_roles enable row level security;
+alter table public.vehicle_bookings enable row level security;
 
 create or replace function public.handle_user_role_sync()
 returns trigger
@@ -137,6 +161,35 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "Authenticated users can read bookings" on public.vehicle_bookings;
+create policy "Authenticated users can read bookings"
+on public.vehicle_bookings
+for select
+to authenticated
+using (true);
+
+drop policy if exists "Users and admins can insert bookings" on public.vehicle_bookings;
+create policy "Users and admins can insert bookings"
+on public.vehicle_bookings
+for insert
+to authenticated
+with check (booked_by_user_id = auth.uid() or public.is_admin());
+
+drop policy if exists "Users and admins can update bookings" on public.vehicle_bookings;
+create policy "Users and admins can update bookings"
+on public.vehicle_bookings
+for update
+to authenticated
+using (booked_by_user_id = auth.uid() or public.is_admin())
+with check (booked_by_user_id = auth.uid() or public.is_admin());
+
+drop policy if exists "Users and admins can delete bookings" on public.vehicle_bookings;
+create policy "Users and admins can delete bookings"
+on public.vehicle_bookings
+for delete
+to authenticated
+using (booked_by_user_id = auth.uid() or public.is_admin());
+
 drop policy if exists "Users can read roles" on public.user_roles;
 create policy "Users can read roles"
 on public.user_roles
@@ -144,12 +197,15 @@ for select
 to authenticated
 using (user_id = auth.uid() or public.is_admin());
 
+drop function if exists public.borrow_vehicle(uuid, text, text, integer, text);
+
 create or replace function public.borrow_vehicle(
   p_vehicle_id uuid,
   p_driver_name text,
   p_purpose text,
   p_start_odometer integer default null,
-  p_borrow_notes text default null
+  p_borrow_notes text default null,
+  p_expected_return_at timestamptz default null
 )
 returns public.vehicle_loans
 language plpgsql
@@ -161,9 +217,14 @@ declare
   v_email text := auth.jwt() ->> 'email';
   v_vehicle public.vehicles;
   v_loan public.vehicle_loans;
+  v_now timestamptz := timezone('utc', now());
 begin
   if v_user_id is null then
     raise exception 'You must be logged in to borrow a vehicle.';
+  end if;
+
+  if p_expected_return_at is null or p_expected_return_at <= v_now then
+    raise exception 'Please choose a valid expected return time.';
   end if;
 
   select *
@@ -180,6 +241,15 @@ begin
     raise exception 'This vehicle is not currently available.';
   end if;
 
+  if exists (
+    select 1
+    from public.vehicle_bookings b
+    where b.vehicle_id = p_vehicle_id
+      and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(v_now, p_expected_return_at, '[)')
+  ) then
+    raise exception 'This vehicle is already booked during the selected period.';
+  end if;
+
   insert into public.vehicle_loans (
     vehicle_id,
     borrowed_by_user_id,
@@ -187,7 +257,8 @@ begin
     driver_name,
     purpose,
     start_odometer,
-    borrow_notes
+    borrow_notes,
+    expected_return_at
   )
   values (
     p_vehicle_id,
@@ -196,7 +267,8 @@ begin
     p_driver_name,
     p_purpose,
     p_start_odometer,
-    p_borrow_notes
+    p_borrow_notes,
+    p_expected_return_at
   )
   returning *
   into v_loan;
@@ -210,7 +282,7 @@ begin
 end;
 $$;
 
-grant execute on function public.borrow_vehicle(uuid, text, text, integer, text) to authenticated;
+grant execute on function public.borrow_vehicle(uuid, text, text, integer, text, timestamptz) to authenticated;
 
 create or replace function public.return_vehicle(
   p_loan_id uuid,

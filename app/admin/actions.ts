@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
+import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 
-type AdminVehicleStatus = "available" | "booked" | "maintenance" | "retired";
+type AdminVehicleStatus = "available" | "maintenance" | "retired";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -27,7 +28,7 @@ async function requireAdmin() {
 }
 
 function isEditableStatus(value: string): value is AdminVehicleStatus {
-  return value === "available" || value === "booked" || value === "maintenance" || value === "retired";
+  return value === "available" || value === "maintenance" || value === "retired";
 }
 
 export async function createVehicle(formData: FormData) {
@@ -107,6 +108,122 @@ export async function updateVehicle(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/dashboard");
   redirect("/admin?message=Vehicle updated successfully.");
+}
+
+export async function createAdminBooking(formData: FormData) {
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const startsAtValue = String(formData.get("startsAt") ?? "").trim();
+  const endsAtValue = String(formData.get("endsAt") ?? "").trim();
+  const comments = String(formData.get("comments") ?? "").trim() || null;
+
+  const startsAt = startsAtValue ? new Date(startsAtValue).toISOString() : "";
+  const endsAt = endsAtValue ? new Date(endsAtValue).toISOString() : "";
+
+  const supabase = await requireAdmin();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const validationError = await validateVehicleBookingWindow(supabase, {
+    vehicleId,
+    startsAt,
+    endsAt,
+  });
+
+  if (validationError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(validationError)}`);
+  }
+
+  const { error } = await supabase.from("vehicle_bookings").insert({
+    vehicle_id: vehicleId,
+    booked_by_user_id: user.id,
+    booked_by_email: user.email ?? "",
+    starts_at: startsAt,
+    ends_at: endsAt,
+    comments,
+  });
+
+  if (error) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  revalidatePath("/book");
+  revalidatePath("/borrow");
+  redirect(`/admin/vehicles/${vehicleId}?message=Booking created successfully.`);
+}
+
+export async function updateAdminBooking(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const startsAtValue = String(formData.get("startsAt") ?? "").trim();
+  const endsAtValue = String(formData.get("endsAt") ?? "").trim();
+  const comments = String(formData.get("comments") ?? "").trim() || null;
+
+  const startsAt = startsAtValue ? new Date(startsAtValue).toISOString() : "";
+  const endsAt = endsAtValue ? new Date(endsAtValue).toISOString() : "";
+
+  if (!bookingId || !vehicleId) {
+    redirect("/admin?error=Booking not found.");
+  }
+
+  const supabase = await requireAdmin();
+  const validationError = await validateVehicleBookingWindow(supabase, {
+    vehicleId,
+    startsAt,
+    endsAt,
+    excludeBookingId: bookingId,
+  });
+
+  if (validationError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(validationError)}`);
+  }
+
+  const { error } = await supabase
+    .from("vehicle_bookings")
+    .update({
+      starts_at: startsAt,
+      ends_at: endsAt,
+      comments,
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  revalidatePath("/book");
+  revalidatePath("/borrow");
+  redirect(`/admin/vehicles/${vehicleId}?message=Booking updated successfully.`);
+}
+
+export async function deleteAdminBooking(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+
+  if (!bookingId || !vehicleId) {
+    redirect("/admin?error=Booking not found.");
+  }
+
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("vehicle_bookings").delete().eq("id", bookingId);
+
+  if (error) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  revalidatePath("/book");
+  revalidatePath("/borrow");
+  redirect(`/admin/vehicles/${vehicleId}?message=Booking deleted successfully.`);
 }
 
 export async function retireVehicle(formData: FormData) {

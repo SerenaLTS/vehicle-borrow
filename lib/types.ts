@@ -19,6 +19,7 @@ export type LoanRow = {
   borrow_notes: string | null;
   return_notes: string | null;
   borrowed_at: string;
+  expected_return_at: string | null;
   returned_at: string | null;
   vehicle: {
     plate_number: string;
@@ -40,6 +41,41 @@ export type RawLoanRow = Omit<LoanRow, "vehicle"> & {
 };
 
 export function normalizeLoan(row: RawLoanRow): LoanRow {
+  return {
+    ...row,
+    vehicle: Array.isArray(row.vehicle) ? row.vehicle[0] ?? null : row.vehicle,
+  };
+}
+
+export type VehicleBooking = {
+  id: string;
+  vehicle_id: string;
+  booked_by_user_id: string;
+  booked_by_email: string;
+  starts_at: string;
+  ends_at: string;
+  comments: string | null;
+  created_at: string;
+  vehicle: {
+    plate_number: string;
+    model: string;
+  } | null;
+};
+
+export type RawVehicleBooking = Omit<VehicleBooking, "vehicle"> & {
+  vehicle:
+    | {
+        plate_number: string;
+        model: string;
+      }
+    | Array<{
+        plate_number: string;
+        model: string;
+      }>
+    | null;
+};
+
+export function normalizeVehicleBooking(row: RawVehicleBooking): VehicleBooking {
   return {
     ...row,
     vehicle: Array.isArray(row.vehicle) ? row.vehicle[0] ?? null : row.vehicle,

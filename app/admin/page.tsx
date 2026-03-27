@@ -6,8 +6,8 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
-import { formatDateTime, formatDisplayName } from "@/lib/utils";
-import { normalizeLoan, type RawLoanRow, type Vehicle } from "@/lib/types";
+import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
+import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 
 type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -30,9 +30,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect("/dashboard?message=Admin access required.");
   }
 
-  const [{ data: roles }, { data: vehicles }] = await Promise.all([
+  const [{ data: roles }, { data: vehicles }, { data: bookingData }] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
     supabase.from("vehicles").select("id, plate_number, model, status, comments, current_holder_user_id").order("plate_number"),
+    supabase
+      .from("vehicle_bookings")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .gte("ends_at", new Date().toISOString())
+      .order("starts_at", { ascending: true }),
   ]);
 
   const vehicleIds = (vehicles ?? []).map((vehicle) => vehicle.id);
@@ -41,7 +46,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       ? await supabase
           .from("vehicle_loans")
           .select(
-            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
+            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
           )
           .in("vehicle_id", vehicleIds)
           .is("returned_at", null)
@@ -51,8 +56,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const fleet = (vehicles ?? []) as Vehicle[];
   const activeLoans = ((activeLoanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
+  const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
+  const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
+
+  for (const booking of activeOrUpcomingBookings) {
+    if (!nextBookingByVehicleId.has(booking.vehicle_id)) {
+      nextBookingByVehicleId.set(booking.vehicle_id, booking);
+    }
+  }
+
   const message = typeof params.message === "string" ? params.message : null;
   const error = typeof params.error === "string" ? params.error : null;
+  const now = Date.now();
 
   return (
     <AppShell
@@ -93,7 +108,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Status
             <select defaultValue="available" name="status" required>
               <option value="available">available</option>
-              <option value="booked">booked</option>
               <option value="maintenance">maintenance</option>
               <option value="retired">retired</option>
             </select>
@@ -141,19 +155,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <section className="sectionHeader">
         <div>
           <h2>Fleet manager</h2>
-          <p className="muted">Edit vehicle details here. Borrowed vehicles can keep their model updated, but their status stays system-controlled until returned.</p>
+          <p className="muted">Edit vehicle details here. Booking windows are now managed from each vehicle record page instead of the manual status dropdown.</p>
         </div>
       </section>
 
       <div className="cardsGrid">
         {fleet.map((vehicle) => {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
+          const nextBooking = nextBookingByVehicleId.get(vehicle.id);
+          const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+          const displayStatus = getVehicleDisplayStatus({
+            storedStatus: vehicle.status,
+            hasActiveLoan: Boolean(activeLoan),
+            hasActiveBooking: isBookingActive,
+          });
 
           return (
             <article className="vehicleCard" key={vehicle.id}>
               <div className="vehicleCardHeader">
                 <Link className="vehicleCardLink" href={`/admin/vehicles/${vehicle.id}`}>
-                  <StatusPill status={vehicle.status} />
+                  <StatusPill status={displayStatus} />
                   <h3>{vehicle.plate_number}</h3>
                   <p className="muted">{vehicle.model}</p>
                 </Link>
@@ -179,6 +200,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               ) : null}
 
+              {!activeLoan && nextBooking ? (
+                <div className="vehicleMeta borrowedSummary">
+                  <span>
+                    <strong>Booked by</strong>
+                    {nextBooking.booked_by_email}
+                  </span>
+                  <span>
+                    <strong>Booked from</strong>
+                    {formatDateTime(nextBooking.starts_at)}
+                  </span>
+                  <span>
+                    <strong>Booked until</strong>
+                    {formatDateTime(nextBooking.ends_at)}
+                  </span>
+                </div>
+              ) : null}
+
               <form action={updateVehicle}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
 
@@ -192,9 +230,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   {vehicle.status === "borrowed" ? (
                     <p className="muted">borrowed</p>
                   ) : (
-                    <select defaultValue={vehicle.status} name="status" required>
+                    <select defaultValue={vehicle.status === "booked" ? "available" : vehicle.status} name="status" required>
                       <option value="available">available</option>
-                      <option value="booked">booked</option>
                       <option value="maintenance">maintenance</option>
                       <option value="retired">retired</option>
                     </select>

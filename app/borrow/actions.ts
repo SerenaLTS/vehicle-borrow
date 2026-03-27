@@ -9,10 +9,17 @@ export async function borrowVehicle(formData: FormData) {
   const customDriverName = String(formData.get("driverName") ?? "").trim();
   const purpose = String(formData.get("purpose") ?? "").trim();
   const startOdometerValue = String(formData.get("startOdometer") ?? "").trim();
+  const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
   const startOdometer = startOdometerValue ? Number(startOdometerValue) : null;
+  const expectedReturnAt = expectedReturnAtValue ? new Date(expectedReturnAtValue).toISOString() : null;
   const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
 
-  if (!vehicleId || !purpose || (startOdometer !== null && (Number.isNaN(startOdometer) || startOdometer < 0))) {
+  if (
+    !vehicleId ||
+    !purpose ||
+    !expectedReturnAt ||
+    (startOdometer !== null && (Number.isNaN(startOdometer) || startOdometer < 0))
+  ) {
     redirect("/borrow?error=Please complete all required fields.");
   }
 
@@ -37,6 +44,7 @@ export async function borrowVehicle(formData: FormData) {
     p_purpose: purpose,
     p_start_odometer: startOdometer,
     p_borrow_notes: borrowNotes,
+    p_expected_return_at: expectedReturnAt,
   });
 
   if (error) {

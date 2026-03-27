@@ -22,3 +22,27 @@ export function formatDateTime(value: string | null) {
     timeStyle: "short",
   }).format(new Date(value));
 }
+
+export function getVehicleDisplayStatus({
+  storedStatus,
+  hasActiveLoan,
+  hasActiveBooking,
+}: {
+  storedStatus: "available" | "booked" | "borrowed" | "maintenance" | "retired";
+  hasActiveLoan: boolean;
+  hasActiveBooking: boolean;
+}) {
+  if (storedStatus === "maintenance" || storedStatus === "retired") {
+    return storedStatus;
+  }
+
+  if (hasActiveLoan || storedStatus === "borrowed") {
+    return "borrowed" as const;
+  }
+
+  if (hasActiveBooking || storedStatus === "booked") {
+    return "booked" as const;
+  }
+
+  return "available" as const;
+}

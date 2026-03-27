@@ -4,9 +4,9 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
-import { formatDisplayName } from "@/lib/utils";
+import { normalizeVehicleBooking, type RawVehicleBooking, type Vehicle } from "@/lib/types";
+import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { borrowVehicle } from "@/app/borrow/actions";
-import type { Vehicle } from "@/lib/types";
 
 type BorrowPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,21 +25,61 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
   const isAdmin = await getIsAdmin(supabase, user.id);
 
-  const { data } = await supabase
-    .from("vehicles")
-    .select("id, plate_number, model, status, comments")
-    .in("status", ["available", "booked"])
-    .order("plate_number");
+  const [{ data: vehicleData }, { data: bookingData }, { data: activeLoanData }] = await Promise.all([
+    supabase
+      .from("vehicles")
+      .select("id, plate_number, model, status, comments, current_holder_user_id")
+      .not("status", "in", '("retired","maintenance")')
+      .order("plate_number"),
+    supabase
+      .from("vehicle_bookings")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .gte("ends_at", new Date().toISOString())
+      .order("starts_at", { ascending: true }),
+    supabase.from("vehicle_loans").select("vehicle_id").is("returned_at", null),
+  ]);
 
-  const vehicles = (data ?? []) as Vehicle[];
-  const availableVehicles = vehicles.filter((vehicle) => vehicle.status === "available");
-  const bookedVehicles = vehicles.filter((vehicle) => vehicle.status === "booked");
+  const vehicles = (vehicleData ?? []) as Vehicle[];
+  const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
+  const activeLoanVehicleIds = new Set((activeLoanData ?? []).map((loan) => loan.vehicle_id));
+  const nextBookingByVehicleId = new Map<string, (typeof upcomingBookings)[number]>();
+
+  for (const booking of upcomingBookings) {
+    if (!nextBookingByVehicleId.has(booking.vehicle_id)) {
+      nextBookingByVehicleId.set(booking.vehicle_id, booking);
+    }
+  }
+
+  const now = Date.now();
+  const availableVehicles = vehicles.filter((vehicle) => {
+    const nextBooking = nextBookingByVehicleId.get(vehicle.id);
+    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+    const displayStatus = getVehicleDisplayStatus({
+      storedStatus: vehicle.status,
+      hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
+      hasActiveBooking: isBookingActive,
+    });
+
+    return displayStatus === "available";
+  });
+
+  const bookedVehicles = vehicles.filter((vehicle) => {
+    const nextBooking = nextBookingByVehicleId.get(vehicle.id);
+    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+    const displayStatus = getVehicleDisplayStatus({
+      storedStatus: vehicle.status,
+      hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
+      hasActiveBooking: isBookingActive,
+    });
+
+    return displayStatus === "booked";
+  });
   const error = typeof params.error === "string" ? params.error : null;
 
   return (
     <AppShell
       title="Borrow"
-      subtitle="Choose an available vehicle and record who is driving it."
+      subtitle="Choose an available vehicle, record who is driving it, and confirm how long you need it."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
@@ -47,7 +87,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     >
       <section className="panel">
         <h2>Borrow a vehicle</h2>
-        <p className="muted">Only vehicles marked available can be borrowed. Vehicles marked booked are shown below for visibility.</p>
+        <p className="muted">Borrowing requires an expected return time. If that window overlaps an existing booking, the system will block the borrow automatically.</p>
 
         {availableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles are available right now.</div>
@@ -82,6 +122,11 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 <input name="purpose" placeholder="Client visit, airport pickup..." required />
               </label>
             </div>
+
+            <label className="fieldLabel">
+              Expected return time
+              <input name="expectedReturnAt" required type="datetime-local" />
+            </label>
 
             <label className="fieldLabel">
               Current odometer (km)
@@ -132,7 +177,26 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 <StatusPill status="booked" />
                 <h3>{vehicle.plate_number}</h3>
                 <p className="muted">{vehicle.model}</p>
-                {vehicle.comments ? <div className="vehicleMeta"><span>{vehicle.comments}</span></div> : null}
+                {(() => {
+                  const booking = nextBookingByVehicleId.get(vehicle.id);
+
+                  if (!booking) {
+                    return vehicle.comments ? (
+                      <div className="vehicleMeta">
+                        <span>{vehicle.comments}</span>
+                      </div>
+                    ) : null;
+                  }
+
+                  return (
+                    <div className="vehicleMeta">
+                      <span>Booked by: {booking.booked_by_email}</span>
+                      <span>From: {formatDateTime(booking.starts_at)}</span>
+                      <span>Until: {formatDateTime(booking.ends_at)}</span>
+                      <span>Comments: {booking.comments || "-"}</span>
+                    </div>
+                  );
+                })()}
               </article>
             ))}
           </div>
