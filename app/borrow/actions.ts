@@ -55,5 +55,7 @@ export async function borrowVehicle(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/return");
   revalidatePath("/history");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
   redirect("/dashboard?message=Vehicle borrowed successfully.");
 }

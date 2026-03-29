@@ -50,5 +50,6 @@ export async function createBooking(formData: FormData) {
   revalidatePath("/book");
   revalidatePath("/borrow");
   revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
   redirect("/dashboard?message=Vehicle booked successfully.");
 }

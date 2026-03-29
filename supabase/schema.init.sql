@@ -1,3 +1,8 @@
+-- Full initialization schema for a fresh Supabase project.
+-- This file is generated from the current project schema and keeps
+-- the latest booking / borrow compatibility changes.
+-- It does not replace or remove the existing schema.sql or patch files.
+
 create extension if not exists "pgcrypto";
 
 create table if not exists public.vehicles (
@@ -73,6 +78,65 @@ alter table public.vehicle_bookings
 add constraint vehicle_bookings_time_check
 check (ends_at > starts_at);
 
+create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
+create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
+create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
+create index if not exists idx_vehicles_status_plate_number on public.vehicles (status, plate_number);
+create index if not exists idx_user_roles_email on public.user_roles (email);
+create index if not exists idx_vehicle_bookings_vehicle_id on public.vehicle_bookings (vehicle_id);
+create index if not exists idx_vehicle_bookings_starts_at on public.vehicle_bookings (starts_at);
+create index if not exists idx_vehicle_bookings_vehicle_window on public.vehicle_bookings (vehicle_id, starts_at, ends_at);
+
+alter table public.vehicles enable row level security;
+alter table public.vehicle_loans enable row level security;
+alter table public.user_roles enable row level security;
+alter table public.vehicle_bookings enable row level security;
+
+create or replace function public.handle_user_role_sync()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  insert into public.user_roles (user_id, email)
+  values (new.id, coalesce(new.email, ''))
+  on conflict (user_id) do update
+  set email = excluded.email,
+      updated_at = timezone('utc', now());
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_role_sync on auth.users;
+create trigger on_auth_user_role_sync
+after insert or update of email on auth.users
+for each row execute procedure public.handle_user_role_sync();
+
+insert into public.user_roles (user_id, email)
+select id, coalesce(email, '')
+from auth.users
+on conflict (user_id) do update
+set email = excluded.email,
+    updated_at = timezone('utc', now());
+
+create or replace function public.is_admin(p_user_id uuid default auth.uid())
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_roles
+    where user_id = coalesce(p_user_id, auth.uid())
+      and is_admin = true
+  );
+$$;
+
+grant execute on function public.is_admin(uuid) to authenticated;
+
 create or replace function public.validate_vehicle_booking()
 returns trigger
 language plpgsql
@@ -138,65 +202,6 @@ drop trigger if exists vehicle_booking_validation_trigger on public.vehicle_book
 create trigger vehicle_booking_validation_trigger
 before insert or update on public.vehicle_bookings
 for each row execute procedure public.validate_vehicle_booking();
-
-create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
-create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
-create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
-create index if not exists idx_vehicles_status_plate_number on public.vehicles (status, plate_number);
-create index if not exists idx_user_roles_email on public.user_roles (email);
-create index if not exists idx_vehicle_bookings_vehicle_id on public.vehicle_bookings (vehicle_id);
-create index if not exists idx_vehicle_bookings_starts_at on public.vehicle_bookings (starts_at);
-create index if not exists idx_vehicle_bookings_vehicle_window on public.vehicle_bookings (vehicle_id, starts_at, ends_at);
-
-alter table public.vehicles enable row level security;
-alter table public.vehicle_loans enable row level security;
-alter table public.user_roles enable row level security;
-alter table public.vehicle_bookings enable row level security;
-
-create or replace function public.handle_user_role_sync()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, auth
-as $$
-begin
-  insert into public.user_roles (user_id, email)
-  values (new.id, coalesce(new.email, ''))
-  on conflict (user_id) do update
-  set email = excluded.email,
-      updated_at = timezone('utc', now());
-
-  return new;
-end;
-$$;
-
-drop trigger if exists on_auth_user_role_sync on auth.users;
-create trigger on_auth_user_role_sync
-after insert or update of email on auth.users
-for each row execute procedure public.handle_user_role_sync();
-
-insert into public.user_roles (user_id, email)
-select id, coalesce(email, '')
-from auth.users
-on conflict (user_id) do update
-set email = excluded.email,
-    updated_at = timezone('utc', now());
-
-create or replace function public.is_admin(p_user_id uuid default auth.uid())
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.user_roles
-    where user_id = coalesce(p_user_id, auth.uid())
-      and is_admin = true
-  );
-$$;
-
-grant execute on function public.is_admin(uuid) to authenticated;
 
 drop policy if exists "Authenticated users can read vehicles" on public.vehicles;
 create policy "Authenticated users can read vehicles"

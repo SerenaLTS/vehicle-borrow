@@ -36,5 +36,6 @@ export async function returnVehicle(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/return");
   revalidatePath("/history");
+  revalidatePath("/admin");
   redirect("/dashboard?message=Vehicle returned successfully.");
 }

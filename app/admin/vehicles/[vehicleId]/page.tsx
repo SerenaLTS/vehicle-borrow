@@ -51,7 +51,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .eq("vehicle_id", vehicleId)
-      .order("starts_at", { ascending: false }),
+      .order("starts_at", { ascending: true }),
   ]);
 
   if (vehicleError) {
@@ -74,7 +74,9 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const history = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const currentLoan = history.find((loan) => loan.returned_at === null) ?? null;
   const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
-  const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= Date.now() && new Date(booking.ends_at).getTime() > Date.now()) ?? null;
+  const now = Date.now();
+  const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && new Date(booking.ends_at).getTime() > now) ?? null;
+  const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
   const displayStatus = getVehicleDisplayStatus({
     storedStatus: record.status,
     hasActiveLoan: Boolean(currentLoan),
@@ -129,8 +131,20 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <span>{formatDateTime(currentLoan?.borrowed_at ?? null)}</span>
           </div>
           <div>
+            <strong>Expected return</strong>
+            <span>{formatDateTime(currentLoan?.expected_return_at ?? null)}</span>
+          </div>
+          <div>
             <strong>Current booking</strong>
             <span>{currentBooking ? `${formatDateTime(currentBooking.starts_at)} to ${formatDateTime(currentBooking.ends_at)}` : "-"}</span>
+          </div>
+          <div>
+            <strong>Booked by</strong>
+            <span>{currentBooking?.booked_by_email ?? "-"}</span>
+          </div>
+          <div>
+            <strong>Next booking</strong>
+            <span>{nextUpcomingBooking ? `${formatDateTime(nextUpcomingBooking.starts_at)} to ${formatDateTime(nextUpcomingBooking.ends_at)}` : "-"}</span>
           </div>
           <div>
             <strong>Comments</strong>
@@ -177,13 +191,15 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         <div className="cardsGrid">
           {bookings.map((booking) => (
             <article className="vehicleCard" key={booking.id}>
-              <StatusPill
-                status={new Date(booking.starts_at).getTime() <= Date.now() && new Date(booking.ends_at).getTime() > Date.now() ? "booked" : "available"}
-              />
+              <StatusPill status={new Date(booking.starts_at).getTime() <= now && new Date(booking.ends_at).getTime() > now ? "booked" : "available"} />
               <h3>{booking.booked_by_email}</h3>
               <p className="muted">
                 {formatDateTime(booking.starts_at)} to {formatDateTime(booking.ends_at)}
               </p>
+              <div className="vehicleMeta">
+                <span>Comments: {booking.comments || "-"}</span>
+                <span>Created: {formatDateTime(booking.created_at)}</span>
+              </div>
 
               <form action={updateAdminBooking}>
                 <input name="bookingId" type="hidden" value={booking.id} />
