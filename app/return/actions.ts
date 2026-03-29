@@ -44,6 +44,7 @@ export async function returnVehicle(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/borrow");
+  revalidatePath("/book");
   revalidatePath("/return");
   revalidatePath("/history");
   revalidatePath("/admin");
