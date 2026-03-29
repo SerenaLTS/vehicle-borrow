@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { createClient } from "@/lib/supabase/server";
 
 export async function borrowVehicle(formData: FormData) {
@@ -11,7 +12,7 @@ export async function borrowVehicle(formData: FormData) {
   const startOdometerValue = String(formData.get("startOdometer") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
   const startOdometer = startOdometerValue ? Number(startOdometerValue) : null;
-  const expectedReturnAt = expectedReturnAtValue ? new Date(expectedReturnAtValue).toISOString() : null;
+  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
 
   if (

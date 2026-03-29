@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 
 export async function createBooking(formData: FormData) {
@@ -11,8 +12,8 @@ export async function createBooking(formData: FormData) {
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
-  const startsAt = startsAtValue ? new Date(startsAtValue).toISOString() : "";
-  const endsAt = endsAtValue ? new Date(endsAtValue).toISOString() : "";
+  const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
+  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
 
   const supabase = await createClient();
   const {

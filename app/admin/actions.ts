@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 
@@ -116,8 +117,8 @@ export async function createAdminBooking(formData: FormData) {
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
-  const startsAt = startsAtValue ? new Date(startsAtValue).toISOString() : "";
-  const endsAt = endsAtValue ? new Date(endsAtValue).toISOString() : "";
+  const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
+  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
 
   const supabase = await requireAdmin();
   const {
@@ -165,8 +166,8 @@ export async function updateAdminBooking(formData: FormData) {
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
-  const startsAt = startsAtValue ? new Date(startsAtValue).toISOString() : "";
-  const endsAt = endsAtValue ? new Date(endsAtValue).toISOString() : "";
+  const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
+  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
 
   if (!bookingId || !vehicleId) {
     redirect("/admin?error=Booking not found.");

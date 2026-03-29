@@ -22,6 +22,16 @@ export async function returnVehicle(formData: FormData) {
     redirect("/");
   }
 
+  const { data: loanRecord, error: loanLoadError } = await supabase
+    .from("vehicle_loans")
+    .select("vehicle_id")
+    .eq("id", loanId)
+    .maybeSingle();
+
+  if (loanLoadError) {
+    redirect(`/return?error=${encodeURIComponent(loanLoadError.message)}`);
+  }
+
   const { error } = await supabase.rpc("return_vehicle", {
     p_loan_id: loanId,
     p_end_odometer: endOdometer,
@@ -37,5 +47,8 @@ export async function returnVehicle(formData: FormData) {
   revalidatePath("/return");
   revalidatePath("/history");
   revalidatePath("/admin");
+  if (loanRecord?.vehicle_id) {
+    revalidatePath(`/admin/vehicles/${loanRecord.vehicle_id}`);
+  }
   redirect("/dashboard?message=Vehicle returned successfully.");
 }

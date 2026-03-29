@@ -5,6 +5,7 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createAdminBooking, deleteAdminBooking, updateAdminBooking } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
+import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
@@ -208,11 +209,11 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <div className="formGrid">
                   <label className="fieldLabel">
                     Start time
-                    <input defaultValue={booking.starts_at.slice(0, 16)} name="startsAt" required type="datetime-local" />
+                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
                   </label>
                   <label className="fieldLabel">
                     End time
-                    <input defaultValue={booking.ends_at.slice(0, 16)} name="endsAt" required type="datetime-local" />
+                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" required type="datetime-local" />
                   </label>
                 </div>
 
