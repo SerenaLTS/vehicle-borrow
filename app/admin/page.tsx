@@ -30,7 +30,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect("/dashboard?message=Admin access required.");
   }
 
-  const [{ data: roles }, { data: vehicles }, { data: bookingData }] = await Promise.all([
+  const [
+    { data: roles, error: rolesError },
+    { data: vehicles, error: vehiclesError },
+    { data: bookingData, error: bookingError },
+  ] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
     supabase.from("vehicles").select("id, plate_number, model, vin, color, status, comments, current_holder_user_id").order("plate_number"),
     supabase
@@ -40,8 +44,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .order("starts_at", { ascending: true }),
   ]);
 
+  if (rolesError) {
+    redirect(`/admin?error=${encodeURIComponent(rolesError.message)}`);
+  }
+
+  if (vehiclesError) {
+    redirect(`/admin?error=${encodeURIComponent(vehiclesError.message)}`);
+  }
+
+  if (bookingError) {
+    redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
+  }
+
   const vehicleIds = (vehicles ?? []).map((vehicle) => vehicle.id);
-  const { data: activeLoanData } =
+  const { data: activeLoanData, error: activeLoanError } =
     vehicleIds.length > 0
       ? await supabase
           .from("vehicle_loans")
@@ -50,7 +66,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           )
           .in("vehicle_id", vehicleIds)
           .is("returned_at", null)
-      : { data: [] };
+      : { data: [], error: null };
+
+  if (activeLoanError) {
+    redirect(`/admin?error=${encodeURIComponent(activeLoanError.message)}`);
+  }
 
   const userRoles = (roles ?? []) as UserRole[];
   const fleet = (vehicles ?? []) as Vehicle[];
