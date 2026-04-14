@@ -94,6 +94,8 @@ You can manage vehicles directly in Supabase:
 3. Add rows with:
    - `plate_number`
    - `model`
+   - `vin` (optional)
+   - `color` (optional)
    - `status`
 
 The schema file already inserts three sample vehicles. You can keep them, edit them, or mark them as `retired` if you do not want them to appear in borrowing.

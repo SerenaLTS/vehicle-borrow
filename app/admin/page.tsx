@@ -32,7 +32,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const [{ data: roles }, { data: vehicles }, { data: bookingData }] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
-    supabase.from("vehicles").select("id, plate_number, model, status, comments, current_holder_user_id").order("plate_number"),
+    supabase.from("vehicles").select("id, plate_number, model, vin, color, status, comments, current_holder_user_id").order("plate_number"),
     supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
@@ -101,6 +101,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <label className="fieldLabel">
               Model
               <input name="model" placeholder="T9 PHEV" required />
+            </label>
+            <label className="fieldLabel">
+              VIN
+              <input name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
+            </label>
+            <label className="fieldLabel">
+              Color
+              <input name="color" placeholder="White" />
             </label>
           </div>
 
@@ -224,6 +232,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Model
                   <input defaultValue={vehicle.model} name="model" required />
                 </label>
+
+                <div className="formGrid">
+                  <label className="fieldLabel">
+                    VIN
+                    <input defaultValue={vehicle.vin ?? ""} name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
+                  </label>
+
+                  <label className="fieldLabel">
+                    Color
+                    <input defaultValue={vehicle.color ?? ""} name="color" placeholder="White" />
+                  </label>
+                </div>
 
                 <label className="fieldLabel">
                   Status

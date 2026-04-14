@@ -35,6 +35,8 @@ function isEditableStatus(value: string): value is AdminVehicleStatus {
 export async function createVehicle(formData: FormData) {
   const plateNumber = String(formData.get("plateNumber") ?? "").trim().toUpperCase();
   const model = String(formData.get("model") ?? "").trim();
+  const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
+  const color = String(formData.get("color") ?? "").trim() || null;
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
@@ -46,6 +48,8 @@ export async function createVehicle(formData: FormData) {
   const { error } = await supabase.from("vehicles").insert({
     plate_number: plateNumber,
     model,
+    vin,
+    color,
     status,
     comments,
   });
@@ -63,6 +67,8 @@ export async function createVehicle(formData: FormData) {
 export async function updateVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim();
+  const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
+  const color = String(formData.get("color") ?? "").trim() || null;
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
@@ -91,9 +97,11 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     existingVehicle.status === "borrowed"
-      ? { model, comments }
+      ? { model, vin, color, comments }
       : {
           model,
+          vin,
+          color,
           status,
           comments,
           current_holder_user_id: null,

@@ -4,6 +4,8 @@ create table if not exists public.vehicles (
   id uuid primary key default gen_random_uuid(),
   plate_number text not null unique,
   model text not null,
+  vin text,
+  color text,
   status text not null default 'available' check (status in ('available', 'booked', 'borrowed', 'maintenance', 'retired')),
   comments text,
   current_holder_user_id uuid references auth.users (id),
@@ -11,10 +13,16 @@ create table if not exists public.vehicles (
 );
 
 alter table public.vehicles add column if not exists comments text;
+alter table public.vehicles add column if not exists vin text;
+alter table public.vehicles add column if not exists color text;
 alter table public.vehicles drop constraint if exists vehicles_status_check;
 alter table public.vehicles
 add constraint vehicles_status_check
 check (status in ('available', 'booked', 'borrowed', 'maintenance', 'retired'));
+
+create unique index if not exists idx_vehicles_vin_unique
+on public.vehicles (vin)
+where vin is not null;
 
 create table if not exists public.vehicle_loans (
   id uuid primary key default gen_random_uuid(),

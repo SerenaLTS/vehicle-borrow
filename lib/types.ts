@@ -2,6 +2,8 @@ export type Vehicle = {
   id: string;
   plate_number: string;
   model: string;
+  vin: string | null;
+  color: string | null;
   status: "available" | "booked" | "borrowed" | "maintenance" | "retired";
   comments: string | null;
   current_holder_user_id: string | null;

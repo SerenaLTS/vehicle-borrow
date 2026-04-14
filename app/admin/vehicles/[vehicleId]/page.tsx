@@ -38,7 +38,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const [{ data: vehicle, error: vehicleError }, { data: loanData, error: loansError }, { data: bookingData, error: bookingError }] = await Promise.all([
     supabase
       .from("vehicles")
-      .select("id, plate_number, model, status, comments, current_holder_user_id")
+      .select("id, plate_number, model, vin, color, status, comments, current_holder_user_id")
       .eq("id", vehicleId)
       .maybeSingle(),
     supabase
@@ -118,6 +118,14 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           <div>
             <strong>Status</strong>
             <span>{displayStatus}</span>
+          </div>
+          <div>
+            <strong>VIN</strong>
+            <span>{record.vin || "-"}</span>
+          </div>
+          <div>
+            <strong>Color</strong>
+            <span>{record.color || "-"}</span>
           </div>
           <div>
             <strong>Current borrower</strong>
