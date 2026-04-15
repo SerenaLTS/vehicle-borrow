@@ -5,6 +5,7 @@ import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
+import { getVehicleSelectClause, supportsVehicleOptionalFields } from "@/lib/vehicle-schema";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
@@ -30,13 +31,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect("/dashboard?message=Admin access required.");
   }
 
+  const canUseVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
+
   const [
     { data: roles, error: rolesError },
     { data: vehicles, error: vehiclesError },
     { data: bookingData, error: bookingError },
   ] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
-    supabase.from("vehicles").select("id, plate_number, model, vin, color, status, comments, current_holder_user_id").order("plate_number"),
+    supabase.from("vehicles").select(getVehicleSelectClause(canUseVehicleOptionalFields)).order("plate_number"),
     supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
@@ -56,7 +59,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
   }
 
-  const vehicleIds = (vehicles ?? []).map((vehicle) => vehicle.id);
+  const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
+  const vehicleIds = fleet.map((vehicle) => vehicle.id);
   const { data: activeLoanData, error: activeLoanError } =
     vehicleIds.length > 0
       ? await supabase
@@ -73,7 +77,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const userRoles = (roles ?? []) as UserRole[];
-  const fleet = (vehicles ?? []) as Vehicle[];
   const activeLoans = ((activeLoanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
@@ -122,15 +125,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Model
               <input name="model" placeholder="T9 PHEV" required />
             </label>
-            <label className="fieldLabel">
-              VIN
-              <input name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
-            </label>
-            <label className="fieldLabel">
-              Color
-              <input name="color" placeholder="White" />
-            </label>
+            {canUseVehicleOptionalFields ? (
+              <>
+                <label className="fieldLabel">
+                  VIN
+                  <input name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
+                </label>
+                <label className="fieldLabel">
+                  Color
+                  <input name="color" placeholder="White" />
+                </label>
+              </>
+            ) : null}
           </div>
+
+          {!canUseVehicleOptionalFields ? <p className="muted">VIN and color fields will appear after those columns are added to the vehicles table.</p> : null}
 
           <label className="fieldLabel">
             Status
@@ -253,17 +262,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <input defaultValue={vehicle.model} name="model" required />
                 </label>
 
-                <div className="formGrid">
-                  <label className="fieldLabel">
-                    VIN
-                    <input defaultValue={vehicle.vin ?? ""} name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
-                  </label>
+                {canUseVehicleOptionalFields ? (
+                  <div className="formGrid">
+                    <label className="fieldLabel">
+                      VIN
+                      <input defaultValue={vehicle.vin ?? ""} name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
+                    </label>
 
-                  <label className="fieldLabel">
-                    Color
-                    <input defaultValue={vehicle.color ?? ""} name="color" placeholder="White" />
-                  </label>
-                </div>
+                    <label className="fieldLabel">
+                      Color
+                      <input defaultValue={vehicle.color ?? ""} name="color" placeholder="White" />
+                    </label>
+                  </div>
+                ) : null}
 
                 <label className="fieldLabel">
                   Status

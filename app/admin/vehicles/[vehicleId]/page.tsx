@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { createAdminBooking, deleteAdminBooking, updateAdminBooking } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
+import { getVehicleSelectClause, supportsVehicleOptionalFields } from "@/lib/vehicle-schema";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
@@ -35,10 +36,12 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     redirect("/dashboard?message=Admin access required.");
   }
 
+  const canUseVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
+
   const [{ data: vehicle, error: vehicleError }, { data: loanData, error: loansError }, { data: bookingData, error: bookingError }] = await Promise.all([
     supabase
       .from("vehicles")
-      .select("id, plate_number, model, vin, color, status, comments, current_holder_user_id")
+      .select(getVehicleSelectClause(canUseVehicleOptionalFields))
       .eq("id", vehicleId)
       .maybeSingle(),
     supabase
@@ -71,7 +74,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
   }
 
-  const record = vehicle as Vehicle;
+  const record = vehicle as unknown as Vehicle;
   const history = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const currentLoan = history.find((loan) => loan.returned_at === null) ?? null;
   const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
@@ -119,14 +122,18 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <strong>Status</strong>
             <span>{displayStatus}</span>
           </div>
-          <div>
-            <strong>VIN</strong>
-            <span>{record.vin || "-"}</span>
-          </div>
-          <div>
-            <strong>Color</strong>
-            <span>{record.color || "-"}</span>
-          </div>
+          {canUseVehicleOptionalFields ? (
+            <>
+              <div>
+                <strong>VIN</strong>
+                <span>{record.vin || "-"}</span>
+              </div>
+              <div>
+                <strong>Color</strong>
+                <span>{record.color || "-"}</span>
+              </div>
+            </>
+          ) : null}
           <div>
             <strong>Current borrower</strong>
             <span>{currentLoan?.borrower_email ?? "-"}</span>

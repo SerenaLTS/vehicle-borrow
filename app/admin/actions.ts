@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
+import { supportsVehicleOptionalFields } from "@/lib/vehicle-schema";
 
 type AdminVehicleStatus = "available" | "maintenance" | "retired";
 
@@ -45,14 +46,15 @@ export async function createVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const { error } = await supabase.from("vehicles").insert({
+  const canStoreVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
+  const insertPayload = {
     plate_number: plateNumber,
     model,
-    vin,
-    color,
     status,
     comments,
-  });
+    ...(canStoreVehicleOptionalFields ? { vin, color } : {}),
+  };
+  const { error } = await supabase.from("vehicles").insert(insertPayload);
 
   if (error) {
     redirect(`/admin?error=${encodeURIComponent(error.message)}`);
@@ -77,6 +79,7 @@ export async function updateVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
+  const canStoreVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
   const { data: existingVehicle, error: loadError } = await supabase
     .from("vehicles")
     .select("status")
@@ -97,14 +100,13 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     existingVehicle.status === "borrowed"
-      ? { model, vin, color, comments }
+      ? { model, comments, ...(canStoreVehicleOptionalFields ? { vin, color } : {}) }
       : {
           model,
-          vin,
-          color,
           status,
           comments,
           current_holder_user_id: null,
+          ...(canStoreVehicleOptionalFields ? { vin, color } : {}),
         };
 
   const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
