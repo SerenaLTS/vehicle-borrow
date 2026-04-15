@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
+import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin } from "@/lib/user-roles";
 import { normalizeVehicleBooking, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
@@ -24,11 +25,12 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
   }
 
   const isAdmin = await getIsAdmin(supabase, user.id);
+  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
 
   const [{ data: vehicleData }, { data: bookingData }, { data: activeLoanData }] = await Promise.all([
     supabase
       .from("vehicles")
-      .select("id, plate_number, model, status, comments, current_holder_user_id")
+      .select(getVehicleSelectClause(optionalFieldSupport))
       .not("status", "in", '("retired","maintenance")')
       .order("plate_number"),
     supabase
@@ -39,7 +41,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     supabase.from("vehicle_loans").select("vehicle_id").is("returned_at", null),
   ]);
 
-  const vehicles = (vehicleData ?? []) as Vehicle[];
+  const vehicles = ((vehicleData ?? []) as unknown[]) as Vehicle[];
   const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const activeLoanVehicleIds = new Set((activeLoanData ?? []).map((loan) => loan.vehicle_id));
   const nextBookingByVehicleId = new Map<string, (typeof upcomingBookings)[number]>();
@@ -107,6 +109,8 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 {availableVehicles.map((vehicle) => (
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.plate_number} • {vehicle.model}
+                    {vehicle.color ? ` • ${vehicle.color}` : ""}
+                    {vehicle.vin ? ` • VIN ${vehicle.vin}` : ""}
                   </option>
                 ))}
               </select>
@@ -158,6 +162,12 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
             <StatusPill status="available" />
             <h3>{vehicle.plate_number}</h3>
             <p className="muted">{vehicle.model}</p>
+            {vehicle.vin || vehicle.color ? (
+              <div className="vehicleMeta">
+                <span>VIN: {vehicle.vin || "-"}</span>
+                <span>Color: {vehicle.color || "-"}</span>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
@@ -177,6 +187,12 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 <StatusPill status="booked" />
                 <h3>{vehicle.plate_number}</h3>
                 <p className="muted">{vehicle.model}</p>
+                {vehicle.vin || vehicle.color ? (
+                  <div className="vehicleMeta">
+                    <span>VIN: {vehicle.vin || "-"}</span>
+                    <span>Color: {vehicle.color || "-"}</span>
+                  </div>
+                ) : null}
                 {(() => {
                   const booking = nextBookingByVehicleId.get(vehicle.id);
 

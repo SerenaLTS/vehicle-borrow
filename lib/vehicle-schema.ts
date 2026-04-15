@@ -1,16 +1,24 @@
 const VEHICLE_BASE_SELECT = "id, plate_number, model, status, comments, current_holder_user_id";
-const VEHICLE_OPTIONAL_SELECT = "vin, color";
 
 type QueryResult<T> = {
   data: T | null;
   error: { message: string } | null;
 };
 
-function isMissingColumnError(message: string) {
-  return message.includes("column vehicles.vin does not exist") || message.includes("column public.vehicles.vin does not exist");
+export type VehicleOptionalFieldSupport = {
+  enabled: boolean;
+  vinColumn: string | null;
+  colorColumn: string | null;
+};
+
+function isMissingColumnError(message: string, column: string) {
+  return (
+    message.includes(`column vehicles.${column} does not exist`) ||
+    message.includes(`column public.vehicles.${column} does not exist`)
+  );
 }
 
-export async function supportsVehicleOptionalFields(supabase: unknown) {
+async function hasVehicleColumn(supabase: unknown, column: string) {
   const client = supabase as {
     from: (table: string) => {
       select: (columns: string) => {
@@ -19,19 +27,45 @@ export async function supportsVehicleOptionalFields(supabase: unknown) {
     };
   };
 
-  const { error } = await client.from("vehicles").select("vin").limit(1);
+  const { error } = await client.from("vehicles").select(column).limit(1);
 
   if (!error) {
     return true;
   }
 
-  if (isMissingColumnError(error.message)) {
+  if (isMissingColumnError(error.message, column)) {
     return false;
   }
 
   throw new Error(error.message);
 }
 
-export function getVehicleSelectClause(includeOptionalFields: boolean) {
-  return includeOptionalFields ? `${VEHICLE_BASE_SELECT}, ${VEHICLE_OPTIONAL_SELECT}` : VEHICLE_BASE_SELECT;
+export async function getVehicleOptionalFieldSupport(supabase: unknown): Promise<VehicleOptionalFieldSupport> {
+  const vinColumn = (await hasVehicleColumn(supabase, "vin")) ? "vin" : (await hasVehicleColumn(supabase, "VIN")) ? "VIN" : null;
+  const colorColumn = (await hasVehicleColumn(supabase, "color")) ? "color" : (await hasVehicleColumn(supabase, "Color")) ? "Color" : null;
+
+  return {
+    enabled: Boolean(vinColumn || colorColumn),
+    vinColumn,
+    colorColumn,
+  };
+}
+
+export function getVehicleSelectClause(optionalFieldSupport: VehicleOptionalFieldSupport) {
+  const optionalColumns = [
+    optionalFieldSupport.vinColumn ? `vin:${optionalFieldSupport.vinColumn}` : null,
+    optionalFieldSupport.colorColumn ? `color:${optionalFieldSupport.colorColumn}` : null,
+  ].filter(Boolean);
+
+  return optionalColumns.length > 0 ? `${VEHICLE_BASE_SELECT}, ${optionalColumns.join(", ")}` : VEHICLE_BASE_SELECT;
+}
+
+export function getVehicleOptionalFieldPayload(
+  optionalFieldSupport: VehicleOptionalFieldSupport,
+  values: { vin: string | null; color: string | null },
+) {
+  return {
+    ...(optionalFieldSupport.vinColumn ? { [optionalFieldSupport.vinColumn]: values.vin } : {}),
+    ...(optionalFieldSupport.colorColumn ? { [optionalFieldSupport.colorColumn]: values.color } : {}),
+  };
 }

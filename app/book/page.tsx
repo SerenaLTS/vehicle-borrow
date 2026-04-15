@@ -4,6 +4,7 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createBooking } from "@/app/book/actions";
 import { createClient } from "@/lib/supabase/server";
+import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin } from "@/lib/user-roles";
 import { normalizeVehicleBooking, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
@@ -24,9 +25,10 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   }
 
   const isAdmin = await getIsAdmin(supabase, user.id);
+  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
 
   const [{ data: vehicles }, { data: bookingData }, { data: activeLoanData }] = await Promise.all([
-    supabase.from("vehicles").select("id, plate_number, model, status, comments, current_holder_user_id").order("plate_number"),
+    supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
     supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
@@ -35,7 +37,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     supabase.from("vehicle_loans").select("vehicle_id").is("returned_at", null),
   ]);
 
-  const fleet = (vehicles ?? []) as Vehicle[];
+  const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
   const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const activeLoanVehicleIds = new Set((activeLoanData ?? []).map((loan) => loan.vehicle_id));
   const nextBookingByVehicleId = new Map<string, (typeof upcomingBookings)[number]>();
@@ -81,6 +83,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 {bookableVehicles.map((vehicle) => (
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.plate_number} • {vehicle.model}
+                    {vehicle.color ? ` • ${vehicle.color}` : ""}
+                    {vehicle.vin ? ` • VIN ${vehicle.vin}` : ""}
                   </option>
                 ))}
               </select>
@@ -132,6 +136,12 @@ export default async function BookPage({ searchParams }: BookPageProps) {
               <StatusPill status={displayStatus} />
               <h3>{vehicle.plate_number}</h3>
               <p className="muted">{vehicle.model}</p>
+              {vehicle.vin || vehicle.color ? (
+                <div className="vehicleMeta">
+                  <span>VIN: {vehicle.vin || "-"}</span>
+                  <span>Color: {vehicle.color || "-"}</span>
+                </div>
+              ) : null}
               {nextBooking ? (
                 <div className="vehicleMeta">
                   <span>Booked by: {nextBooking.booked_by_email}</span>

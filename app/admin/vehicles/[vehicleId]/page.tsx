@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { createAdminBooking, deleteAdminBooking, updateAdminBooking } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
-import { getVehicleSelectClause, supportsVehicleOptionalFields } from "@/lib/vehicle-schema";
+import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
@@ -36,12 +36,12 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     redirect("/dashboard?message=Admin access required.");
   }
 
-  const canUseVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
+  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
 
   const [{ data: vehicle, error: vehicleError }, { data: loanData, error: loansError }, { data: bookingData, error: bookingError }] = await Promise.all([
     supabase
       .from("vehicles")
-      .select(getVehicleSelectClause(canUseVehicleOptionalFields))
+      .select(getVehicleSelectClause(optionalFieldSupport))
       .eq("id", vehicleId)
       .maybeSingle(),
     supabase
@@ -122,7 +122,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <strong>Status</strong>
             <span>{displayStatus}</span>
           </div>
-          {canUseVehicleOptionalFields ? (
+          {optionalFieldSupport.enabled ? (
             <>
               <div>
                 <strong>VIN</strong>

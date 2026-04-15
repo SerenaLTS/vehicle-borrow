@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
-import { supportsVehicleOptionalFields } from "@/lib/vehicle-schema";
+import { getVehicleOptionalFieldPayload, getVehicleOptionalFieldSupport } from "@/lib/vehicle-schema";
 
 type AdminVehicleStatus = "available" | "maintenance" | "retired";
 
@@ -46,13 +46,13 @@ export async function createVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const canStoreVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
+  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
   const insertPayload = {
     plate_number: plateNumber,
     model,
     status,
     comments,
-    ...(canStoreVehicleOptionalFields ? { vin, color } : {}),
+    ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }),
   };
   const { error } = await supabase.from("vehicles").insert(insertPayload);
 
@@ -79,7 +79,7 @@ export async function updateVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const canStoreVehicleOptionalFields = await supportsVehicleOptionalFields(supabase);
+  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
   const { data: existingVehicle, error: loadError } = await supabase
     .from("vehicles")
     .select("status")
@@ -100,13 +100,13 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     existingVehicle.status === "borrowed"
-      ? { model, comments, ...(canStoreVehicleOptionalFields ? { vin, color } : {}) }
+      ? { model, comments, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }) }
       : {
           model,
           status,
           comments,
           current_holder_user_id: null,
-          ...(canStoreVehicleOptionalFields ? { vin, color } : {}),
+          ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }),
         };
 
   const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
