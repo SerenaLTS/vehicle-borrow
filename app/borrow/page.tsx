@@ -157,19 +157,32 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       </section>
 
       <div className="cardsGrid">
-        {availableVehicles.map((vehicle) => (
-          <article className="vehicleCard" key={vehicle.id}>
-            <StatusPill status="available" />
-            <h3>{vehicle.plate_number}</h3>
-            <p className="muted">{vehicle.model}</p>
-            {vehicle.vin || vehicle.color ? (
-              <div className="vehicleMeta">
-                <span>VIN: {vehicle.vin || "-"}</span>
-                <span>Color: {vehicle.color || "-"}</span>
-              </div>
-            ) : null}
-          </article>
-        ))}
+        {availableVehicles.map((vehicle) => {
+          const nextBooking = nextBookingByVehicleId.get(vehicle.id);
+          const hasUpcomingBooking = nextBooking ? new Date(nextBooking.starts_at).getTime() > now : false;
+
+          return (
+            <article className="vehicleCard" key={vehicle.id}>
+              <StatusPill status={hasUpcomingBooking ? "booked" : "available"} />
+              <h3>{vehicle.plate_number}</h3>
+              <p className="muted">{vehicle.model}</p>
+              {vehicle.vin || vehicle.color ? (
+                <div className="vehicleMeta">
+                  <span>VIN: {vehicle.vin || "-"}</span>
+                  <span>Color: {vehicle.color || "-"}</span>
+                </div>
+              ) : null}
+              {nextBooking ? (
+                <div className="vehicleMeta">
+                  <span>Booked by: {nextBooking.booked_by_email}</span>
+                  <span>From: {formatDateTime(nextBooking.starts_at)}</span>
+                  <span>Until: {formatDateTime(nextBooking.ends_at)}</span>
+                  <span>Comments: {nextBooking.comments || "-"}</span>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
 
       {bookedVehicles.length > 0 ? (
