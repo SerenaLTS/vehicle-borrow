@@ -5,9 +5,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { cancelOwnBooking, createBooking, updateOwnBooking } from "@/app/book/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
-import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
+import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
-import { normalizeVehicleBooking, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 
 type BookPageProps = {
@@ -25,28 +24,11 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     redirect("/");
   }
 
-  const [isAdmin, optionalFieldSupport] = await Promise.all([getIsAdmin(supabase, user.id), getVehicleOptionalFieldSupport(supabase)]);
-
-  const [{ data: vehicles }, { data: bookingData }, { data: activeLoanData }] = await Promise.all([
-    supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
-    supabase
-      .from("vehicle_bookings")
-      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
-      .gte("ends_at", new Date().toISOString())
-      .order("starts_at", { ascending: true }),
-    supabase.from("vehicle_loans").select("vehicle_id").is("returned_at", null),
-  ]);
-
-  const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
-  const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
-  const activeLoanVehicleIds = new Set((activeLoanData ?? []).map((loan) => loan.vehicle_id));
-  const nextBookingByVehicleId = new Map<string, (typeof upcomingBookings)[number]>();
-
-  for (const booking of upcomingBookings) {
-    if (!nextBookingByVehicleId.has(booking.vehicle_id)) {
-      nextBookingByVehicleId.set(booking.vehicle_id, booking);
-    }
-  }
+  const [isAdmin, snapshot] = await Promise.all([getIsAdmin(supabase, user.id), getFleetSnapshot(supabase)]);
+  const fleet = snapshot.vehicles;
+  const upcomingBookings = snapshot.upcomingBookings;
+  const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
+  const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
 
   const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance" && !activeLoanVehicleIds.has(vehicle.id));
   const error = typeof params.error === "string" ? params.error : null;

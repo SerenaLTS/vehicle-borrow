@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
+import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function borrowVehicle(formData: FormData) {
@@ -52,6 +53,7 @@ export async function borrowVehicle(formData: FormData) {
     redirect(`/borrow?error=${encodeURIComponent(error.message)}`);
   }
 
+  clearFleetSnapshotCache();
   revalidatePath("/dashboard");
   revalidatePath("/borrow");
   revalidatePath("/return");

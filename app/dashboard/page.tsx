@@ -5,6 +5,7 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { cancelOwnBooking } from "@/app/book/actions";
 import { createClient } from "@/lib/supabase/server";
+import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking } from "@/lib/types";
@@ -24,14 +25,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect("/");
   }
 
-  const [{ data: activeLoans }, { count: totalFleetCount }, { data: bookingData }, isAdmin] = await Promise.all([
+  const [{ data: activeLoans }, { data: bookingData }, isAdmin, snapshot] = await Promise.all([
     supabase
       .from("vehicle_loans")
       .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
       .eq("borrowed_by_user_id", user.id)
       .is("returned_at", null)
       .order("borrowed_at", { ascending: false }),
-    supabase.from("vehicles").select("id", { count: "exact", head: true }),
     supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
@@ -39,6 +39,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .gte("ends_at", new Date().toISOString())
       .order("starts_at", { ascending: true }),
     getIsAdmin(supabase, user.id),
+    getFleetSnapshot(supabase),
   ]);
 
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);
@@ -88,7 +89,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </article>
         <article className="statCard">
           <p className="statLabel">Total fleet in system</p>
-          <p className="statValue">{totalFleetCount ?? 0}</p>
+          <p className="statValue">{snapshot.totalFleetCount}</p>
         </article>
       </section>
 

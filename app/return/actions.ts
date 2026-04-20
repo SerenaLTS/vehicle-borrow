@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function returnVehicle(formData: FormData) {
@@ -42,6 +43,7 @@ export async function returnVehicle(formData: FormData) {
     redirect(`/return?error=${encodeURIComponent(error.message)}`);
   }
 
+  clearFleetSnapshotCache();
   revalidatePath("/dashboard");
   revalidatePath("/borrow");
   revalidatePath("/book");

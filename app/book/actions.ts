@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
@@ -47,6 +48,7 @@ export async function createBooking(formData: FormData) {
     redirect(`/book?error=${encodeURIComponent(error.message)}`);
   }
 
+  clearFleetSnapshotCache();
   revalidatePath("/dashboard");
   revalidatePath("/book");
   revalidatePath("/borrow");
@@ -121,6 +123,7 @@ export async function updateOwnBooking(formData: FormData) {
     redirect(`/book?error=${encodeURIComponent(updateError.message)}`);
   }
 
+  clearFleetSnapshotCache();
   revalidatePath("/dashboard");
   revalidatePath("/book");
   revalidatePath("/borrow");
@@ -175,6 +178,7 @@ export async function cancelOwnBooking(formData: FormData) {
     redirect(`/book?error=${encodeURIComponent(deleteError.message)}`);
   }
 
+  clearFleetSnapshotCache();
   revalidatePath("/dashboard");
   revalidatePath("/book");
   revalidatePath("/borrow");
