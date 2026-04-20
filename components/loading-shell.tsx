@@ -19,6 +19,7 @@ export function LoadingShell({
         <div className="duckPond" aria-hidden="true">
           <div className="pondWater pondWaterBack" />
           <div className="duckSwimmer">
+            <span className="duckFloatRing" />
             <span className="duckIllustration">
               <span className="duckTail" />
               <span className="duckBody" />
@@ -32,7 +33,6 @@ export function LoadingShell({
             <span className="duckRipple duckRippleOne" />
             <span className="duckRipple duckRippleTwo" />
           </div>
-          <div className="pondWater pondWaterFront" />
         </div>
 
         <p className="loadingCopy">Duck is on the way...</p>
