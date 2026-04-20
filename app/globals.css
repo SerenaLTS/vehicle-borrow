@@ -420,41 +420,84 @@ textarea {
   animation: shimmer 1.2s linear infinite;
 }
 
-.loadingPanel {
+.loadingScreen {
+  min-height: 100vh;
+  padding: 24px 18px;
+}
+
+.loadingBackdrop {
   display: grid;
-  place-items: center;
-  gap: 14px;
-  min-height: 220px;
+  gap: 22px;
+  align-content: center;
+  justify-items: center;
+  min-height: calc(100vh - 48px);
   text-align: center;
 }
 
-.duckLoader {
+.loadingHeader {
   display: grid;
-  place-items: center;
-  width: 104px;
-  height: 104px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line);
-  box-shadow: inset 0 0 0 8px rgba(31, 107, 82, 0.08);
+  gap: 8px;
 }
 
-.duckOrbit {
-  display: grid;
-  place-items: center;
-  width: 68px;
-  height: 68px;
-  border-radius: 999px;
-  border: 4px dashed rgba(31, 107, 82, 0.25);
-  animation: duck-spin 1.8s linear infinite;
+.duckPond {
+  position: relative;
+  width: min(92vw, 760px);
+  height: 180px;
+  overflow: hidden;
 }
 
-.duckEmoji {
+.duckPond::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 22px;
+  height: 18px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(39, 96, 160, 0.08), rgba(39, 96, 160, 0.24), rgba(39, 96, 160, 0.08));
+  filter: blur(1px);
+}
+
+.duckSwimmer {
+  position: absolute;
+  left: -12%;
+  top: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  transform: rotate(-12deg);
+  width: 92px;
+  height: 92px;
+  transform: translateY(-50%);
+  animation: duck-swim 8.6s ease-in-out infinite;
+}
+
+.duckEmoji {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  filter: drop-shadow(0 10px 14px rgba(39, 96, 160, 0.18));
+  animation: duck-turn 8.6s ease-in-out infinite;
+}
+
+.duckRipple {
+  position: absolute;
+  left: 50%;
+  top: 74%;
+  width: 76px;
+  height: 18px;
+  border: 2px solid rgba(39, 96, 160, 0.22);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.duckRippleOne {
+  animation: duck-ripple 1.8s linear infinite;
+}
+
+.duckRippleTwo {
+  animation: duck-ripple 1.8s linear infinite 0.9s;
 }
 
 .loadingCopy {
@@ -472,13 +515,82 @@ textarea {
   }
 }
 
-@keyframes duck-spin {
+@keyframes duck-swim {
   from {
-    transform: rotate(0deg);
+    left: -12%;
+    transform: translateY(-50%) rotate(-6deg);
+  }
+
+  12.5% {
+    transform: translateY(calc(-50% - 8px)) rotate(4deg);
+  }
+
+  25% {
+    left: calc(50% - 46px);
+    transform: translateY(-50%) rotate(-5deg);
+  }
+
+  37.5% {
+    left: calc(100% - 92px);
+    transform: translateY(calc(-50% + 6px)) rotate(5deg);
+  }
+
+  50% {
+    left: calc(100% - 92px);
+    transform: translateY(-50%) rotate(-4deg);
+  }
+
+  62.5% {
+    left: calc(50% - 46px);
+    transform: translateY(calc(-50% - 8px)) rotate(4deg);
+  }
+
+  75% {
+    left: 0;
+    transform: translateY(-50%) rotate(-5deg);
+  }
+
+  87.5% {
+    transform: translateY(calc(-50% + 6px)) rotate(5deg);
   }
 
   to {
-    transform: rotate(360deg);
+    left: -12%;
+    transform: translateY(-50%) rotate(-4deg);
+  }
+}
+
+@keyframes duck-turn {
+  from {
+    transform: scaleX(1) rotate(0deg);
+  }
+
+  44% {
+    transform: scaleX(1) rotate(0deg);
+  }
+
+  50% {
+    transform: scaleX(-1) rotate(0deg);
+  }
+
+  94% {
+    transform: scaleX(-1) rotate(0deg);
+  }
+
+  to {
+    transform: scaleX(1) rotate(0deg);
+  }
+}
+
+@keyframes duck-ripple {
+  from {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.35);
   }
 }
 
