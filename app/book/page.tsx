@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
-import { createBooking } from "@/app/book/actions";
+import { cancelOwnBooking, createBooking, updateOwnBooking } from "@/app/book/actions";
 import { createClient } from "@/lib/supabase/server";
+import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin } from "@/lib/user-roles";
 import { normalizeVehicleBooking, type RawVehicleBooking, type Vehicle } from "@/lib/types";
@@ -50,6 +51,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
   const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance" && !activeLoanVehicleIds.has(vehicle.id));
   const error = typeof params.error === "string" ? params.error : null;
+  const message = typeof params.message === "string" ? params.message : null;
+  const yourBookings = upcomingBookings.filter((booking) => booking.booked_by_user_id === user.id);
   const now = Date.now();
 
   return (
@@ -61,6 +64,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       backLabel="Dashboard"
       adminHref={isAdmin ? "/admin" : undefined}
     >
+      {message ? <p className="message">{message}</p> : null}
+
       <section className="panel">
         <h2>Book a vehicle</h2>
         <p className="muted">Bookings reserve a time slot. Vehicles with existing bookings are still shown here, but you should avoid overlapping the booked time window shown below.</p>
@@ -113,6 +118,64 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
         {error ? <p className="message error">{error}</p> : null}
       </section>
+
+      <section className="sectionHeader">
+        <div>
+          <h2>Your bookings</h2>
+          <p className="muted">Before the booking starts, you can adjust the time window, update comments, or cancel it.</p>
+        </div>
+      </section>
+
+      {yourBookings.length === 0 ? (
+        <div className="emptyState">You do not have any upcoming bookings right now.</div>
+      ) : (
+        <div className="cardsGrid">
+          {yourBookings.map((booking) => (
+            <article className="vehicleCard" key={booking.id}>
+              <StatusPill status="booked" />
+              <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+              <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
+              <div className="vehicleMeta">
+                <span>From: {formatDateTime(booking.starts_at)}</span>
+                <span>Until: {formatDateTime(booking.ends_at)}</span>
+                <span>Comments: {booking.comments || "-"}</span>
+                <span>Created: {formatDateTime(booking.created_at)}</span>
+              </div>
+
+              <form action={updateOwnBooking}>
+                <input name="bookingId" type="hidden" value={booking.id} />
+                <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+
+                <div className="formGrid">
+                  <label className="fieldLabel">
+                    Start time
+                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
+                  </label>
+                  <label className="fieldLabel">
+                    End time
+                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" required type="datetime-local" />
+                  </label>
+                </div>
+
+                <label className="fieldLabel">
+                  Comments
+                  <textarea defaultValue={booking.comments ?? ""} name="comments" />
+                </label>
+
+                <div className="actionsRow">
+                  <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
+                </div>
+              </form>
+
+              <form action={cancelOwnBooking}>
+                <input name="bookingId" type="hidden" value={booking.id} />
+                <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
+              </form>
+            </article>
+          ))}
+        </div>
+      )}
 
       <section className="sectionHeader">
         <div>

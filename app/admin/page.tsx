@@ -257,6 +257,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               ) : null}
 
+              {!activeLoan && nextBooking ? (
+                <div className="actionsRow">
+                  <Link className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
+                    Manage booking
+                  </Link>
+                </div>
+              ) : null}
+
               <form action={updateVehicle}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
 
