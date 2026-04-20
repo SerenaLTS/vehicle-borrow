@@ -2,10 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
+import { SubmitButton } from "@/components/submit-button";
+import { cancelOwnBooking } from "@/app/book/actions";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
-import { normalizeLoan, type RawLoanRow } from "@/lib/types";
+import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking } from "@/lib/types";
 
 type DashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -24,7 +26,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const isAdmin = await getIsAdmin(supabase, user.id);
 
-  const [{ data: activeLoans }, { count: totalFleetCount }] = await Promise.all([
+  const [{ data: activeLoans }, { count: totalFleetCount }, { data: bookingData }] = await Promise.all([
     supabase
       .from("vehicle_loans")
       .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
@@ -32,10 +34,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .is("returned_at", null)
       .order("borrowed_at", { ascending: false }),
     supabase.from("vehicles").select("id", { count: "exact", head: true }),
+    supabase
+      .from("vehicle_bookings")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .eq("booked_by_user_id", user.id)
+      .gte("ends_at", new Date().toISOString())
+      .order("starts_at", { ascending: true }),
   ]);
 
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);
+  const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const message = typeof params.message === "string" ? params.message : null;
+  const now = Date.now();
 
   return (
     <AppShell
@@ -108,6 +118,48 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      <section className="sectionHeader">
+        <div>
+          <h2>Your current bookings</h2>
+          <p className="muted">Upcoming and active bookings you have made.</p>
+        </div>
+      </section>
+
+      {bookings.length === 0 ? (
+        <div className="emptyState">You do not have any current bookings right now.</div>
+      ) : (
+        <div className="cardsGrid">
+          {bookings.map((booking) => {
+            const hasStarted = new Date(booking.starts_at).getTime() <= now;
+
+            return (
+              <article className="vehicleCard" key={booking.id}>
+                <StatusPill status="booked" />
+                <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
+                <div className="vehicleMeta">
+                  <span>From: {formatDateTime(booking.starts_at)}</span>
+                  <span>Until: {formatDateTime(booking.ends_at)}</span>
+                  <span>Comments: {booking.comments || "-"}</span>
+                </div>
+                <div className="actionsRow">
+                  <Link className="secondaryButton" href={`/book#booking-${booking.id}`}>
+                    Edit booking
+                  </Link>
+                </div>
+                {!hasStarted ? (
+                  <form action={cancelOwnBooking}>
+                    <input name="bookingId" type="hidden" value={booking.id} />
+                    <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                    <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
+                  </form>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       )}
     </AppShell>

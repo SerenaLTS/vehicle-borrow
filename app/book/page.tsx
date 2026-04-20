@@ -131,7 +131,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       ) : (
         <div className="cardsGrid">
           {yourBookings.map((booking) => (
-            <article className="vehicleCard" key={booking.id}>
+            <article className="vehicleCard" id={`booking-${booking.id}`} key={booking.id}>
               <StatusPill status="booked" />
               <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
               <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
