@@ -63,7 +63,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     >
       <section className="panel">
         <h2>Book a vehicle</h2>
-        <p className="muted">Bookings reserve a time slot. Borrowing will be blocked automatically if it overlaps with an existing booking.</p>
+        <p className="muted">Bookings reserve a time slot. Vehicles with existing bookings are still shown here, but you should avoid overlapping the booked time window shown below.</p>
 
         {bookableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles can be booked right now.</div>
@@ -124,11 +124,11 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       <div className="cardsGrid">
         {fleet.map((vehicle) => {
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-          const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+          const hasUpcomingBooking = nextBooking ? new Date(nextBooking.ends_at).getTime() > now : false;
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
             hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
-            hasActiveBooking: isBookingActive,
+            hasActiveBooking: hasUpcomingBooking,
           });
 
           return (
