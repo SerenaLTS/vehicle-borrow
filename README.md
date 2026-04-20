@@ -98,8 +98,8 @@ You can manage vehicles directly in Supabase:
    - `color` (optional)
    - `status`
 
-The schema file already inserts three sample vehicles. You can keep them, edit them, or mark them as `retired` if you do not want them to appear in borrowing.
-Admins can also mark a vehicle as `booked` and add comments for future use notes or operational details.
+The schema file already inserts sample vehicles. You can keep them, edit them, or mark them as `retired` if you do not want them to appear in borrowing.
+Future reservations should be created through the booking flow instead of manually setting a vehicle status to `booked`.
 
 ## Admin setup
 
@@ -115,9 +115,10 @@ New auth users are synced into `user_roles` automatically.
 ## Important behavior
 
 - When a user borrows a vehicle, the app creates a loan record and marks the vehicle as `borrowed`.
-- When the same user returns it, the loan record is closed and the vehicle goes back to `available`.
+- When the same user returns it, the loan record is closed and the stored vehicle status goes back to `available`.
 - History is never deleted, so exports remain available.
-- Vehicles in `booked` do not appear in the borrow page and can be used to reserve a vehicle ahead of time.
+- Booking windows are stored in `vehicle_bookings` and are used to calculate whether a vehicle is currently `booked` or has an upcoming reservation.
+- Vehicles with a current booking are blocked from the borrow flow, while vehicles with a future booking still appear and show the booked time window.
 - Vehicles in `maintenance` do not appear in the borrow page.
 - Vehicles in `retired` do not appear in the borrow page and should be used instead of deleting vehicles that already have history.
 

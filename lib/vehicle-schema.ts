@@ -11,6 +11,8 @@ export type VehicleOptionalFieldSupport = {
   colorColumn: string | null;
 };
 
+let cachedVehicleOptionalFieldSupport: Promise<VehicleOptionalFieldSupport> | null = null;
+
 function isMissingColumnError(message: string, column: string) {
   return (
     message.includes(`column vehicles.${column} does not exist`) ||
@@ -41,14 +43,23 @@ async function hasVehicleColumn(supabase: unknown, column: string) {
 }
 
 export async function getVehicleOptionalFieldSupport(supabase: unknown): Promise<VehicleOptionalFieldSupport> {
-  const vinColumn = (await hasVehicleColumn(supabase, "vin")) ? "vin" : (await hasVehicleColumn(supabase, "VIN")) ? "VIN" : null;
-  const colorColumn = (await hasVehicleColumn(supabase, "color")) ? "color" : (await hasVehicleColumn(supabase, "Color")) ? "Color" : null;
+  if (!cachedVehicleOptionalFieldSupport) {
+    cachedVehicleOptionalFieldSupport = (async () => {
+      const vinColumn = (await hasVehicleColumn(supabase, "vin")) ? "vin" : (await hasVehicleColumn(supabase, "VIN")) ? "VIN" : null;
+      const colorColumn = (await hasVehicleColumn(supabase, "color")) ? "color" : (await hasVehicleColumn(supabase, "Color")) ? "Color" : null;
 
-  return {
-    enabled: Boolean(vinColumn || colorColumn),
-    vinColumn,
-    colorColumn,
-  };
+      return {
+        enabled: Boolean(vinColumn || colorColumn),
+        vinColumn,
+        colorColumn,
+      };
+    })().catch((error) => {
+      cachedVehicleOptionalFieldSupport = null;
+      throw error;
+    });
+  }
+
+  return cachedVehicleOptionalFieldSupport;
 }
 
 export function getVehicleSelectClause(optionalFieldSupport: VehicleOptionalFieldSupport) {

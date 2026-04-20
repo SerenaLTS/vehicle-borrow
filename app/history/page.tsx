@@ -16,13 +16,14 @@ export default async function HistoryPage() {
     redirect("/");
   }
 
-  const isAdmin = await getIsAdmin(supabase, user.id);
-
-  const { data } = await supabase
-    .from("vehicle_loans")
-    .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
-    .order("borrowed_at", { ascending: false })
-    .limit(200);
+  const [{ data }, isAdmin] = await Promise.all([
+    supabase
+      .from("vehicle_loans")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .order("borrowed_at", { ascending: false })
+      .limit(200),
+    getIsAdmin(supabase, user.id),
+  ]);
 
   const history = ((data ?? []) as RawLoanRow[]).map(normalizeLoan);
 

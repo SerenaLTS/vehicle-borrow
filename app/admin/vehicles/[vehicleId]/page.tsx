@@ -30,13 +30,11 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     redirect("/");
   }
 
-  const isAdmin = await getIsAdmin(supabase, user.id);
+  const [isAdmin, optionalFieldSupport] = await Promise.all([getIsAdmin(supabase, user.id), getVehicleOptionalFieldSupport(supabase)]);
 
   if (!isAdmin) {
     redirect("/dashboard?message=Admin access required.");
   }
-
-  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
 
   const [{ data: vehicle, error: vehicleError }, { data: loanData, error: loansError }, { data: bookingData, error: bookingError }] = await Promise.all([
     supabase

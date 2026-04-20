@@ -25,8 +25,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     redirect("/");
   }
 
-  const isAdmin = await getIsAdmin(supabase, user.id);
-  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
+  const [isAdmin, optionalFieldSupport] = await Promise.all([getIsAdmin(supabase, user.id), getVehicleOptionalFieldSupport(supabase)]);
 
   const [{ data: vehicles }, { data: bookingData }, { data: activeLoanData }] = await Promise.all([
     supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
@@ -130,50 +129,60 @@ export default async function BookPage({ searchParams }: BookPageProps) {
         <div className="emptyState">You do not have any upcoming bookings right now.</div>
       ) : (
         <div className="cardsGrid">
-          {yourBookings.map((booking) => (
-            <article className="vehicleCard" id={`booking-${booking.id}`} key={booking.id}>
-              <StatusPill status="booked" />
-              <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
-              <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
-              <div className="vehicleMeta">
-                <span>From: {formatDateTime(booking.starts_at)}</span>
-                <span>Until: {formatDateTime(booking.ends_at)}</span>
-                <span>Comments: {booking.comments || "-"}</span>
-                <span>Created: {formatDateTime(booking.created_at)}</span>
-              </div>
+          {yourBookings.map((booking) => {
+            const hasStarted = new Date(booking.starts_at).getTime() <= now;
 
-              <form action={updateOwnBooking}>
-                <input name="bookingId" type="hidden" value={booking.id} />
-                <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-
-                <div className="formGrid">
-                  <label className="fieldLabel">
-                    Start time
-                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
-                  </label>
-                  <label className="fieldLabel">
-                    End time
-                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" required type="datetime-local" />
-                  </label>
+            return (
+              <article className="vehicleCard" id={`booking-${booking.id}`} key={booking.id}>
+                <StatusPill status="booked" />
+                <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
+                <div className="vehicleMeta">
+                  <span>From: {formatDateTime(booking.starts_at)}</span>
+                  <span>Until: {formatDateTime(booking.ends_at)}</span>
+                  <span>Comments: {booking.comments || "-"}</span>
+                  <span>Created: {formatDateTime(booking.created_at)}</span>
                 </div>
 
-                <label className="fieldLabel">
-                  Comments
-                  <textarea defaultValue={booking.comments ?? ""} name="comments" />
-                </label>
+                {hasStarted ? (
+                  <p className="muted">This booking has already started, so it can no longer be changed here.</p>
+                ) : (
+                  <>
+                    <form action={updateOwnBooking}>
+                      <input name="bookingId" type="hidden" value={booking.id} />
+                      <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
 
-                <div className="actionsRow">
-                  <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
-                </div>
-              </form>
+                      <div className="formGrid">
+                        <label className="fieldLabel">
+                          Start time
+                          <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
+                        </label>
+                        <label className="fieldLabel">
+                          End time
+                          <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" required type="datetime-local" />
+                        </label>
+                      </div>
 
-              <form action={cancelOwnBooking}>
-                <input name="bookingId" type="hidden" value={booking.id} />
-                <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
-              </form>
-            </article>
-          ))}
+                      <label className="fieldLabel">
+                        Comments
+                        <textarea defaultValue={booking.comments ?? ""} name="comments" />
+                      </label>
+
+                      <div className="actionsRow">
+                        <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
+                      </div>
+                    </form>
+
+                    <form action={cancelOwnBooking}>
+                      <input name="bookingId" type="hidden" value={booking.id} />
+                      <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                      <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
+                    </form>
+                  </>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
 

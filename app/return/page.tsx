@@ -21,14 +21,15 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
     redirect("/");
   }
 
-  const isAdmin = await getIsAdmin(supabase, user.id);
-
-  const { data } = await supabase
-    .from("vehicle_loans")
-    .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
-    .eq("borrowed_by_user_id", user.id)
-    .is("returned_at", null)
-    .order("borrowed_at", { ascending: false });
+  const [{ data }, isAdmin] = await Promise.all([
+    supabase
+      .from("vehicle_loans")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .eq("borrowed_by_user_id", user.id)
+      .is("returned_at", null)
+      .order("borrowed_at", { ascending: false }),
+    getIsAdmin(supabase, user.id),
+  ]);
 
   const loans = ((data ?? []) as RawLoanRow[]).map(normalizeLoan);
   const error = typeof params.error === "string" ? params.error : null;

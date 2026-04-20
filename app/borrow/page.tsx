@@ -24,8 +24,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     redirect("/");
   }
 
-  const isAdmin = await getIsAdmin(supabase, user.id);
-  const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
+  const [isAdmin, optionalFieldSupport] = await Promise.all([getIsAdmin(supabase, user.id), getVehicleOptionalFieldSupport(supabase)]);
 
   const [{ data: vehicleData }, { data: bookingData }, { data: activeLoanData }] = await Promise.all([
     supabase

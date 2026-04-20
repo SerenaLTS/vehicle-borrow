@@ -24,9 +24,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect("/");
   }
 
-  const isAdmin = await getIsAdmin(supabase, user.id);
-
-  const [{ data: activeLoans }, { count: totalFleetCount }, { data: bookingData }] = await Promise.all([
+  const [{ data: activeLoans }, { count: totalFleetCount }, { data: bookingData }, isAdmin] = await Promise.all([
     supabase
       .from("vehicle_loans")
       .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
@@ -40,6 +38,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .eq("booked_by_user_id", user.id)
       .gte("ends_at", new Date().toISOString())
       .order("starts_at", { ascending: true }),
+    getIsAdmin(supabase, user.id),
   ]);
 
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);
@@ -147,7 +146,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </div>
                 <div className="actionsRow">
                   <Link className="secondaryButton" href={`/book#booking-${booking.id}`}>
-                    Edit booking
+                    {hasStarted ? "View booking" : "Edit booking"}
                   </Link>
                 </div>
                 {!hasStarted ? (
