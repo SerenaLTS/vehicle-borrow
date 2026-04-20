@@ -446,15 +446,36 @@ textarea {
   overflow: hidden;
 }
 
-.duckPond::before {
-  content: "";
+.pondWater {
   position: absolute;
-  inset: auto 0 22px;
-  height: 18px;
-  border-radius: 999px;
+  left: -8%;
+  width: 116%;
+  pointer-events: none;
+}
+
+.pondWaterBack {
+  bottom: 34px;
+  height: 34px;
+  opacity: 0.55;
   background:
-    linear-gradient(90deg, rgba(39, 96, 160, 0.08), rgba(39, 96, 160, 0.24), rgba(39, 96, 160, 0.08));
-  filter: blur(1px);
+    radial-gradient(circle at 18px 20px, rgba(255, 255, 255, 0.32) 0 10px, transparent 11px),
+    radial-gradient(circle at 70px 16px, rgba(255, 255, 255, 0.2) 0 8px, transparent 9px),
+    linear-gradient(180deg, rgba(67, 148, 214, 0.18), rgba(67, 148, 214, 0.3));
+  background-size: 120px 34px, 140px 34px, 100% 100%;
+  animation: pond-wave-back 3.4s linear infinite;
+}
+
+.pondWaterFront {
+  bottom: 30px;
+  z-index: 3;
+  height: 44px;
+  background:
+    radial-gradient(circle at 24px 8px, rgba(255, 255, 255, 0.8) 0 12px, transparent 13px),
+    radial-gradient(circle at 88px 12px, rgba(255, 255, 255, 0.65) 0 14px, transparent 15px),
+    linear-gradient(180deg, rgba(109, 187, 231, 0.92) 0%, rgba(73, 155, 214, 0.96) 55%, rgba(52, 125, 191, 0.98) 100%);
+  background-size: 128px 28px, 156px 30px, 100% 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  animation: pond-wave-front 2.6s linear infinite;
 }
 
 .duckSwimmer {
@@ -466,19 +487,116 @@ textarea {
   justify-content: center;
   width: 92px;
   height: 92px;
+  z-index: 2;
   transform: translateY(-50%);
   animation: duck-swim 8.6s ease-in-out infinite;
 }
 
-.duckEmoji {
+.duckSwimmer::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 18px;
+  height: 26px;
+  z-index: 4;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 18px 8px, rgba(255, 255, 255, 0.7) 0 8px, transparent 9px),
+    radial-gradient(circle at 50px 10px, rgba(255, 255, 255, 0.52) 0 9px, transparent 10px),
+    linear-gradient(180deg, rgba(109, 187, 231, 0.94) 0%, rgba(73, 155, 214, 0.98) 60%, rgba(52, 125, 191, 1) 100%);
+  animation: duck-waterline 1.7s ease-in-out infinite;
+}
+
+.duckIllustration {
   position: relative;
   z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 3rem;
+  width: 84px;
+  height: 84px;
   filter: drop-shadow(0 10px 14px rgba(39, 96, 160, 0.18));
-  animation: duck-turn 8.6s ease-in-out infinite;
+  animation: duck-turn 8.6s ease-in-out infinite, duck-bob 1.2s ease-in-out infinite;
+}
+
+.duckBody,
+.duckWing,
+.duckHead,
+.duckNeck,
+.duckTail,
+.duckBeak,
+.duckEye {
+  position: absolute;
+  display: block;
+}
+
+.duckBody {
+  left: 16px;
+  top: 28px;
+  width: 42px;
+  height: 30px;
+  border-radius: 55% 50% 48% 52%;
+  background: linear-gradient(180deg, #ffd84d 0%, #f6bf17 100%);
+}
+
+.duckWing {
+  left: 28px;
+  top: 36px;
+  width: 21px;
+  height: 14px;
+  border-radius: 60% 40% 50% 50%;
+  background: linear-gradient(180deg, #f3b611 0%, #df9900 100%);
+  transform: rotate(-12deg);
+}
+
+.duckNeck {
+  left: 47px;
+  top: 20px;
+  width: 13px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd84d 0%, #f6bf17 100%);
+  transform: rotate(-12deg);
+  transform-origin: bottom center;
+}
+
+.duckHead {
+  left: 50px;
+  top: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd84d 0%, #f6bf17 100%);
+}
+
+.duckEye {
+  left: 11px;
+  top: 7px;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: #243127;
+}
+
+.duckBeak {
+  left: 15px;
+  top: 9px;
+  width: 10px;
+  height: 7px;
+  border-radius: 45% 65% 60% 35%;
+  background: linear-gradient(180deg, #ff9d33 0%, #f57a14 100%);
+  transform: rotate(6deg);
+}
+
+.duckTail {
+  left: 11px;
+  top: 30px;
+  width: 13px;
+  height: 13px;
+  border-radius: 30% 70% 30% 70%;
+  background: linear-gradient(180deg, #ffd84d 0%, #f3b611 100%);
+  transform: rotate(-22deg);
 }
 
 .duckRipple {
@@ -591,6 +709,48 @@ textarea {
   to {
     opacity: 0;
     transform: translate(-50%, -50%) scale(1.35);
+  }
+}
+
+@keyframes duck-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+
+  50% {
+    transform: translateY(5px) rotate(2deg);
+  }
+}
+
+@keyframes duck-waterline {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes pond-wave-front {
+  from {
+    background-position: 0 0, 0 0, 0 0;
+  }
+
+  to {
+    background-position: 128px 0, 156px 0, 0 0;
+  }
+}
+
+@keyframes pond-wave-back {
+  from {
+    background-position: 0 0, 0 0, 0 0;
+  }
+
+  to {
+    background-position: -120px 0, -140px 0, 0 0;
   }
 }
 

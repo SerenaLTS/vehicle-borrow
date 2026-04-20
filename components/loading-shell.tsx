@@ -17,11 +17,22 @@ export function LoadingShell({
         </div>
 
         <div className="duckPond" aria-hidden="true">
+          <div className="pondWater pondWaterBack" />
           <div className="duckSwimmer">
-            <span className="duckEmoji">🦆</span>
+            <span className="duckIllustration">
+              <span className="duckTail" />
+              <span className="duckBody" />
+              <span className="duckWing" />
+              <span className="duckNeck" />
+              <span className="duckHead">
+                <span className="duckEye" />
+                <span className="duckBeak" />
+              </span>
+            </span>
             <span className="duckRipple duckRippleOne" />
             <span className="duckRipple duckRippleTwo" />
           </div>
+          <div className="pondWater pondWaterFront" />
         </div>
 
         <p className="loadingCopy">Duck is on the way...</p>
