@@ -202,6 +202,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {fleet.map((vehicle) => {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
+          const isActivelyBorrowed = Boolean(activeLoan);
           const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
@@ -280,10 +281,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
                 <label className="fieldLabel">
                   Status
-                  {vehicle.status === "borrowed" ? (
+                  {isActivelyBorrowed ? (
                     <p className="muted">borrowed</p>
                   ) : (
-                    <select defaultValue={vehicle.status === "booked" ? "available" : vehicle.status} name="status" required>
+                    <select
+                      defaultValue={vehicle.status === "maintenance" || vehicle.status === "retired" ? vehicle.status : "available"}
+                      name="status"
+                      required
+                    >
                       <option value="available">available</option>
                       <option value="maintenance">maintenance</option>
                       <option value="retired">retired</option>
@@ -305,7 +310,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               </form>
 
-              {vehicle.status !== "borrowed" ? (
+              {!isActivelyBorrowed ? (
                 <form action={retireVehicle}>
                   <input name="vehicleId" type="hidden" value={vehicle.id} />
                   <SubmitButton className="ghostButton" idleLabel="Mark as retired" pendingLabel="Retiring..." />

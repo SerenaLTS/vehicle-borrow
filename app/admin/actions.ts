@@ -80,11 +80,14 @@ export async function updateVehicle(formData: FormData) {
 
   const supabase = await requireAdmin();
   const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
-  const { data: existingVehicle, error: loadError } = await supabase
+  const [{ data: existingVehicle, error: loadError }, { data: activeLoan }] = await Promise.all([
+    supabase
     .from("vehicles")
     .select("status")
     .eq("id", vehicleId)
-    .maybeSingle();
+    .maybeSingle(),
+    supabase.from("vehicle_loans").select("id").eq("vehicle_id", vehicleId).is("returned_at", null).maybeSingle(),
+  ]);
 
   if (loadError) {
     redirect(`/admin?error=${encodeURIComponent(loadError.message)}`);
@@ -94,12 +97,14 @@ export async function updateVehicle(formData: FormData) {
     redirect("/admin?error=Vehicle not found.");
   }
 
-  if (existingVehicle.status !== "borrowed" && !isEditableStatus(status)) {
+  const isActivelyBorrowed = Boolean(activeLoan);
+
+  if (!isActivelyBorrowed && !isEditableStatus(status)) {
     redirect("/admin?error=Please choose a valid vehicle status.");
   }
 
   const updatePayload =
-    existingVehicle.status === "borrowed"
+    isActivelyBorrowed
       ? { model, comments, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }) }
       : {
           model,
@@ -245,11 +250,14 @@ export async function retireVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const { data: existingVehicle, error: loadError } = await supabase
-    .from("vehicles")
-    .select("status")
-    .eq("id", vehicleId)
-    .maybeSingle();
+  const [{ data: existingVehicle, error: loadError }, { data: activeLoan }] = await Promise.all([
+    supabase
+      .from("vehicles")
+      .select("status")
+      .eq("id", vehicleId)
+      .maybeSingle(),
+    supabase.from("vehicle_loans").select("id").eq("vehicle_id", vehicleId).is("returned_at", null).maybeSingle(),
+  ]);
 
   if (loadError) {
     redirect(`/admin?error=${encodeURIComponent(loadError.message)}`);
@@ -259,7 +267,7 @@ export async function retireVehicle(formData: FormData) {
     redirect("/admin?error=Vehicle not found.");
   }
 
-  if (existingVehicle.status === "borrowed") {
+  if (activeLoan) {
     redirect("/admin?error=Borrowed vehicles cannot be retired until they are returned.");
   }
 

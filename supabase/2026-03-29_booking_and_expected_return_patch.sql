@@ -40,7 +40,7 @@ begin
     raise exception 'Vehicle not found.';
   end if;
 
-  if v_vehicle.status <> 'available' or v_vehicle.current_holder_user_id is not null then
+  if v_vehicle.status in ('retired', 'maintenance') or v_vehicle.current_holder_user_id is not null then
     raise exception 'This vehicle is not currently available.';
   end if;
 

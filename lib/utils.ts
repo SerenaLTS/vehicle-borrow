@@ -36,11 +36,11 @@ export function getVehicleDisplayStatus({
     return storedStatus;
   }
 
-  if (hasActiveLoan || storedStatus === "borrowed") {
+  if (hasActiveLoan) {
     return "borrowed" as const;
   }
 
-  if (hasActiveBooking || storedStatus === "booked") {
+  if (hasActiveBooking) {
     return "booked" as const;
   }
 
