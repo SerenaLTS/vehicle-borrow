@@ -251,6 +251,83 @@ button:disabled {
   margin-top: 16px;
 }
 
+.timelineDisclosure {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.timelineDisclosure summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 600;
+  list-style: none;
+}
+
+.timelineDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.timelineDisclosure summary::after {
+  content: " +";
+}
+
+.timelineDisclosure[open] summary::after {
+  content: " -";
+}
+
+.timelineList {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.timelineItem {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 12px;
+}
+
+.timelineDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+
+.timelineDot-booked {
+  background: #275fa0;
+}
+
+.timelineDot-borrowed {
+  background: var(--warning);
+}
+
+.timelineCard {
+  display: grid;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(39, 96, 160, 0.14);
+}
+
+.timelineHeader {
+  display: grid;
+  gap: 2px;
+}
+
+.timelineMeta {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.timelineEmpty {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
 .vehicleCardHeader {
   display: flex;
   flex-direction: column;

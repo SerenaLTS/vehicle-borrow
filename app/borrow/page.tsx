@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
+import { VehicleScheduleTimeline } from "@/components/vehicle-schedule-timeline";
 import { createClient } from "@/lib/supabase/server";
 import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
@@ -27,6 +28,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
   const vehicles = snapshot.vehicles.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance");
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
+  const scheduleTimelineByVehicleId = snapshot.scheduleTimelineByVehicleId;
 
   const now = Date.now();
   const availableVehicles = vehicles.filter((vehicle) => {
@@ -156,6 +158,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                   <span>Comments: {nextBooking.comments || "-"}</span>
                 </div>
               ) : null}
+              <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
             </article>
           );
         })}
@@ -202,6 +205,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                     </div>
                   );
                 })()}
+                <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
               </article>
             ))}
           </div>

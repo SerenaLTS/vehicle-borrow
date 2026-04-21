@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { cancelOwnBooking, createBooking, updateOwnBooking } from "@/app/book/actions";
+import { VehicleScheduleTimeline } from "@/components/vehicle-schedule-timeline";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getFleetSnapshot } from "@/lib/fleet-cache";
@@ -29,6 +30,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   const upcomingBookings = snapshot.upcomingBookings;
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
+  const scheduleTimelineByVehicleId = snapshot.scheduleTimelineByVehicleId;
 
   const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance" && !activeLoanVehicleIds.has(vehicle.id));
   const error = typeof params.error === "string" ? params.error : null;
@@ -208,6 +210,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <span>{vehicle.comments || "No upcoming booking recorded."}</span>
                 </div>
               )}
+              <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
             </article>
           );
         })}
