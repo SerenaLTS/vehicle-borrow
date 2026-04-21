@@ -251,29 +251,70 @@ button:disabled {
   margin-top: 16px;
 }
 
-.timelineDisclosure {
+.calendarTriggerButton {
+  min-height: 40px;
   margin-top: 16px;
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
-
-.timelineDisclosure summary {
-  cursor: pointer;
+  border: none;
+  padding: 0;
+  background: transparent;
   color: var(--accent-strong);
   font-weight: 600;
-  list-style: none;
+  text-align: left;
 }
 
-.timelineDisclosure summary::-webkit-details-marker {
-  display: none;
+.calendarModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(35, 49, 39, 0.36);
+  backdrop-filter: blur(6px);
 }
 
-.timelineDisclosure summary::after {
-  content: " +";
+.calendarModal {
+  width: min(980px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  border-radius: 20px;
+  padding: 20px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
 }
 
-.timelineDisclosure[open] summary::after {
-  content: " -";
+.calendarModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.calendarModalHeader h3 {
+  margin: 0 0 8px;
+}
+
+.calendarCloseButton {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: white;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.calendarMonthNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.calendarMonthNav h4 {
+  margin: 0;
 }
 
 .timelineEmpty {
@@ -319,6 +360,7 @@ button:disabled {
 .calendarMonth {
   display: grid;
   gap: 10px;
+  margin-top: 18px;
 }
 
 .calendarMonth h4 {
@@ -965,6 +1007,10 @@ th {
   .actionsRow {
     display: flex;
     flex-wrap: wrap;
+  }
+
+  .calendarMonthNav .secondaryButton {
+    min-width: 110px;
   }
 
   .vehicleCardHeader {

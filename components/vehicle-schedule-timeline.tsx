@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { APP_TIME_ZONE } from "@/lib/datetime";
 
 type VehicleScheduleEvent = {
@@ -53,34 +56,6 @@ function compareDayKeys(left: string, right: string) {
   return 0;
 }
 
-function buildCoveredMonths(events: VehicleScheduleEvent[]) {
-  const months = new Set<string>();
-
-  for (const event of events) {
-    const start = getZonedParts(event.startAt);
-    const end = getZonedParts(event.endAt ?? event.startAt);
-    let year = start.year;
-    let month = start.month;
-
-    while (year < end.year || (year === end.year && month <= end.month)) {
-      months.add(`${year}-${String(month).padStart(2, "0")}`);
-      month += 1;
-
-      if (month === 13) {
-        month = 1;
-        year += 1;
-      }
-    }
-  }
-
-  if (months.size === 0) {
-    const today = getZonedParts(new Date());
-    months.add(`${today.year}-${String(today.month).padStart(2, "0")}`);
-  }
-
-  return Array.from(months).sort().slice(0, 4);
-}
-
 function getDaysInMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
@@ -88,7 +63,7 @@ function getDaysInMonth(year: number, month: number) {
 function getMonthMatrix(year: number, month: number) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-  const cells: Array<{ key: string; day: number; weekday: number } | null> = [];
+  const cells: Array<{ key: string; day: number } | null> = [];
 
   for (let index = 0; index < firstWeekday; index += 1) {
     cells.push(null);
@@ -98,7 +73,6 @@ function getMonthMatrix(year: number, month: number) {
     cells.push({
       key: toDayKey({ year, month, day }),
       day,
-      weekday: new Date(Date.UTC(year, month - 1, day)).getUTCDay(),
     });
   }
 
@@ -119,8 +93,44 @@ function chunkWeeks<T>(cells: T[], size: number) {
   return weeks;
 }
 
+function addMonth(monthKey: string, delta: number) {
+  const [yearText, monthText] = monthKey.split("-");
+  const date = new Date(Date.UTC(Number(yearText), Number(monthText) - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function buildInitialMonth(events: VehicleScheduleEvent[]) {
+  const today = getZonedParts(new Date());
+  const todayKey = `${today.year}-${String(today.month).padStart(2, "0")}`;
+
+  const coveredMonths = new Set<string>();
+
+  for (const event of events) {
+    const start = getZonedParts(event.startAt);
+    const end = getZonedParts(event.endAt ?? event.startAt);
+    let year = start.year;
+    let month = start.month;
+
+    while (year < end.year || (year === end.year && month <= end.month)) {
+      coveredMonths.add(`${year}-${String(month).padStart(2, "0")}`);
+      month += 1;
+
+      if (month === 13) {
+        month = 1;
+        year += 1;
+      }
+    }
+  }
+
+  if (coveredMonths.has(todayKey)) {
+    return todayKey;
+  }
+
+  return Array.from(coveredMonths).sort()[0] ?? todayKey;
+}
+
 function getWeekSegments(
-  week: Array<{ key: string; day: number; weekday: number } | null>,
+  week: Array<{ key: string; day: number } | null>,
   events: Array<VehicleScheduleEvent & { startKey: string; endKey: string }>,
 ) {
   const weekStartKey = week.find((cell) => cell)?.key;
@@ -138,12 +148,7 @@ function getWeekSegments(
 
       for (let index = 0; index < week.length; index += 1) {
         const cell = week[index];
-
-        if (!cell) {
-          continue;
-        }
-
-        if (compareDayKeys(cell.key, event.startKey) >= 0) {
+        if (cell && compareDayKeys(cell.key, event.startKey) >= 0) {
           startColumn = index + 1;
           break;
         }
@@ -151,22 +156,13 @@ function getWeekSegments(
 
       for (let index = week.length - 1; index >= 0; index -= 1) {
         const cell = week[index];
-
-        if (!cell) {
-          continue;
-        }
-
-        if (compareDayKeys(cell.key, event.endKey) <= 0) {
+        if (cell && compareDayKeys(cell.key, event.endKey) <= 0) {
           endColumn = index + 1;
           break;
         }
       }
 
-      return {
-        ...event,
-        startColumn,
-        endColumn,
-      };
+      return { ...event, startColumn, endColumn };
     })
     .sort((left, right) => {
       if (left.startColumn !== right.startColumn) {
@@ -202,107 +198,145 @@ function getWeekSegments(
 }
 
 export function VehicleScheduleTimeline({ events }: VehicleScheduleTimelineProps) {
-  if (events.length === 0) {
-    return (
-      <details className="timelineDisclosure">
-        <summary>Monthly calendar</summary>
-        <div className="timelineEmpty">No recent or upcoming bookings found for this vehicle.</div>
-      </details>
-    );
-  }
+  const [isOpen, setIsOpen] = useState(false);
+  const [monthKey, setMonthKey] = useState(() => buildInitialMonth(events));
 
-  const months = buildCoveredMonths(events);
-  const normalizedEvents = events.map((event) => {
-    const startKey = toDayKey(getZonedParts(event.startAt));
-    const endKey = toDayKey(getZonedParts(event.endAt ?? event.startAt));
+  const normalizedEvents = useMemo(
+    () =>
+      events.map((event) => ({
+        ...event,
+        startKey: toDayKey(getZonedParts(event.startAt)),
+        endKey: toDayKey(getZonedParts(event.endAt ?? event.startAt)),
+      })),
+    [events],
+  );
 
-    return {
-      ...event,
-      startKey,
-      endKey,
+  useEffect(() => {
+    setMonthKey(buildInitialMonth(events));
+  }, [events]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
     };
-  });
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+  const [yearText, monthText] = monthKey.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const monthLabel = MONTH_LABEL_FORMATTER.format(new Date(Date.UTC(year, month - 1, 1)));
+  const monthWeeks = chunkWeeks(getMonthMatrix(year, month), 7);
 
   return (
-    <details className="timelineDisclosure">
-      <summary>Monthly calendar</summary>
-      <div className="calendarLegend">
-        <span className="calendarLegendItem">
-          <span className="calendarLegendSwatch calendarLegendSwatch-booked" />
-          Booked
-        </span>
-        <span className="calendarLegendItem">
-          <span className="calendarLegendSwatch calendarLegendSwatch-borrowed" />
-          Borrowed
-        </span>
-      </div>
+    <>
+      <button className="calendarTriggerButton" type="button" onClick={() => setIsOpen(true)}>
+        View monthly calendar
+      </button>
 
-      <div className="calendarMonthStack">
-        {months.map((monthKey) => {
-          const [yearText, monthText] = monthKey.split("-");
-          const year = Number(yearText);
-          const month = Number(monthText);
-          const monthCells = getMonthMatrix(year, month);
-          const monthWeeks = chunkWeeks(monthCells, 7);
-          const monthLabel = MONTH_LABEL_FORMATTER.format(new Date(Date.UTC(year, month - 1, 1)));
+      {isOpen ? (
+        <div className="calendarModalOverlay" onClick={() => setIsOpen(false)}>
+          <div
+            className="calendarModal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Vehicle monthly calendar"
+          >
+            <div className="calendarModalHeader">
+              <div>
+                <h3>Monthly calendar</h3>
+                <div className="calendarLegend">
+                  <span className="calendarLegendItem">
+                    <span className="calendarLegendSwatch calendarLegendSwatch-booked" />
+                    Booked
+                  </span>
+                  <span className="calendarLegendItem">
+                    <span className="calendarLegendSwatch calendarLegendSwatch-borrowed" />
+                    Borrowed
+                  </span>
+                </div>
+              </div>
+              <button aria-label="Close calendar" className="calendarCloseButton" type="button" onClick={() => setIsOpen(false)}>
+                ×
+              </button>
+            </div>
 
-          return (
-            <section className="calendarMonth" key={monthKey}>
+            <div className="calendarMonthNav">
+              <button className="secondaryButton" type="button" onClick={() => setMonthKey((current) => addMonth(current, -1))}>
+                Previous
+              </button>
               <h4>{monthLabel}</h4>
-              <div className="calendarGrid calendarGrid-header">
-                {WEEKDAY_LABELS.map((label) => (
-                  <div className="calendarWeekday" key={label}>
-                    {label}
-                  </div>
-                ))}
-              </div>
-              <div className="calendarWeekStack">
-                {monthWeeks.map((week, weekIndex) => {
-                  const lanes = getWeekSegments(week, normalizedEvents);
+              <button className="secondaryButton" type="button" onClick={() => setMonthKey((current) => addMonth(current, 1))}>
+                Next
+              </button>
+            </div>
 
-                  return (
-                    <section className="calendarWeek" key={`${monthKey}-week-${weekIndex}`}>
-                      <div className="calendarGrid">
-                        {week.map((cell, index) => {
-                          if (!cell) {
-                            return <div className="calendarCell calendarCell-empty" key={`empty-${monthKey}-${weekIndex}-${index}`} />;
-                          }
+            {events.length === 0 ? (
+              <div className="timelineEmpty">No recent or upcoming bookings found for this vehicle.</div>
+            ) : (
+              <div className="calendarMonth">
+                <div className="calendarGrid calendarGrid-header">
+                  {WEEKDAY_LABELS.map((label) => (
+                    <div className="calendarWeekday" key={label}>
+                      {label}
+                    </div>
+                  ))}
+                </div>
+                <div className="calendarWeekStack">
+                  {monthWeeks.map((week, weekIndex) => {
+                    const lanes = getWeekSegments(week, normalizedEvents);
 
-                          return (
-                            <div className="calendarCell" key={cell.key}>
-                              <span className="calendarDayNumber">{cell.day}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {lanes.length > 0 ? (
-                        <div className="calendarLaneStack">
-                          {lanes.map((lane, laneIndex) => (
-                            <div className="calendarGrid calendarLane" key={`${monthKey}-${weekIndex}-lane-${laneIndex}`}>
-                              {lane.map((segment) => (
-                                <div
-                                  className={`calendarEvent calendarEvent-${segment.kind}`}
-                                  key={`${segment.kind}-${segment.id}-${monthKey}-${weekIndex}`}
-                                  style={{ gridColumn: `${segment.startColumn} / ${segment.endColumn + 1}` }}
-                                  title={`${segment.kind === "booked" ? "Booked" : "Borrowed"} • ${segment.actor}`}
-                                >
-                                  <span>{segment.actor}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ))}
+                    return (
+                      <section className="calendarWeek" key={`${monthKey}-week-${weekIndex}`}>
+                        <div className="calendarGrid">
+                          {week.map((cell, index) =>
+                            cell ? (
+                              <div className="calendarCell" key={cell.key}>
+                                <span className="calendarDayNumber">{cell.day}</span>
+                              </div>
+                            ) : (
+                              <div className="calendarCell calendarCell-empty" key={`${monthKey}-empty-${weekIndex}-${index}`} />
+                            ),
+                          )}
                         </div>
-                      ) : (
-                        <div className="calendarNoEvents">No bookings or loans this week.</div>
-                      )}
-                    </section>
-                  );
-                })}
+                        {lanes.length > 0 ? (
+                          <div className="calendarLaneStack">
+                            {lanes.map((lane, laneIndex) => (
+                              <div className="calendarGrid calendarLane" key={`${monthKey}-${weekIndex}-lane-${laneIndex}`}>
+                                {lane.map((segment) => (
+                                  <div
+                                    className={`calendarEvent calendarEvent-${segment.kind}`}
+                                    key={`${segment.kind}-${segment.id}-${monthKey}-${weekIndex}`}
+                                    style={{ gridColumn: `${segment.startColumn} / ${segment.endColumn + 1}` }}
+                                    title={`${segment.kind === "booked" ? "Booked" : "Borrowed"} • ${segment.actor}`}
+                                  >
+                                    <span>{segment.actor}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="calendarNoEvents">No bookings or loans this week.</div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
               </div>
-            </section>
-          );
-        })}
-      </div>
-    </details>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
