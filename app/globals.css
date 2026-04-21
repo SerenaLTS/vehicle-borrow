@@ -276,56 +276,132 @@ button:disabled {
   content: " -";
 }
 
-.timelineList {
-  display: grid;
+.timelineEmpty {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.calendarLegend {
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 14px;
 }
 
-.timelineItem {
-  position: relative;
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  gap: 12px;
+.calendarLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.94rem;
 }
 
-.timelineDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  margin-top: 6px;
+.calendarLegendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
 }
 
-.timelineDot-booked {
+.calendarLegendSwatch-booked {
   background: #275fa0;
 }
 
-.timelineDot-borrowed {
+.calendarLegendSwatch-borrowed {
   background: var(--warning);
 }
 
-.timelineCard {
+.calendarMonthStack {
   display: grid;
-  gap: 8px;
-  padding-left: 10px;
-  border-left: 2px solid rgba(39, 96, 160, 0.14);
+  gap: 18px;
+  margin-top: 14px;
 }
 
-.timelineHeader {
+.calendarMonth {
   display: grid;
-  gap: 2px;
+  gap: 10px;
 }
 
-.timelineMeta {
+.calendarMonth h4 {
+  margin: 0;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendarWeekStack {
+  display: grid;
+  gap: 10px;
+}
+
+.calendarWeek {
+  display: grid;
+  gap: 6px;
+}
+
+.calendarWeekday {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.calendarCell {
+  min-height: 82px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.calendarCell-empty {
+  background: transparent;
+  border-style: dashed;
+}
+
+.calendarDayNumber {
+  display: inline-block;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.calendarLaneStack {
   display: grid;
   gap: 4px;
-  color: var(--muted);
-  font-size: 0.95rem;
 }
 
-.timelineEmpty {
-  margin-top: 12px;
+.calendarLane {
+  align-items: stretch;
+}
+
+.calendarEvent {
+  min-height: 20px;
+  border-radius: 6px;
+  padding: 3px 6px;
+  color: white;
+  font-size: 0.72rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.calendarEvent-booked {
+  background: #275fa0;
+}
+
+.calendarEvent-borrowed {
+  background: var(--warning);
+}
+
+.calendarMore {
   color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.calendarNoEvents {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .vehicleCardHeader {
