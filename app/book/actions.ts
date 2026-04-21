@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
+import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
@@ -49,6 +50,7 @@ export async function createBooking(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/dashboard");
   revalidatePath("/book");
   revalidatePath("/borrow");
@@ -124,6 +126,7 @@ export async function updateOwnBooking(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/dashboard");
   revalidatePath("/book");
   revalidatePath("/borrow");
@@ -179,6 +182,7 @@ export async function cancelOwnBooking(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/dashboard");
   revalidatePath("/book");
   revalidatePath("/borrow");

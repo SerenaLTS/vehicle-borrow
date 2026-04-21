@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
-import { VehicleMonthlyCalendar, addMonth, buildInitialMonth, type VehicleScheduleEvent } from "@/components/vehicle-monthly-calendar";
+import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
 import { createAdminBooking, deleteAdminBooking, updateAdminBooking } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
@@ -11,6 +11,7 @@ import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/ve
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
+import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
 
 type VehicleRecordPageProps = {
   params: Promise<{
@@ -78,9 +79,12 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const currentLoan = history.find((loan) => loan.returned_at === null) ?? null;
   const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const now = Date.now();
+  const currentYear = new Date().getFullYear();
+  const requestedMonth = typeof pageParams.month === "string" && /^\d{4}-\d{2}$/.test(pageParams.month) ? pageParams.month : undefined;
+  const loadedYear = Number((requestedMonth ?? `${currentYear}-01`).slice(0, 4));
   const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && new Date(booking.ends_at).getTime() > now) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
-  const calendarEvents: VehicleScheduleEvent[] = [
+  const calendarEvents: VehicleCalendarEvent[] = [
     ...bookings.map((booking) => ({
       id: booking.id,
       kind: "booked" as const,
@@ -97,9 +101,12 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       endAt: loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString(),
       notes: loan.purpose || loan.borrow_notes || null,
     })),
-  ];
-  const initialMonth = buildInitialMonth(calendarEvents);
-  const currentMonth = typeof pageParams.month === "string" ? pageParams.month : initialMonth;
+  ].filter((event) => {
+    const eventYearStart = Number(event.startAt.slice(0, 4));
+    const eventYearEnd = Number((event.endAt ?? event.startAt).slice(0, 4));
+    return eventYearStart <= loadedYear && eventYearEnd >= loadedYear;
+  });
+  const initialMonth = requestedMonth;
   const displayStatus = getVehicleDisplayStatus({
     storedStatus: record.status,
     hasActiveLoan: Boolean(currentLoan),
@@ -130,10 +137,11 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         </div>
 
         <VehicleMonthlyCalendar
-          currentMonth={currentMonth}
+          crossYearNextHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(`${loadedYear + 1}-01`)}`}
+          crossYearPreviousHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(`${loadedYear - 1}-12`)}`}
           events={calendarEvents}
-          nextHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(addMonth(currentMonth, 1))}`}
-          previousHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(addMonth(currentMonth, -1))}`}
+          initialMonth={initialMonth}
+          loadedYear={loadedYear}
         />
       </section>
 

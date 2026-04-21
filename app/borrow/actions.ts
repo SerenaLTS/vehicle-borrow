@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
+import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function borrowVehicle(formData: FormData) {
@@ -54,6 +55,7 @@ export async function borrowVehicle(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/dashboard");
   revalidatePath("/borrow");
   revalidatePath("/return");

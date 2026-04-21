@@ -1,20 +1,17 @@
-import Link from "next/link";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { APP_TIME_ZONE } from "@/lib/datetime";
 
-export type VehicleScheduleEvent = {
-  id: string;
-  kind: "booked" | "borrowed";
-  actor: string;
-  startAt: string;
-  endAt: string | null;
-  notes: string | null;
-};
+import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
 
 type VehicleMonthlyCalendarProps = {
-  currentMonth?: string;
-  events: VehicleScheduleEvent[];
-  nextHref: string;
-  previousHref: string;
+  initialMonth?: string;
+  events: VehicleCalendarEvent[];
+  crossYearNextHref?: string;
+  crossYearPreviousHref?: string;
+  loadedYear?: number;
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -94,13 +91,13 @@ function chunkWeeks<T>(cells: T[], size: number) {
   return weeks;
 }
 
-export function addMonth(monthKey: string, delta: number) {
+function addMonth(monthKey: string, delta: number) {
   const [yearText, monthText] = monthKey.split("-");
   const date = new Date(Date.UTC(Number(yearText), Number(monthText) - 1 + delta, 1));
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function buildInitialMonth(events: VehicleScheduleEvent[]) {
+function buildInitialMonth(events: VehicleCalendarEvent[]) {
   const today = getZonedParts(new Date());
   const todayKey = `${today.year}-${String(today.month).padStart(2, "0")}`;
 
@@ -136,7 +133,7 @@ export function buildInitialMonth(events: VehicleScheduleEvent[]) {
 
 function getWeekSegments(
   week: Array<{ key: string; day: number } | null>,
-  events: Array<VehicleScheduleEvent & { startKey: string; endKey: string }>,
+  events: Array<VehicleCalendarEvent & { startKey: string; endKey: string }>,
 ) {
   const weekStartKey = week.find((cell) => cell)?.key;
   const weekEndKey = [...week].reverse().find((cell) => cell)?.key;
@@ -203,22 +200,52 @@ function getWeekSegments(
 }
 
 export function VehicleMonthlyCalendar({
-  currentMonth,
+  initialMonth,
   events,
-  nextHref,
-  previousHref,
+  crossYearNextHref,
+  crossYearPreviousHref,
+  loadedYear,
 }: VehicleMonthlyCalendarProps) {
-  const resolvedMonth = currentMonth ?? buildInitialMonth(events);
+  const router = useRouter();
+  const [currentMonth, setCurrentMonth] = useState(initialMonth ?? buildInitialMonth(events));
+  const resolvedMonth = currentMonth;
   const [yearText, monthText] = resolvedMonth.split("-");
   const year = Number(yearText);
   const month = Number(monthText);
   const monthLabel = MONTH_LABEL_FORMATTER.format(new Date(Date.UTC(year, month - 1, 1)));
-  const monthWeeks = chunkWeeks(getMonthMatrix(year, month), 7);
-  const normalizedEvents = events.map((event) => ({
-    ...event,
-    startKey: toDayKey(getZonedParts(event.startAt)),
-    endKey: toDayKey(getZonedParts(event.endAt ?? event.startAt)),
-  }));
+  const monthWeeks = useMemo(() => chunkWeeks(getMonthMatrix(year, month), 7), [year, month]);
+  const normalizedEvents = useMemo(
+    () =>
+      events.map((event) => ({
+        ...event,
+        startKey: toDayKey(getZonedParts(event.startAt)),
+        endKey: toDayKey(getZonedParts(event.endAt ?? event.startAt)),
+      })),
+    [events],
+  );
+  const effectiveLoadedYear = loadedYear ?? Number((initialMonth ?? buildInitialMonth(events)).slice(0, 4));
+
+  function moveMonth(delta: number) {
+    const targetMonth = addMonth(resolvedMonth, delta);
+    const targetYear = Number(targetMonth.slice(0, 4));
+
+    if (targetYear === effectiveLoadedYear) {
+      setCurrentMonth(targetMonth);
+      return;
+    }
+
+    if (delta < 0 && crossYearPreviousHref) {
+      router.push(crossYearPreviousHref);
+      return;
+    }
+
+    if (delta > 0 && crossYearNextHref) {
+      router.push(crossYearNextHref);
+      return;
+    }
+
+    setCurrentMonth(targetMonth);
+  }
 
   return (
     <>
@@ -234,13 +261,13 @@ export function VehicleMonthlyCalendar({
       </div>
 
       <div className="calendarMonthNav">
-        <Link className="secondaryButton" href={previousHref}>
+        <button className="secondaryButton" onClick={() => moveMonth(-1)} type="button">
           Previous
-        </Link>
+        </button>
         <h4>{monthLabel}</h4>
-        <Link className="secondaryButton" href={nextHref}>
+        <button className="secondaryButton" onClick={() => moveMonth(1)} type="button">
           Next
-        </Link>
+        </button>
       </div>
 
       {events.length === 0 ? <div className="calendarNoEventsMonth">No bookings or loans on record for this vehicle yet.</div> : null}

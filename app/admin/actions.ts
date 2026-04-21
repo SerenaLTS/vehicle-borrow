@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
+import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
@@ -62,6 +63,7 @@ export async function createVehicle(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache();
   revalidatePath("/admin");
   revalidatePath("/borrow");
   revalidatePath("/dashboard");
@@ -123,6 +125,7 @@ export async function updateVehicle(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
   revalidatePath("/borrow");
   revalidatePath("/dashboard");
@@ -171,6 +174,7 @@ export async function createAdminBooking(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book");
@@ -218,6 +222,7 @@ export async function updateAdminBooking(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book");
@@ -241,6 +246,7 @@ export async function deleteAdminBooking(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book");
@@ -287,6 +293,7 @@ export async function retireVehicle(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
   revalidatePath("/borrow");
   revalidatePath("/dashboard");

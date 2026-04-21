@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { VehicleMonthlyCalendar, addMonth, buildInitialMonth, type VehicleScheduleEvent } from "@/components/vehicle-monthly-calendar";
+import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
 import { createClient } from "@/lib/supabase/server";
-import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDisplayName } from "@/lib/utils";
+import { getVehicleCalendarSnapshotForYear } from "@/lib/vehicle-calendar-cache";
 
 type VehicleCalendarPageProps = {
   params: Promise<{ vehicleId: string }>;
@@ -19,7 +19,15 @@ function sanitizeBackPath(value: string | null) {
   return value;
 }
 
-function buildCalendarHref(vehicleId: string, month: string, from: string) {
+function sanitizeMonth(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function buildVehicleCalendarHref(vehicleId: string, month: string, from: string) {
   return `/vehicle-calendar/${vehicleId}?month=${encodeURIComponent(month)}&from=${encodeURIComponent(from)}`;
 }
 
@@ -35,21 +43,24 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
     redirect("/");
   }
 
-  const [isAdmin, snapshot] = await Promise.all([getIsAdmin(supabase, user.id), getFleetSnapshot(supabase)]);
-  const vehicle = snapshot.vehicles.find((entry) => entry.id === vehicleId);
+  const backHref = sanitizeBackPath(typeof pageParams.from === "string" ? pageParams.from : null);
+  const requestedMonth = sanitizeMonth(typeof pageParams.month === "string" ? pageParams.month : undefined);
+  const requestedYear = Number((requestedMonth ?? `${new Date().getFullYear()}-01`).slice(0, 4));
+  const [isAdmin, calendarSnapshot] = await Promise.all([
+    getIsAdmin(supabase, user.id),
+    getVehicleCalendarSnapshotForYear(supabase, vehicleId, requestedYear),
+  ]);
+  const vehicle = calendarSnapshot.vehicle;
 
   if (!vehicle) {
     redirect(sanitizeBackPath(typeof pageParams.from === "string" ? pageParams.from : null));
   }
 
-  const rawEvents = snapshot.scheduleTimelineByVehicleId.get(vehicleId) ?? [];
-  const events = rawEvents.map((event) => ({
+  const events = calendarSnapshot.events.map((event) => ({
     ...event,
     notes: event.notes ?? null,
   }));
-  const initialMonth = buildInitialMonth(events);
-  const currentMonth = typeof pageParams.month === "string" ? pageParams.month : initialMonth;
-  const backHref = sanitizeBackPath(typeof pageParams.from === "string" ? pageParams.from : null);
+  const initialMonth = requestedMonth;
 
   return (
     <AppShell
@@ -70,10 +81,11 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
         </div>
 
         <VehicleMonthlyCalendar
-          currentMonth={currentMonth}
+          crossYearNextHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year + 1}-01`, backHref)}
+          crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref)}
           events={events}
-          nextHref={buildCalendarHref(vehicleId, addMonth(currentMonth, 1), backHref)}
-          previousHref={buildCalendarHref(vehicleId, addMonth(currentMonth, -1), backHref)}
+          initialMonth={initialMonth}
+          loadedYear={calendarSnapshot.year}
         />
       </section>
     </AppShell>

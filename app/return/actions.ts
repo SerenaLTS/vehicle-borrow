@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
+import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function returnVehicle(formData: FormData) {
@@ -44,6 +45,7 @@ export async function returnVehicle(formData: FormData) {
   }
 
   clearFleetSnapshotCache();
+  clearVehicleCalendarCache(loanRecord?.vehicle_id ?? undefined);
   revalidatePath("/dashboard");
   revalidatePath("/borrow");
   revalidatePath("/book");
