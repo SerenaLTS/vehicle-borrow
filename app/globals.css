@@ -262,6 +262,17 @@ button:disabled {
   text-align: left;
 }
 
+.calendarPageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.calendarPageHeader h2 {
+  margin: 0 0 8px;
+}
+
 .calendarModalOverlay {
   position: fixed;
   inset: 0;

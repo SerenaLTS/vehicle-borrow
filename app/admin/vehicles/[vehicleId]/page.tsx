@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
+import { VehicleMonthlyCalendar, addMonth, buildInitialMonth, type VehicleScheduleEvent } from "@/components/vehicle-monthly-calendar";
 import { createAdminBooking, deleteAdminBooking, updateAdminBooking } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
@@ -79,6 +80,26 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const now = Date.now();
   const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && new Date(booking.ends_at).getTime() > now) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
+  const calendarEvents: VehicleScheduleEvent[] = [
+    ...bookings.map((booking) => ({
+      id: booking.id,
+      kind: "booked" as const,
+      actor: booking.booked_by_email,
+      startAt: booking.starts_at,
+      endAt: booking.ends_at,
+      notes: booking.comments ?? null,
+    })),
+    ...history.map((loan) => ({
+      id: loan.id,
+      kind: "borrowed" as const,
+      actor: loan.borrower_email,
+      startAt: loan.borrowed_at,
+      endAt: loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString(),
+      notes: loan.purpose || loan.borrow_notes || null,
+    })),
+  ];
+  const initialMonth = buildInitialMonth(calendarEvents);
+  const currentMonth = typeof pageParams.month === "string" ? pageParams.month : initialMonth;
   const displayStatus = getVehicleDisplayStatus({
     storedStatus: record.status,
     hasActiveLoan: Boolean(currentLoan),
@@ -98,6 +119,23 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     >
       {message ? <p className="message">{message}</p> : null}
       {error ? <p className="message error">{error}</p> : null}
+
+      <section className="panel">
+        <div className="calendarPageHeader">
+          <div>
+            <p className="eyebrow">Vehicle calendar</p>
+            <h2>{record.plate_number}</h2>
+            <p className="muted">{record.model}</p>
+          </div>
+        </div>
+
+        <VehicleMonthlyCalendar
+          currentMonth={currentMonth}
+          events={calendarEvents}
+          nextHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(addMonth(currentMonth, 1))}`}
+          previousHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(addMonth(currentMonth, -1))}`}
+        />
+      </section>
 
       <section className="panel">
         <div className="sectionHeader compactSectionHeader">

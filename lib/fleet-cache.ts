@@ -89,7 +89,7 @@ function createScheduleTimelineMap(bookings: VehicleBooking[], loans: LoanRow[])
       kind: "borrowed",
       actor: loan.borrower_email,
       startAt: loan.borrowed_at,
-      endAt: loan.returned_at ?? loan.expected_return_at,
+      endAt: loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString(),
       notes: loan.purpose || loan.borrow_notes,
     });
     timelineByVehicleId.set(loan.vehicle_id, vehicleTimeline);
