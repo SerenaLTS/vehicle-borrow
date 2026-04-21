@@ -266,22 +266,24 @@ button:disabled {
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(35, 49, 39, 0.36);
-  backdrop-filter: blur(6px);
+  padding: 18px 14px 32px;
+  background:
+    radial-gradient(circle at top left, rgba(219, 198, 153, 0.55), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(31, 107, 82, 0.18), transparent 30%),
+    var(--bg);
+  overflow: auto;
 }
 
 .calendarModal {
-  width: min(980px, 100%);
-  max-height: min(90vh, 820px);
-  overflow: auto;
-  border-radius: 20px;
-  padding: 20px;
-  background: var(--panel-strong);
+  width: min(1080px, 100%);
+  min-height: calc(100vh - 50px);
+  margin: 0 auto;
+  border-radius: 28px;
+  padding: 22px;
+  background: var(--panel);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
 }
 
 .calendarModalHeader {
@@ -296,6 +298,9 @@ button:disabled {
 }
 
 .calendarCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 40px;
   min-height: 40px;
   border-radius: 8px;
@@ -444,6 +449,11 @@ button:disabled {
 .calendarNoEvents {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.calendarNoEventsMonth {
+  margin-top: 16px;
+  color: var(--muted);
 }
 
 .vehicleCardHeader {

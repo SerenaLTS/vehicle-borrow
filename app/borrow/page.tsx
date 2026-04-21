@@ -28,7 +28,6 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
   const vehicles = snapshot.vehicles.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance");
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
-  const scheduleTimelineByVehicleId = snapshot.scheduleTimelineByVehicleId;
 
   const now = Date.now();
   const availableVehicles = vehicles.filter((vehicle) => {
@@ -158,7 +157,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                   <span>Comments: {nextBooking.comments || "-"}</span>
                 </div>
               ) : null}
-              <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
+              <VehicleScheduleTimeline basePath="/borrow" vehicleId={vehicle.id} />
             </article>
           );
         })}
@@ -205,7 +204,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                     </div>
                   );
                 })()}
-                <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
+                <VehicleScheduleTimeline basePath="/borrow" vehicleId={vehicle.id} />
               </article>
             ))}
           </div>

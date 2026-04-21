@@ -30,7 +30,6 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   const upcomingBookings = snapshot.upcomingBookings;
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
-  const scheduleTimelineByVehicleId = snapshot.scheduleTimelineByVehicleId;
 
   const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance" && !activeLoanVehicleIds.has(vehicle.id));
   const error = typeof params.error === "string" ? params.error : null;
@@ -210,7 +209,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <span>{vehicle.comments || "No upcoming booking recorded."}</span>
                 </div>
               )}
-              <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
+              <VehicleScheduleTimeline basePath="/book" vehicleId={vehicle.id} />
             </article>
           );
         })}

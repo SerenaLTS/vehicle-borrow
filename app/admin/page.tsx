@@ -6,7 +6,6 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { VehicleScheduleTimeline } from "@/components/vehicle-schedule-timeline";
 import { createClient } from "@/lib/supabase/server";
-import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
@@ -27,10 +26,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect("/");
   }
 
-  const [isAdmin, optionalFieldSupport, snapshot] = await Promise.all([
+  const [isAdmin, optionalFieldSupport] = await Promise.all([
     getIsAdmin(supabase, user.id),
     getVehicleOptionalFieldSupport(supabase),
-    getFleetSnapshot(supabase),
   ]);
 
   if (!isAdmin) {
@@ -85,7 +83,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
-  const scheduleTimelineByVehicleId = snapshot.scheduleTimelineByVehicleId;
 
   for (const booking of activeOrUpcomingBookings) {
     if (!nextBookingByVehicleId.has(booking.vehicle_id)) {
@@ -262,7 +259,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               ) : null}
 
-              <VehicleScheduleTimeline events={scheduleTimelineByVehicleId.get(vehicle.id) ?? []} />
+              <VehicleScheduleTimeline basePath="/admin" vehicleId={vehicle.id} />
 
               <form action={updateVehicle}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
