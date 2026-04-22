@@ -4,7 +4,6 @@ import { AppShell } from "@/components/app-shell";
 import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
-import { VehicleScheduleTimeline } from "@/components/vehicle-schedule-timeline";
 import { createClient } from "@/lib/supabase/server";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
@@ -258,9 +257,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </span>
                 </div>
               ) : null}
-
-              <VehicleScheduleTimeline basePath="/admin" vehicleId={vehicle.id} />
-
               <form action={updateVehicle}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
 
