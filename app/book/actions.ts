@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
+import { sendBookingNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
@@ -36,17 +37,39 @@ export async function createBooking(formData: FormData) {
     redirect(`/book?error=${encodeURIComponent(validationError)}`);
   }
 
-  const { error } = await supabase.from("vehicle_bookings").insert({
-    vehicle_id: vehicleId,
-    booked_by_user_id: user.id,
-    booked_by_email: user.email ?? "",
-    starts_at: startsAt,
-    ends_at: endsAt,
-    comments,
-  });
+  const { data: createdBooking, error } = await supabase
+    .from("vehicle_bookings")
+    .insert({
+      vehicle_id: vehicleId,
+      booked_by_user_id: user.id,
+      booked_by_email: user.email ?? "",
+      starts_at: startsAt,
+      ends_at: endsAt,
+      comments,
+    })
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .single();
 
   if (error) {
     redirect(`/book?error=${encodeURIComponent(error.message)}`);
+  }
+
+  try {
+    await sendBookingNotificationEmail({
+      supabase,
+      action: "created",
+      actorEmail: user.email ?? "",
+      booking: {
+        bookingId: createdBooking.id,
+        vehicleId: createdBooking.vehicle_id,
+        bookedByEmail: createdBooking.booked_by_email,
+        startsAt: createdBooking.starts_at,
+        endsAt: createdBooking.ends_at,
+        comments: createdBooking.comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send booking confirmation email.", notificationError);
   }
 
   clearFleetSnapshotCache();
@@ -83,7 +106,7 @@ export async function updateOwnBooking(formData: FormData) {
 
   const { data: booking, error } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_user_id, starts_at")
+    .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments")
     .eq("id", bookingId)
     .eq("booked_by_user_id", user.id)
     .maybeSingle();
@@ -125,6 +148,29 @@ export async function updateOwnBooking(formData: FormData) {
     redirect(`/book?error=${encodeURIComponent(updateError.message)}`);
   }
 
+  try {
+    await sendBookingNotificationEmail({
+      supabase,
+      action: "updated",
+      actorEmail: user.email ?? "",
+      booking: {
+        bookingId,
+        vehicleId,
+        bookedByEmail: booking.booked_by_email,
+        startsAt,
+        endsAt,
+        comments,
+      },
+      previousBooking: {
+        startsAt: booking.starts_at,
+        endsAt: booking.ends_at,
+        comments: booking.comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send booking update email.", notificationError);
+  }
+
   clearFleetSnapshotCache();
   clearVehicleCalendarCache(vehicleId);
   revalidatePath("/dashboard");
@@ -154,7 +200,7 @@ export async function cancelOwnBooking(formData: FormData) {
 
   const { data: booking, error } = await supabase
     .from("vehicle_bookings")
-    .select("id, starts_at")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
     .eq("id", bookingId)
     .eq("booked_by_user_id", user.id)
     .maybeSingle();
@@ -179,6 +225,24 @@ export async function cancelOwnBooking(formData: FormData) {
 
   if (deleteError) {
     redirect(`/book?error=${encodeURIComponent(deleteError.message)}`);
+  }
+
+  try {
+    await sendBookingNotificationEmail({
+      supabase,
+      action: "cancelled",
+      actorEmail: user.email ?? "",
+      booking: {
+        bookingId,
+        vehicleId: booking.vehicle_id,
+        bookedByEmail: booking.booked_by_email,
+        startsAt: booking.starts_at,
+        endsAt: booking.ends_at,
+        comments: booking.comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send booking cancellation email.", notificationError);
   }
 
   clearFleetSnapshotCache();

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { cancelOwnBooking, createBooking, updateOwnBooking } from "@/app/book/actions";
@@ -131,7 +132,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <p className="muted">This booking has already started, so it can no longer be changed here.</p>
                 ) : (
                   <>
-                    <form action={updateOwnBooking}>
+                    <ConfirmForm action={updateOwnBooking} confirmMessage="Confirm updating this booking?">
                       <input name="bookingId" type="hidden" value={booking.id} />
                       <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
 
@@ -154,13 +155,13 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                       <div className="actionsRow">
                         <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
                       </div>
-                    </form>
+                    </ConfirmForm>
 
-                    <form action={cancelOwnBooking}>
+                    <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this booking?">
                       <input name="bookingId" type="hidden" value={booking.id} />
                       <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
                       <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
-                    </form>
+                    </ConfirmForm>
                   </>
                 )}
               </article>

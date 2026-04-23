@@ -32,6 +32,12 @@ cp .env.example .env.local
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 COMPANY_EMAIL_DOMAIN=yourcompany.com
+SMTP_HOST=smtp.yourmailprovider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-email@yourcompany.com
+SMTP_PASS=your-app-password-or-smtp-password
+SMTP_FROM=Vehicle Borrow <your-email@yourcompany.com>
 ```
 
 4. In Supabase SQL Editor, run [`supabase/schema.sql`](./supabase/schema.sql)
@@ -77,6 +83,12 @@ npm run dev
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `COMPANY_EMAIL_DOMAIN`
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_SECURE`
+   - `SMTP_USER`
+   - `SMTP_PASS`
+   - `SMTP_FROM`
 5. Click deploy.
 6. After deployment finishes, copy the production domain.
 7. Go back to Supabase `Authentication -> URL Configuration`.
@@ -121,6 +133,13 @@ New auth users are synced into `user_roles` automatically.
 - Vehicles with a current booking are blocked from the borrow flow, while vehicles with a future booking still appear and show the booked time window.
 - Vehicles in `maintenance` do not appear in the borrow page.
 - Vehicles in `retired` do not appear in the borrow page and should be used instead of deleting vehicles that already have history.
+- If SMTP is configured, booking create, update, and cancel actions send email notifications. Admin-triggered booking changes notify the booked user plus all admins.
+
+## Email notes
+
+- You can use your own mailbox as the sender if your provider supports SMTP access.
+- For Gmail, Outlook, and many company mail systems, this usually means using an app password or a dedicated SMTP credential, not your normal sign-in password.
+- If the SMTP variables are not set, the app skips email sending and booking still succeeds.
 
 ## Useful commands
 

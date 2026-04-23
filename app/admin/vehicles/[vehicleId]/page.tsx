@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
@@ -261,7 +262,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <span>Created: {formatDateTime(booking.created_at)}</span>
               </div>
 
-              <form action={updateAdminBooking}>
+              <ConfirmForm action={updateAdminBooking} confirmMessage="Confirm updating this booking?">
                 <input name="bookingId" type="hidden" value={booking.id} />
                 <input name="vehicleId" type="hidden" value={record.id} />
 
@@ -284,13 +285,13 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <div className="actionsRow">
                   <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
                 </div>
-              </form>
+              </ConfirmForm>
 
-              <form action={deleteAdminBooking}>
+              <ConfirmForm action={deleteAdminBooking} confirmMessage="Confirm deleting this booking? This cannot be undone.">
                 <input name="bookingId" type="hidden" value={booking.id} />
                 <input name="vehicleId" type="hidden" value={record.id} />
                 <SubmitButton className="ghostButton" idleLabel="Delete booking" pendingLabel="Deleting..." />
-              </form>
+              </ConfirmForm>
             </article>
           ))}
         </div>

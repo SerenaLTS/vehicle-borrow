@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
+import { sendBookingNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
@@ -160,17 +161,40 @@ export async function createAdminBooking(formData: FormData) {
     redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(validationError)}`);
   }
 
-  const { error } = await supabase.from("vehicle_bookings").insert({
-    vehicle_id: vehicleId,
-    booked_by_user_id: user.id,
-    booked_by_email: user.email ?? "",
-    starts_at: startsAt,
-    ends_at: endsAt,
-    comments,
-  });
+  const { data: createdBooking, error } = await supabase
+    .from("vehicle_bookings")
+    .insert({
+      vehicle_id: vehicleId,
+      booked_by_user_id: user.id,
+      booked_by_email: user.email ?? "",
+      starts_at: startsAt,
+      ends_at: endsAt,
+      comments,
+    })
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .single();
 
   if (error) {
     redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  try {
+    await sendBookingNotificationEmail({
+      supabase,
+      action: "created",
+      actorEmail: user.email ?? "",
+      booking: {
+        bookingId: createdBooking.id,
+        vehicleId: createdBooking.vehicle_id,
+        bookedByEmail: createdBooking.booked_by_email,
+        startsAt: createdBooking.starts_at,
+        endsAt: createdBooking.ends_at,
+        comments: createdBooking.comments,
+      },
+      notifyAdmins: true,
+    });
+  } catch (notificationError) {
+    console.error("Failed to send admin booking confirmation email.", notificationError);
   }
 
   clearFleetSnapshotCache();
@@ -197,6 +221,28 @@ export async function updateAdminBooking(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const { data: existingBooking, error: loadBookingError } = await supabase
+    .from("vehicle_bookings")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (loadBookingError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(loadBookingError.message)}`);
+  }
+
+  if (!existingBooking) {
+    redirect(`/admin/vehicles/${vehicleId}?error=Booking not found.`);
+  }
+
   const validationError = await validateVehicleBookingWindow(supabase, {
     vehicleId,
     startsAt,
@@ -221,6 +267,30 @@ export async function updateAdminBooking(formData: FormData) {
     redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
   }
 
+  try {
+    await sendBookingNotificationEmail({
+      supabase,
+      action: "updated",
+      actorEmail: user.email ?? "",
+      booking: {
+        bookingId,
+        vehicleId,
+        bookedByEmail: existingBooking.booked_by_email,
+        startsAt,
+        endsAt,
+        comments,
+      },
+      previousBooking: {
+        startsAt: existingBooking.starts_at,
+        endsAt: existingBooking.ends_at,
+        comments: existingBooking.comments,
+      },
+      notifyAdmins: true,
+    });
+  } catch (notificationError) {
+    console.error("Failed to send admin booking update email.", notificationError);
+  }
+
   clearFleetSnapshotCache();
   clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
@@ -239,10 +309,51 @@ export async function deleteAdminBooking(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const { data: booking, error: loadBookingError } = await supabase
+    .from("vehicle_bookings")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (loadBookingError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(loadBookingError.message)}`);
+  }
+
+  if (!booking) {
+    redirect(`/admin/vehicles/${vehicleId}?error=Booking not found.`);
+  }
+
   const { error } = await supabase.from("vehicle_bookings").delete().eq("id", bookingId);
 
   if (error) {
     redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  try {
+    await sendBookingNotificationEmail({
+      supabase,
+      action: "cancelled",
+      actorEmail: user.email ?? "",
+      booking: {
+        bookingId,
+        vehicleId: booking.vehicle_id,
+        bookedByEmail: booking.booked_by_email,
+        startsAt: booking.starts_at,
+        endsAt: booking.ends_at,
+        comments: booking.comments,
+      },
+      notifyAdmins: true,
+    });
+  } catch (notificationError) {
+    console.error("Failed to send admin booking cancellation email.", notificationError);
   }
 
   clearFleetSnapshotCache();

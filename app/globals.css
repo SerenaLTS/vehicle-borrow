@@ -525,11 +525,18 @@ input,
 textarea,
 select {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.9);
   padding: 15px 16px;
   color: var(--text);
+}
+
+input[type="datetime-local"] {
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 textarea {
@@ -1053,8 +1060,19 @@ th {
   }
 
   .heroGrid,
-  .detailList {
+  .detailList,
+  .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  .fieldLabel,
+  .formGrid > * {
+    min-width: 0;
+  }
+
+  input[type="datetime-local"] {
+    padding: 13px 12px;
+    font-size: 0.95rem;
   }
 
   .content {
