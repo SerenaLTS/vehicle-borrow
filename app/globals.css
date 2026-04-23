@@ -181,6 +181,14 @@ button:disabled {
   color: var(--muted);
 }
 
+.userIdentity {
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
 .headerActions {
   display: flex;
   flex-wrap: wrap;
@@ -1087,6 +1095,10 @@ th {
 
   .sidebarFooter {
     align-items: stretch;
+  }
+
+  .userIdentity {
+    font-size: 1.18rem;
   }
 
   .sidebarFooter .ghostButton {

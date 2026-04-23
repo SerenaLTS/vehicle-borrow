@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { cancelOwnBooking } from "@/app/book/actions";
@@ -151,11 +152,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   </Link>
                 </div>
                 {!hasStarted ? (
-                  <form action={cancelOwnBooking}>
+                  <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this booking?">
                     <input name="bookingId" type="hidden" value={booking.id} />
                     <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
                     <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
-                  </form>
+                  </ConfirmForm>
                 ) : null}
               </article>
             );

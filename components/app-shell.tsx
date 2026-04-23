@@ -24,7 +24,7 @@ export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Ba
           </div>
 
           <div className="sidebarFooter">
-            <p className="signedInAs">{userLabel}</p>
+            <p className="signedInAs userIdentity">{userLabel}</p>
             <div className="headerActions">
               {adminHref ? (
                 <Link className="ghostButton" href={adminHref}>
