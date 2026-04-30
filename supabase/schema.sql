@@ -442,6 +442,8 @@ $$;
 
 grant execute on function public.extend_vehicle_loan(uuid, timestamptz, text) to authenticated;
 
+notify pgrst, 'reload schema';
+
 create or replace function public.return_vehicle(
   p_loan_id uuid,
   p_end_odometer integer,

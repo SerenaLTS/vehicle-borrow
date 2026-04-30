@@ -81,3 +81,5 @@ end;
 $$;
 
 grant execute on function public.extend_vehicle_loan(uuid, timestamptz, text) to authenticated;
+
+notify pgrst, 'reload schema';
