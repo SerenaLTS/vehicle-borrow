@@ -11,7 +11,7 @@ import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
-import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking } from "@/lib/types";
+import { normalizeLoan, normalizeVehicleBooking, type LoanExtension, type RawLoanRow, type RawVehicleBooking } from "@/lib/types";
 
 type DashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -28,7 +28,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect("/");
   }
 
-  const [{ data: activeLoans }, { data: bookingData }, isAdmin, snapshot] = await Promise.all([
+  const [{ data: activeLoans }, { data: bookingData }, { data: extensionData }, isAdmin, snapshot] = await Promise.all([
     supabase
       .from("vehicle_loans")
       .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
@@ -41,12 +41,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .eq("booked_by_user_id", user.id)
       .gte("ends_at", new Date().toISOString())
       .order("starts_at", { ascending: true }),
+    supabase
+      .from("loan_extensions")
+      .select("id, loan_id, vehicle_id, extended_by_user_id, previous_expected_return_at, new_expected_return_at, reason, created_at")
+      .eq("extended_by_user_id", user.id)
+      .order("created_at", { ascending: false }),
     getIsAdmin(supabase, user.id),
     getFleetSnapshot(supabase),
   ]);
 
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);
   const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
+  const extensionsByLoanId = ((extensionData ?? []) as LoanExtension[]).reduce<Map<string, LoanExtension[]>>((grouped, extension) => {
+    const existing = grouped.get(extension.loan_id) ?? [];
+    existing.push(extension);
+    grouped.set(extension.loan_id, existing);
+    return grouped;
+  }, new Map());
   const message = typeof params.message === "string" ? params.message : null;
   const error = typeof params.error === "string" ? params.error : null;
   const now = Date.now();
@@ -110,33 +121,51 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <div className="emptyState">You do not have any vehicles borrowed right now.</div>
       ) : (
         <div className="cardsGrid">
-          {loans.map((loan) => (
-            <article className="vehicleCard" key={loan.id}>
-              <StatusPill status="borrowed" />
-              <h3>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
-              <p className="muted">{loan.vehicle?.model ?? "Vehicle"}</p>
-              <div className="vehicleMeta">
-                <span>Driver: {loan.driver_name}</span>
-                <span>Purpose: {loan.purpose}</span>
-                <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
-                <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
-              </div>
-              <form action={extendVehicleLoan} className="extensionForm">
-                <input name="loanId" type="hidden" value={loan.id} />
-                <input name="returnTo" type="hidden" value="/dashboard" />
-                <label className="fieldLabel">
-                  New expected return time
-                  <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" required type="datetime-local" />
-                </label>
-                <label className="fieldLabel">
-                  Reason
-                  <textarea name="extensionReason" placeholder="Explain why more time is needed..." required />
-                </label>
-                <SubmitButton className="secondaryButton" idleLabel="Extend" pendingLabel="Checking..." />
-              </form>
-            </article>
-          ))}
+          {loans.map((loan) => {
+            const extensions = extensionsByLoanId.get(loan.id) ?? [];
+
+            return (
+              <article className="vehicleCard" key={loan.id}>
+                <StatusPill status="borrowed" />
+                <h3>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                <p className="muted">{loan.vehicle?.model ?? "Vehicle"}</p>
+                <div className="vehicleMeta">
+                  <span>Driver: {loan.driver_name}</span>
+                  <span>Purpose: {loan.purpose}</span>
+                  <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
+                  <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
+                  <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
+                </div>
+                {extensions.length > 0 ? (
+                  <div className="extensionHistory">
+                    <strong>Extension history</strong>
+                    {extensions.map((extension) => (
+                      <div className="extensionHistoryItem" key={extension.id}>
+                        <span>{formatDateTime(extension.previous_expected_return_at)} to {formatDateTime(extension.new_expected_return_at)}</span>
+                        <span>Reason: {extension.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <details className="extensionDisclosure">
+                  <summary>Extend</summary>
+                  <form action={extendVehicleLoan} className="extensionForm">
+                    <input name="loanId" type="hidden" value={loan.id} />
+                    <input name="returnTo" type="hidden" value="/dashboard" />
+                    <label className="fieldLabel">
+                      New expected return time
+                      <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" required type="datetime-local" />
+                    </label>
+                    <label className="fieldLabel">
+                      Reason
+                      <textarea name="extensionReason" placeholder="Explain why more time is needed..." required />
+                    </label>
+                    <SubmitButton className="secondaryButton" idleLabel="Confirm extend" pendingLabel="Checking..." />
+                  </form>
+                </details>
+              </article>
+            );
+          })}
         </div>
       )}
 

@@ -1,3 +1,26 @@
+create table if not exists public.loan_extensions (
+  id uuid primary key default gen_random_uuid(),
+  loan_id uuid not null references public.vehicle_loans (id) on delete cascade,
+  vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+  extended_by_user_id uuid not null references auth.users (id),
+  previous_expected_return_at timestamptz,
+  new_expected_return_at timestamptz not null,
+  reason text not null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_loan_extensions_loan_id on public.loan_extensions (loan_id);
+create index if not exists idx_loan_extensions_vehicle_id on public.loan_extensions (vehicle_id);
+
+alter table public.loan_extensions enable row level security;
+
+drop policy if exists "Authenticated users can read loan extensions" on public.loan_extensions;
+create policy "Authenticated users can read loan extensions"
+on public.loan_extensions
+for select
+to authenticated
+using (true);
+
 create or replace function public.extend_vehicle_loan(
   p_loan_id uuid,
   p_expected_return_at timestamptz,
@@ -13,6 +36,7 @@ declare
   v_loan public.vehicle_loans;
   v_now timestamptz := timezone('utc', now());
   v_extension_note text;
+  v_previous_expected_return_at timestamptz;
 begin
   if v_user_id is null then
     raise exception 'You must be logged in to extend a borrow.';
@@ -48,6 +72,8 @@ begin
     raise exception 'Please choose a return time later than the current expected return time.';
   end if;
 
+  v_previous_expected_return_at := v_loan.expected_return_at;
+
   if exists (
     select 1
     from public.vehicle_bookings b
@@ -75,6 +101,23 @@ begin
   where id = p_loan_id
   returning *
   into v_loan;
+
+  insert into public.loan_extensions (
+    loan_id,
+    vehicle_id,
+    extended_by_user_id,
+    previous_expected_return_at,
+    new_expected_return_at,
+    reason
+  )
+  values (
+    v_loan.id,
+    v_loan.vehicle_id,
+    v_user_id,
+    v_previous_expected_return_at,
+    p_expected_return_at,
+    trim(p_extension_reason)
+  );
 
   return v_loan;
 end;

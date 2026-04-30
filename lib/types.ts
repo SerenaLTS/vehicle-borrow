@@ -49,6 +49,17 @@ export function normalizeLoan(row: RawLoanRow): LoanRow {
   };
 }
 
+export type LoanExtension = {
+  id: string;
+  loan_id: string;
+  vehicle_id: string;
+  extended_by_user_id: string;
+  previous_expected_return_at: string | null;
+  new_expected_return_at: string;
+  reason: string;
+  created_at: string;
+};
+
 export type VehicleBooking = {
   id: string;
   vehicle_id: string;
