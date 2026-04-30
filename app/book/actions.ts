@@ -254,3 +254,40 @@ export async function cancelOwnBooking(formData: FormData) {
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   redirect("/book?message=Booking cancelled successfully.");
 }
+
+export async function collectBookingKey(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+
+  if (!bookingId || !vehicleId) {
+    redirect("/book?error=Booking not found.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const { error } = await supabase.rpc("collect_booking_key", {
+    p_booking_id: bookingId,
+  });
+
+  if (error) {
+    redirect(`/book?error=${encodeURIComponent(error.message)}`);
+  }
+
+  clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
+  revalidatePath("/dashboard");
+  revalidatePath("/book");
+  revalidatePath("/borrow");
+  revalidatePath("/return");
+  revalidatePath("/history");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  redirect("/dashboard?message=Key collected. Booking converted to active borrow.");
+}

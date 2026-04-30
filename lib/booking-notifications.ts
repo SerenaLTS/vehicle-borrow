@@ -32,6 +32,8 @@ export type BookingNotificationSnapshot = {
   comments: string | null;
 };
 
+export type KeyCollectionReminderSnapshot = BookingNotificationSnapshot;
+
 type BookingNotificationAction = "created" | "updated" | "cancelled";
 
 type BookingNotificationParams = {
@@ -221,5 +223,55 @@ export async function sendBookingNotificationEmail({
       previousBooking,
       vehicleLabel,
     }),
+  });
+}
+
+export async function sendKeyCollectionReminderEmail({
+  supabase,
+  booking,
+}: {
+  supabase: unknown;
+  booking: KeyCollectionReminderSnapshot;
+}) {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
+    return;
+  }
+
+  const vehicle = await getVehicleForNotification(supabase, booking.vehicleId);
+  const vehicleLabel = buildVehicleLabel(vehicle);
+  const recipient = booking.bookedByEmail.trim().toLowerCase();
+
+  if (!recipient) {
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: recipient,
+    subject: `Have you collected the key? ${vehicleLabel}`,
+    text: [
+      "Your vehicle booking has reached its start time.",
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Start time: ${formatDateTime(booking.startsAt)}`,
+      `End time: ${formatDateTime(booking.endsAt)}`,
+      `Comments: ${booking.comments || "-"}`,
+      "",
+      "If you have collected the key, open Vehicle Borrow and select Key collected on your booking. This will convert the booking into an active borrow.",
+      "",
+      "Booking alone is not enough once the key has been collected.",
+    ].join("\n"),
   });
 }

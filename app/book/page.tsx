@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
-import { cancelOwnBooking, createBooking, updateOwnBooking } from "@/app/book/actions";
+import { cancelOwnBooking, collectBookingKey, createBooking, updateOwnBooking } from "@/app/book/actions";
 import { VehicleScheduleTimeline } from "@/components/vehicle-schedule-timeline";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
@@ -129,8 +129,14 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <span>Created: {formatDateTime(booking.created_at)}</span>
                 </div>
 
+                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
+                  <input name="bookingId" type="hidden" value={booking.id} />
+                  <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                  <SubmitButton className="primaryButton" idleLabel="Key collected" pendingLabel="Converting..." />
+                </ConfirmForm>
+
                 {hasStarted ? (
-                  <p className="muted">This booking has already started, so it can no longer be changed here.</p>
+                  <p className="muted">This booking has already started, so only key collection is available here.</p>
                 ) : (
                   <>
                     <ConfirmForm action={updateOwnBooking} confirmMessage="Confirm updating this booking?">

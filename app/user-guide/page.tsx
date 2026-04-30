@@ -125,6 +125,8 @@ export default function UserGuidePage() {
             <li>Booking is only a reservation.</li>
             <li>You must still complete Borrow when you collect the key.</li>
           </ul>
+          <h3>Key collected</h3>
+          <p>If you already have a booking and have collected the key, select Key collected on your booking. The system will convert the booking into an active borrow.</p>
           <h3>If blocked</h3>
           <p>This usually means the vehicle is already booked, or your selected time overlaps.</p>
           <p>Choose another vehicle or adjust the time.</p>
