@@ -81,6 +81,9 @@ export default function UserGuidePage() {
             <li>Record Borrow immediately after collecting the key.</li>
             <li>Delays may cause booking conflicts or tracking issues.</li>
           </ul>
+          <h3>Extend</h3>
+          <p>If you need more time, use Extend on the Borrow page. Choose a later expected return time and enter a clear reason.</p>
+          <p>If the new time conflicts with the next booking, the extension will fail. Choose an earlier time or contact the team.</p>
           <h3>If blocked</h3>
           <p>This usually means the vehicle is already booked, or your time overlaps with an existing booking.</p>
           <p>Choose another vehicle or time.</p>

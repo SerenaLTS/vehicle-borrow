@@ -4,10 +4,12 @@ import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { VehicleScheduleTimeline } from "@/components/vehicle-schedule-timeline";
 import { createClient } from "@/lib/supabase/server";
+import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
+import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
-import { borrowVehicle } from "@/app/borrow/actions";
+import { borrowVehicle, extendVehicleLoan } from "@/app/borrow/actions";
 
 type BorrowPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -24,8 +26,18 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     redirect("/");
   }
 
-  const [isAdmin, snapshot] = await Promise.all([getIsAdmin(supabase, user.id), getFleetSnapshot(supabase)]);
+  const [isAdmin, snapshot, { data: loanData }] = await Promise.all([
+    getIsAdmin(supabase, user.id),
+    getFleetSnapshot(supabase),
+    supabase
+      .from("vehicle_loans")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .eq("borrowed_by_user_id", user.id)
+      .is("returned_at", null)
+      .order("borrowed_at", { ascending: false }),
+  ]);
   const vehicles = snapshot.vehicles.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance");
+  const activeLoans = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
 
@@ -54,6 +66,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     return displayStatus === "booked";
   });
   const error = typeof params.error === "string" ? params.error : null;
+  const message = typeof params.message === "string" ? params.message : null;
 
   return (
     <AppShell
@@ -65,6 +78,47 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       adminHref={isAdmin ? "/admin" : undefined}
       helpHref="/user-guide#borrow"
     >
+      {message ? <p className="message">{message}</p> : null}
+
+      {activeLoans.length > 0 ? (
+        <>
+          <section className="sectionHeader compactSectionHeader">
+            <div>
+              <h2>Extend active borrow</h2>
+              <p className="muted">Need more time? Choose a later expected return time and explain why.</p>
+            </div>
+          </section>
+
+          <div className="cardsGrid">
+            {activeLoans.map((loan) => (
+              <article className="vehicleCard" key={loan.id}>
+                <StatusPill status="borrowed" />
+                <h3>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                <p className="muted">{loan.vehicle?.model ?? "Vehicle"}</p>
+                <div className="vehicleMeta">
+                  <span>Purpose: {loan.purpose}</span>
+                  <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
+                  <span>Current expected return: {formatDateTime(loan.expected_return_at)}</span>
+                </div>
+
+                <form action={extendVehicleLoan} className="extensionForm">
+                  <input name="loanId" type="hidden" value={loan.id} />
+                  <label className="fieldLabel">
+                    New expected return time
+                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" required type="datetime-local" />
+                  </label>
+                  <label className="fieldLabel">
+                    Reason
+                    <textarea name="extensionReason" placeholder="Explain why more time is needed..." required />
+                  </label>
+                  <SubmitButton className="secondaryButton" idleLabel="Extend" pendingLabel="Checking..." />
+                </form>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
+
       <section className="panel">
         <h2>Borrow a vehicle</h2>
         <p className="muted">Borrowing requires an expected return time. If that window overlaps an existing booking, the system will block the borrow automatically.</p>

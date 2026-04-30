@@ -64,3 +64,56 @@ export async function borrowVehicle(formData: FormData) {
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   redirect("/dashboard?message=Vehicle borrowed successfully.");
 }
+
+export async function extendVehicleLoan(formData: FormData) {
+  const loanId = String(formData.get("loanId") ?? "");
+  const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
+  const extensionReason = String(formData.get("extensionReason") ?? "").trim();
+  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
+
+  if (!loanId || !expectedReturnAt || !extensionReason) {
+    redirect("/borrow?error=Please choose a new return time and enter an extension reason.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const { data: loanRecord, error: loanLoadError } = await supabase
+    .from("vehicle_loans")
+    .select("vehicle_id")
+    .eq("id", loanId)
+    .maybeSingle();
+
+  if (loanLoadError) {
+    redirect(`/borrow?error=${encodeURIComponent(loanLoadError.message)}`);
+  }
+
+  const { error } = await supabase.rpc("extend_vehicle_loan", {
+    p_loan_id: loanId,
+    p_expected_return_at: expectedReturnAt,
+    p_extension_reason: extensionReason,
+  });
+
+  if (error) {
+    redirect(`/borrow?error=${encodeURIComponent(error.message)}`);
+  }
+
+  clearFleetSnapshotCache();
+  clearVehicleCalendarCache(loanRecord?.vehicle_id ?? undefined);
+  revalidatePath("/dashboard");
+  revalidatePath("/borrow");
+  revalidatePath("/book");
+  revalidatePath("/return");
+  revalidatePath("/history");
+  revalidatePath("/admin");
+  if (loanRecord?.vehicle_id) {
+    revalidatePath(`/admin/vehicles/${loanRecord.vehicle_id}`);
+  }
+  redirect("/borrow?message=Borrow time extended successfully.");
+}

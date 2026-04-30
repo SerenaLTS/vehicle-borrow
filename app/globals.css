@@ -359,6 +359,12 @@ button:disabled {
   margin-top: 16px;
 }
 
+.extensionForm {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
 .calendarTriggerButton {
   min-height: 40px;
   margin-top: 16px;
