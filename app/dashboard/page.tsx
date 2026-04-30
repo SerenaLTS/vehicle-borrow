@@ -54,6 +54,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       subtitle="Track the current borrowing status of company vehicles."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       adminHref={isAdmin ? "/admin" : undefined}
+      helpHref="/user-guide#quick-decision-guide"
     >
       <section className="sectionHeader">
         <div>

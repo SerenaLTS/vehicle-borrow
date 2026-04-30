@@ -63,6 +63,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       backHref="/dashboard"
       backLabel="Dashboard"
       adminHref={isAdmin ? "/admin" : undefined}
+      helpHref="/user-guide#borrow"
     >
       <section className="panel">
         <h2>Borrow a vehicle</h2>

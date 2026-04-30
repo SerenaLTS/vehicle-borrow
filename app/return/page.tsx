@@ -42,6 +42,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
       backHref="/dashboard"
       backLabel="Dashboard"
       adminHref={isAdmin ? "/admin" : undefined}
+      helpHref="/user-guide#return"
     >
       <section className="panel">
         <h2>Return a vehicle</h2>

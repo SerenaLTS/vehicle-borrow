@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { signInWithPassword, signUpWithPassword } from "@/app/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,6 +23,10 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <div className="authPage">
+      <Link aria-label="Open login guide" className="helpButton" href="/user-guide#login" title="User guide">
+        ?
+      </Link>
+
       <section className="authStack">
         <header className="authHeader">
           <p className="eyebrow">Vehicle Borrow</p>

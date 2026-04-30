@@ -9,12 +9,19 @@ type AppShellProps = {
   backHref?: string;
   backLabel?: string;
   adminHref?: string;
+  helpHref?: string;
   children: ReactNode;
 };
 
-export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Back to dashboard", adminHref, children }: AppShellProps) {
+export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Back to dashboard", adminHref, helpHref, children }: AppShellProps) {
   return (
     <div className="pageShell">
+      {helpHref ? (
+        <Link aria-label="Open user guide" className="helpButton" href={helpHref} title="User guide">
+          ?
+        </Link>
+      ) : null}
+
       <aside className="sidebar">
         <div className="sidebarTop">
           <div>

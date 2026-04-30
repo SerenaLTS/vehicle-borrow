@@ -46,6 +46,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       backHref="/dashboard"
       backLabel="Dashboard"
       adminHref={isAdmin ? "/admin" : undefined}
+      helpHref="/user-guide#book"
     >
       {message ? <p className="message">{message}</p> : null}
 
