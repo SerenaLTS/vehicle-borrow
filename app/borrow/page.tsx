@@ -103,6 +103,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
                 <form action={extendVehicleLoan} className="extensionForm">
                   <input name="loanId" type="hidden" value={loan.id} />
+                  <input name="returnTo" type="hidden" value="/borrow" />
                   <label className="fieldLabel">
                     New expected return time
                     <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" required type="datetime-local" />

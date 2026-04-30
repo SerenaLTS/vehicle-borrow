@@ -5,7 +5,9 @@ import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { cancelOwnBooking } from "@/app/book/actions";
+import { extendVehicleLoan } from "@/app/borrow/actions";
 import { createClient } from "@/lib/supabase/server";
+import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
@@ -46,6 +48,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);
   const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const message = typeof params.message === "string" ? params.message : null;
+  const error = typeof params.error === "string" ? params.error : null;
   const now = Date.now();
 
   return (
@@ -83,6 +86,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </section>
 
       {message ? <p className="message">{message}</p> : null}
+      {error ? <p className="message error">{error}</p> : null}
 
       <section className="statsGrid">
         <article className="statCard">
@@ -118,6 +122,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
                 <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
               </div>
+              <form action={extendVehicleLoan} className="extensionForm">
+                <input name="loanId" type="hidden" value={loan.id} />
+                <input name="returnTo" type="hidden" value="/dashboard" />
+                <label className="fieldLabel">
+                  New expected return time
+                  <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" required type="datetime-local" />
+                </label>
+                <label className="fieldLabel">
+                  Reason
+                  <textarea name="extensionReason" placeholder="Explain why more time is needed..." required />
+                </label>
+                <SubmitButton className="secondaryButton" idleLabel="Extend" pendingLabel="Checking..." />
+              </form>
             </article>
           ))}
         </div>

@@ -7,6 +7,12 @@ import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { createClient } from "@/lib/supabase/server";
 
+function getExtendReturnPath(formData: FormData) {
+  const returnTo = String(formData.get("returnTo") ?? "");
+
+  return returnTo === "/dashboard" ? "/dashboard" : "/borrow";
+}
+
 export async function borrowVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "");
   const customDriverName = String(formData.get("driverName") ?? "").trim();
@@ -66,13 +72,14 @@ export async function borrowVehicle(formData: FormData) {
 }
 
 export async function extendVehicleLoan(formData: FormData) {
+  const returnPath = getExtendReturnPath(formData);
   const loanId = String(formData.get("loanId") ?? "");
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
   const extensionReason = String(formData.get("extensionReason") ?? "").trim();
   const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
 
   if (!loanId || !expectedReturnAt || !extensionReason) {
-    redirect("/borrow?error=Please choose a new return time and enter an extension reason.");
+    redirect(`${returnPath}?error=Please choose a new return time and enter an extension reason.`);
   }
 
   const supabase = await createClient();
@@ -91,7 +98,7 @@ export async function extendVehicleLoan(formData: FormData) {
     .maybeSingle();
 
   if (loanLoadError) {
-    redirect(`/borrow?error=${encodeURIComponent(loanLoadError.message)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(loanLoadError.message)}`);
   }
 
   const { error } = await supabase.rpc("extend_vehicle_loan", {
@@ -101,7 +108,7 @@ export async function extendVehicleLoan(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/borrow?error=${encodeURIComponent(error.message)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
   clearFleetSnapshotCache();
@@ -115,5 +122,5 @@ export async function extendVehicleLoan(formData: FormData) {
   if (loanRecord?.vehicle_id) {
     revalidatePath(`/admin/vehicles/${loanRecord.vehicle_id}`);
   }
-  redirect("/borrow?message=Borrow time extended successfully.");
+  redirect(`${returnPath}?message=Borrow time extended successfully.`);
 }
