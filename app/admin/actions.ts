@@ -6,6 +6,7 @@ import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { sendBookingNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
@@ -131,6 +132,93 @@ export async function updateVehicle(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/dashboard");
   redirect("/admin?message=Vehicle updated successfully.");
+}
+
+export async function adminReturnVehicle(formData: FormData) {
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const loanId = String(formData.get("loanId") ?? "").trim();
+  const endOdometerValue = String(formData.get("endOdometer") ?? "").trim();
+  const returnNotes = String(formData.get("returnNotes") ?? "").trim();
+  const endOdometer = endOdometerValue ? Number(endOdometerValue) : null;
+
+  if (!vehicleId || !loanId || !returnNotes || (endOdometer !== null && (Number.isNaN(endOdometer) || endOdometer < 0))) {
+    redirect("/admin?error=Please enter a valid admin return note and odometer.");
+  }
+
+  const supabase = await requireAdmin();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const adminClient = createAdminClient();
+
+  const { data: loanRecord, error: loanLoadError } = await adminClient
+    .from("vehicle_loans")
+    .select("id, vehicle_id, start_odometer, returned_at, return_notes")
+    .eq("id", loanId)
+    .eq("vehicle_id", vehicleId)
+    .maybeSingle();
+
+  if (loanLoadError) {
+    redirect(`/admin?error=${encodeURIComponent(loanLoadError.message)}`);
+  }
+
+  if (!loanRecord) {
+    redirect("/admin?error=Active loan record not found.");
+  }
+
+  if (loanRecord.returned_at) {
+    redirect("/admin?error=This vehicle has already been returned.");
+  }
+
+  if (endOdometer !== null && loanRecord.start_odometer !== null && endOdometer < Number(loanRecord.start_odometer)) {
+    redirect("/admin?error=Return odometer cannot be less than the borrow odometer.");
+  }
+
+  const adminReturnNote = `Admin return by ${user?.email ?? "admin"}: ${returnNotes}`;
+  const combinedReturnNotes = loanRecord.return_notes ? `${loanRecord.return_notes}\n${adminReturnNote}` : adminReturnNote;
+
+  const { data: returnedLoan, error: updateLoanError } = await adminClient
+    .from("vehicle_loans")
+    .update({
+      end_odometer: endOdometer,
+      return_notes: combinedReturnNotes,
+      returned_at: new Date().toISOString(),
+    })
+    .eq("id", loanId)
+    .is("returned_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (updateLoanError) {
+    redirect(`/admin?error=${encodeURIComponent(updateLoanError.message)}`);
+  }
+
+  if (!returnedLoan) {
+    redirect("/admin?error=This vehicle has already been returned.");
+  }
+
+  const { error: updateVehicleError } = await adminClient
+    .from("vehicles")
+    .update({
+      status: "available",
+      current_holder_user_id: null,
+    })
+    .eq("id", vehicleId);
+
+  if (updateVehicleError) {
+    redirect(`/admin?error=${encodeURIComponent(updateVehicleError.message)}`);
+  }
+
+  clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/borrow");
+  revalidatePath("/book");
+  revalidatePath("/return");
+  revalidatePath("/history");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  redirect("/admin?message=Vehicle returned by admin successfully.");
 }
 
 export async function createAdminBooking(formData: FormData) {

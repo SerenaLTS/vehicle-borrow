@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { adminReturnVehicle, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
@@ -225,20 +226,52 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
 
               {activeLoan ? (
-                <div className="vehicleMeta borrowedSummary">
-                  <span>
-                    <strong>Borrower</strong>
-                    {activeLoan.borrower_email}
-                  </span>
-                  <span>
-                    <strong>Borrowed at</strong>
-                    {formatDateTime(activeLoan.borrowed_at)}
-                  </span>
-                  <span>
-                    <strong>Driver</strong>
-                    {activeLoan.driver_name || "-"}
-                  </span>
-                </div>
+                <>
+                  <div className="vehicleMeta borrowedSummary">
+                    <span>
+                      <strong>Borrower</strong>
+                      {activeLoan.borrower_email}
+                    </span>
+                    <span>
+                      <strong>Borrowed at</strong>
+                      {formatDateTime(activeLoan.borrowed_at)}
+                    </span>
+                    <span>
+                      <strong>Driver</strong>
+                      {activeLoan.driver_name || "-"}
+                    </span>
+                    <span>
+                      <strong>Start odometer</strong>
+                      {activeLoan.start_odometer?.toLocaleString() ?? "-"}{activeLoan.start_odometer !== null ? " km" : ""}
+                    </span>
+                  </div>
+
+                  <details className="extensionDisclosure adminReturnDisclosure">
+                    <summary>Admin return</summary>
+                    <ConfirmForm
+                      action={adminReturnVehicle}
+                      className="extensionForm"
+                      confirmMessage="Confirm admin return? This will close the active borrow record and make the vehicle available."
+                    >
+                      <input name="vehicleId" type="hidden" value={vehicle.id} />
+                      <input name="loanId" type="hidden" value={activeLoan.id} />
+                      <label className="fieldLabel">
+                        Return odometer
+                        <input
+                          min={activeLoan.start_odometer ?? 0}
+                          name="endOdometer"
+                          placeholder={activeLoan.start_odometer !== null ? `${activeLoan.start_odometer}` : "Optional"}
+                          type="number"
+                        />
+                      </label>
+                      <label className="fieldLabel">
+                        Admin return note
+                        <textarea name="returnNotes" placeholder="Borrower forgot to return in system, confirmed key/vehicle returned..." required />
+                      </label>
+                      <SubmitButton className="primaryButton" idleLabel="Return vehicle" pendingLabel="Returning..." />
+                    </ConfirmForm>
+                  </details>
+                </>
               ) : null}
 
               {!activeLoan && nextBooking ? (

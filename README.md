@@ -31,6 +31,8 @@ cp .env.example .env.local
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+CRON_SECRET=your-random-cron-secret
 COMPANY_EMAIL_DOMAIN=yourcompany.com
 SMTP_HOST=smtp.yourmailprovider.com
 SMTP_PORT=587
@@ -82,6 +84,8 @@ npm run dev
 4. In Vercel `Environment Variables`, add:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `CRON_SECRET`
    - `COMPANY_EMAIL_DOMAIN`
    - `SMTP_HOST`
    - `SMTP_PORT`
@@ -140,6 +144,7 @@ New auth users are synced into `user_roles` automatically.
 - You can use your own mailbox as the sender if your provider supports SMTP access.
 - For Gmail, Outlook, and many company mail systems, this usually means using an app password or a dedicated SMTP credential, not your normal sign-in password.
 - If the SMTP variables are not set, the app skips email sending and booking still succeeds.
+- `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` are required for the scheduled key-collection reminder endpoint in production.
 
 ## Useful commands
 
