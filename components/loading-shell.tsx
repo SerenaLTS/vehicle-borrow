@@ -1,3 +1,5 @@
+import { APP_NAME } from "@/lib/app-config";
+
 type LoadingShellProps = {
   title?: string;
   subtitle?: string;
@@ -11,7 +13,7 @@ export function LoadingShell({
     <div className="loadingScreen" role="status" aria-live="polite">
       <div className="loadingBackdrop">
         <div className="loadingHeader">
-          <p className="eyebrow">Vehicle Borrow</p>
+          <p className="eyebrow">{APP_NAME}</p>
           <h1>{title}</h1>
           <p className="sidebarCopy">{subtitle}</p>
         </div>

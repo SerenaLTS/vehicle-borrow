@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { APP_NAME } from "@/lib/app-config";
 
-const siteUrl = "https://vehicle-borrow.vercel.app/";
+const siteUrl = "https://vehicle-usage-management.vercel.app/";
 
 export default function UserGuidePage() {
   return (
@@ -11,7 +12,7 @@ export default function UserGuidePage() {
 
       <article className="guidePanel">
         <header className="guideHero">
-          <p className="eyebrow">Vehicle Borrow</p>
+          <p className="eyebrow">{APP_NAME}</p>
           <h1>User Guide</h1>
           <p className="heroLead">
             Save the link for future use:{" "}
@@ -49,7 +50,7 @@ export default function UserGuidePage() {
         </section>
 
         <section className="guideSection" id="what-the-system-does">
-          <h2>What the system does</h2>
+          <h2>What {APP_NAME} does</h2>
           <ul>
             <li>Borrow: when you are using a vehicle.</li>
             <li>Return: when you finish using a vehicle.</li>
@@ -126,7 +127,7 @@ export default function UserGuidePage() {
             <li>You must still complete Borrow when you collect the key.</li>
           </ul>
           <h3>Key collected</h3>
-          <p>If you already have a booking and have collected the key, select Key collected on your booking. The system will convert the booking into an active borrow.</p>
+          <p>If you already have a booking and have collected the key, select Key collected on your booking. {APP_NAME} will convert the booking into an active borrow.</p>
           <h3>If blocked</h3>
           <p>This usually means the vehicle is already booked, or your selected time overlaps.</p>
           <p>Choose another vehicle or adjust the time.</p>

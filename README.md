@@ -1,6 +1,6 @@
-# Vehicle Borrow
+# vehicle-usage-management
 
-Internal vehicle borrowing tracker built with Next.js, Supabase, and Vercel.
+Internal vehicle usage management system built with Next.js, Supabase, and Vercel.
 
 ## What is included
 
@@ -37,7 +37,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your-email@yourcompany.com
 SMTP_PASS=your-app-password-or-smtp-password
-SMTP_FROM=Vehicle Borrow <your-email@yourcompany.com>
+SMTP_FROM=vehicle-usage-management <your-email@yourcompany.com>
 ```
 
 4. In Supabase SQL Editor, run [`supabase/schema.sql`](./supabase/schema.sql)
@@ -67,7 +67,7 @@ npm run dev
 2. Make sure `Email` is enabled.
 3. Make sure email/password sign-in is enabled.
 4. In `Authentication -> URL Configuration`, set:
-   - `Site URL` to your deployed Vercel domain later, for example `https://vehicle-borrow.vercel.app`
+   - `Site URL` to your deployed Vercel domain later, for example `https://vehicle-usage-management.vercel.app`
    - `Redirect URLs` to:
      - `http://localhost:3000/auth/callback`
      - `https://YOUR-VERCEL-DOMAIN/auth/callback`

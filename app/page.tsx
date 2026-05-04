@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signInWithPassword, signUpWithPassword } from "@/app/auth/actions";
+import { APP_NAME } from "@/lib/app-config";
 import { createClient } from "@/lib/supabase/server";
 
 type HomeProps = {
@@ -29,8 +30,8 @@ export default async function Home({ searchParams }: HomeProps) {
 
       <section className="authStack">
         <header className="authHeader">
-          <p className="eyebrow">Vehicle Borrow</p>
-          <h1>Company vehicle tracker</h1>
+          <p className="eyebrow">{APP_NAME}</p>
+          <h1>Company vehicle usage management</h1>
           <p className="heroLead">Create your password once, then sign in with email and password.</p>
         </header>
 

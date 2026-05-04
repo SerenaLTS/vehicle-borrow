@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Vehicle Borrow",
-  description: "Internal vehicle borrowing tracker",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

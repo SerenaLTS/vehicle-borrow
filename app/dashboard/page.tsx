@@ -105,7 +105,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <p className="statValue">{loans.length}</p>
         </article>
         <article className="statCard">
-          <p className="statLabel">Total fleet in system</p>
+          <p className="statLabel">Total managed fleet</p>
           <p className="statValue">{snapshot.totalFleetCount}</p>
         </article>
       </section>

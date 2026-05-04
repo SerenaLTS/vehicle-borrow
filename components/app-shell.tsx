@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
+import { APP_NAME } from "@/lib/app-config";
 
 type AppShellProps = {
   title: string;
@@ -25,7 +26,7 @@ export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Ba
       <aside className="sidebar">
         <div className="sidebarTop">
           <div>
-            <p className="eyebrow">Vehicle Borrow</p>
+            <p className="eyebrow">{APP_NAME}</p>
             <h1>{title}</h1>
             <p className="sidebarCopy">{subtitle}</p>
           </div>

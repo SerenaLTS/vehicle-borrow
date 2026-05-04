@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { APP_NAME } from "@/lib/app-config";
 import { formatDateTime } from "@/lib/utils";
 
 type SupabaseNotificationClient = {
@@ -269,7 +270,7 @@ export async function sendKeyCollectionReminderEmail({
       `End time: ${formatDateTime(booking.endsAt)}`,
       `Comments: ${booking.comments || "-"}`,
       "",
-      "If you have collected the key, open Vehicle Borrow and select Key collected on your booking. This will convert the booking into an active borrow.",
+      `If you have collected the key, open ${APP_NAME} and select Key collected on your booking. This will convert the booking into an active borrow.`,
       "",
       "Booking alone is not enough once the key has been collected.",
     ].join("\n"),
