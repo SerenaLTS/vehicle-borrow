@@ -1,3 +1,5 @@
+import { APP_TIME_ZONE } from "@/lib/datetime";
+
 export function formatDisplayName(email: string) {
   const local = email.split("@")[0] ?? "";
 
@@ -18,6 +20,7 @@ export function formatDateTime(value: string | null) {
   }
 
   return new Intl.DateTimeFormat("en-AU", {
+    timeZone: APP_TIME_ZONE,
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));

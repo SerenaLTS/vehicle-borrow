@@ -185,8 +185,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <tr key={role.user_id}>
                 <td>{role.email}</td>
                 <td>{role.is_admin ? "Yes" : "No"}</td>
-                <td>{new Date(role.created_at).toLocaleString("en-AU")}</td>
-                <td>{new Date(role.updated_at).toLocaleString("en-AU")}</td>
+                <td>{formatDateTime(role.created_at)}</td>
+                <td>{formatDateTime(role.updated_at)}</td>
               </tr>
             ))}
           </tbody>
