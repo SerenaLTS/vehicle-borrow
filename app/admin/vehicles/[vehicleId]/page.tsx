@@ -5,11 +5,11 @@ import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
-import { createAdminBooking, deleteAdminBooking, updateAdminBooking } from "@/app/admin/actions";
+import { createAdminBooking, createHistoricalLoan, deleteAdminBooking, updateAdminBooking, updateHistoricalLoan } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
-import { getIsAdmin } from "@/lib/user-roles";
+import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
@@ -39,7 +39,12 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     redirect("/dashboard?message=Admin access required.");
   }
 
-  const [{ data: vehicle, error: vehicleError }, { data: loanData, error: loansError }, { data: bookingData, error: bookingError }] = await Promise.all([
+  const [
+    { data: vehicle, error: vehicleError },
+    { data: loanData, error: loansError },
+    { data: bookingData, error: bookingError },
+    { data: roleData, error: rolesError },
+  ] = await Promise.all([
     supabase
       .from("vehicles")
       .select(getVehicleSelectClause(optionalFieldSupport))
@@ -57,6 +62,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .eq("vehicle_id", vehicleId)
       .order("starts_at", { ascending: true }),
+    supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
   ]);
 
   if (vehicleError) {
@@ -75,8 +81,14 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
   }
 
+  if (rolesError) {
+    redirect(`/admin?error=${encodeURIComponent(rolesError.message)}`);
+  }
+
   const record = vehicle as unknown as Vehicle;
   const history = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
+  const userRoles = (roleData ?? []) as UserRole[];
+  const defaultBorrowerUserId = userRoles.some((role) => role.user_id === user.id) ? user.id : "";
   const currentLoan = history.find((loan) => loan.returned_at === null) ?? null;
   const bookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
   const now = Date.now();
@@ -297,45 +309,182 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         </div>
       )}
 
+      <section className="panel">
+        <h2>Add past borrow record</h2>
+        <p className="muted">Use the admin portal account as borrowed by, then enter the colleague or contact who actually drove the vehicle.</p>
+        {userRoles.length === 0 ? (
+          <div className="emptyState">No users are available yet. Ask the borrower to sign in once, then add the historical record.</div>
+        ) : (
+          <form action={createHistoricalLoan}>
+            <input name="vehicleId" type="hidden" value={record.id} />
+
+            <div className="formGrid">
+              <label className="fieldLabel">
+                Borrowed by portal account
+                <select name="borrowerUserId" required defaultValue={defaultBorrowerUserId}>
+                  <option disabled value="">
+                    Select a user
+                  </option>
+                  {userRoles.map((role) => (
+                    <option key={role.user_id} value={role.user_id}>
+                      {role.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="fieldLabel">
+                Actual driver
+                <input name="driverName" placeholder="Colleague or contact name" required />
+              </label>
+            </div>
+
+            <label className="fieldLabel">
+              Purpose
+              <input name="purpose" placeholder="Demo, delivery, service..." required />
+            </label>
+
+            <div className="formGrid">
+              <label className="fieldLabel">
+                Borrowed time
+                <input name="borrowedAt" required type="datetime-local" />
+              </label>
+              <label className="fieldLabel">
+                Expected return
+                <input name="expectedReturnAt" type="datetime-local" />
+              </label>
+              <label className="fieldLabel">
+                Returned time
+                <input name="returnedAt" required type="datetime-local" />
+              </label>
+            </div>
+
+            <div className="formGrid">
+              <label className="fieldLabel">
+                Start KM
+                <input min="0" name="startOdometer" type="number" />
+              </label>
+              <label className="fieldLabel">
+                End KM
+                <input min="0" name="endOdometer" type="number" />
+              </label>
+            </div>
+
+            <div className="formGrid">
+              <label className="fieldLabel">
+                Borrow notes
+                <textarea name="borrowNotes" placeholder="Pickup notes, condition, handover..." />
+              </label>
+              <label className="fieldLabel">
+                Return notes
+                <textarea name="returnNotes" placeholder="Return condition, key returned, fuel..." />
+              </label>
+            </div>
+
+            <SubmitButton className="primaryButton" idleLabel="Add past record" pendingLabel="Saving..." />
+          </form>
+        )}
+      </section>
+
       <section className="sectionHeader">
         <div>
           <h2>Borrow records</h2>
-          <p className="muted">All recorded loans for this vehicle, newest first.</p>
+          <p className="muted">All recorded loans for this vehicle, newest first. Returned records can be edited here.</p>
         </div>
       </section>
 
       {history.length === 0 ? (
         <div className="emptyState">No borrowing history has been recorded for this vehicle yet.</div>
       ) : (
-        <div className="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Borrower</th>
-                <th>Driver</th>
-                <th>Purpose</th>
-                <th>Borrowed</th>
-                <th>Expected return</th>
-                <th>Returned</th>
-                <th>Start KM</th>
-                <th>End KM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((loan) => (
-                <tr key={loan.id}>
-                  <td>{loan.borrower_email}</td>
-                  <td>{loan.driver_name}</td>
-                  <td>{loan.purpose}</td>
-                  <td>{formatDateTime(loan.borrowed_at)}</td>
-                  <td>{formatDateTime(loan.expected_return_at)}</td>
-                  <td>{formatDateTime(loan.returned_at)}</td>
-                  <td>{loan.start_odometer?.toLocaleString() ?? "-"}</td>
-                  <td>{loan.end_odometer?.toLocaleString() ?? "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="cardsGrid">
+          {history.map((loan) => (
+            <article className="vehicleCard" key={loan.id}>
+              <StatusPill status={loan.returned_at ? "available" : "borrowed"} />
+              <h3>{loan.borrower_email}</h3>
+              <p className="muted">
+                {formatDateTime(loan.borrowed_at)} to {formatDateTime(loan.returned_at)}
+              </p>
+              <div className="vehicleMeta">
+                <span>Driver: {loan.driver_name}</span>
+                <span>Purpose: {loan.purpose}</span>
+                <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
+                <span>Start KM: {loan.start_odometer?.toLocaleString() ?? "-"}</span>
+                <span>End KM: {loan.end_odometer?.toLocaleString() ?? "-"}</span>
+              </div>
+
+              {loan.returned_at ? (
+                <details className="extensionDisclosure">
+                  <summary>Edit returned record</summary>
+                  <ConfirmForm action={updateHistoricalLoan} className="extensionForm" confirmMessage="Confirm updating this returned borrow record?">
+                    <input name="loanId" type="hidden" value={loan.id} />
+                    <input name="vehicleId" type="hidden" value={record.id} />
+
+                      <div className="formGrid">
+                        <label className="fieldLabel">
+                        Borrowed by portal account
+                        <select name="borrowerUserId" required defaultValue={loan.borrowed_by_user_id}>
+                          {userRoles.map((role) => (
+                            <option key={role.user_id} value={role.user_id}>
+                              {role.email}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="fieldLabel">
+                        Actual driver
+                        <input defaultValue={loan.driver_name} name="driverName" required />
+                      </label>
+                    </div>
+
+                    <label className="fieldLabel">
+                      Purpose
+                      <input defaultValue={loan.purpose} name="purpose" required />
+                    </label>
+
+                    <div className="formGrid">
+                      <label className="fieldLabel">
+                        Borrowed time
+                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.borrowed_at)} name="borrowedAt" required type="datetime-local" />
+                      </label>
+                      <label className="fieldLabel">
+                        Expected return
+                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" type="datetime-local" />
+                      </label>
+                      <label className="fieldLabel">
+                        Returned time
+                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.returned_at)} name="returnedAt" required type="datetime-local" />
+                      </label>
+                    </div>
+
+                    <div className="formGrid">
+                      <label className="fieldLabel">
+                        Start KM
+                        <input defaultValue={loan.start_odometer ?? ""} min="0" name="startOdometer" type="number" />
+                      </label>
+                      <label className="fieldLabel">
+                        End KM
+                        <input defaultValue={loan.end_odometer ?? ""} min="0" name="endOdometer" type="number" />
+                      </label>
+                    </div>
+
+                    <div className="formGrid">
+                      <label className="fieldLabel">
+                        Borrow notes
+                        <textarea defaultValue={loan.borrow_notes ?? ""} name="borrowNotes" />
+                      </label>
+                      <label className="fieldLabel">
+                        Return notes
+                        <textarea defaultValue={loan.return_notes ?? ""} name="returnNotes" />
+                      </label>
+                    </div>
+
+                    <SubmitButton className="primaryButton" idleLabel="Update record" pendingLabel="Saving..." />
+                  </ConfirmForm>
+                </details>
+              ) : (
+                <p className="muted">Use Admin return to close this active borrow before editing it as history.</p>
+              )}
+            </article>
+          ))}
         </div>
       )}
     </AppShell>

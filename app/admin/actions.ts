@@ -33,6 +33,37 @@ async function requireAdmin() {
   return supabase;
 }
 
+function parseOptionalNonNegativeInteger(value: FormDataEntryValue | null) {
+  const text = String(value ?? "").trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const number = Number(text);
+
+  if (!Number.isInteger(number) || number < 0) {
+    return Number.NaN;
+  }
+
+  return number;
+}
+
+function redirectToVehicleRecordError(vehicleId: string, message: string): never {
+  redirect(`/admin/vehicles/${vehicleId || ""}?error=${encodeURIComponent(message)}`);
+}
+
+function revalidateVehicleLoanViews(vehicleId: string) {
+  clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  revalidatePath("/borrow");
+  revalidatePath("/dashboard");
+  revalidatePath("/history");
+  revalidatePath("/return");
+}
+
 function isEditableStatus(value: string): value is AdminVehicleStatus {
   return value === "available" || value === "maintenance" || value === "retired";
 }
@@ -451,6 +482,178 @@ export async function deleteAdminBooking(formData: FormData) {
   revalidatePath("/book");
   revalidatePath("/borrow");
   redirect(`/admin/vehicles/${vehicleId}?message=Booking deleted successfully.`);
+}
+
+export async function createHistoricalLoan(formData: FormData) {
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const borrowerUserId = String(formData.get("borrowerUserId") ?? "").trim();
+  const driverName = String(formData.get("driverName") ?? "").trim();
+  const purpose = String(formData.get("purpose") ?? "").trim();
+  const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
+  const returnNotes = String(formData.get("returnNotes") ?? "").trim() || null;
+  const startOdometer = parseOptionalNonNegativeInteger(formData.get("startOdometer"));
+  const endOdometer = parseOptionalNonNegativeInteger(formData.get("endOdometer"));
+  const borrowedAtValue = String(formData.get("borrowedAt") ?? "").trim();
+  const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
+  const returnedAtValue = String(formData.get("returnedAt") ?? "").trim();
+  const borrowedAt = borrowedAtValue ? parseDateTimeLocalToUtcIso(borrowedAtValue) : null;
+  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
+  const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
+
+  if (!vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt || !returnedAt) {
+    redirectToVehicleRecordError(vehicleId, "Please complete the borrower, driver, purpose, borrowed time, and returned time.");
+  }
+
+  if (Number.isNaN(startOdometer) || Number.isNaN(endOdometer)) {
+    redirectToVehicleRecordError(vehicleId, "Odometer values must be whole numbers greater than or equal to zero.");
+  }
+
+  if (startOdometer !== null && endOdometer !== null && endOdometer < startOdometer) {
+    redirectToVehicleRecordError(vehicleId, "Return odometer cannot be less than the borrow odometer.");
+  }
+
+  if (new Date(returnedAt).getTime() <= new Date(borrowedAt).getTime()) {
+    redirectToVehicleRecordError(vehicleId, "Returned time must be after borrowed time.");
+  }
+
+  if (expectedReturnAt && new Date(expectedReturnAt).getTime() <= new Date(borrowedAt).getTime()) {
+    redirectToVehicleRecordError(vehicleId, "Expected return time must be after borrowed time.");
+  }
+
+  const supabase = await requireAdmin();
+  const [{ data: vehicle, error: vehicleError }, { data: borrower, error: borrowerError }] = await Promise.all([
+    supabase.from("vehicles").select("id").eq("id", vehicleId).maybeSingle(),
+    supabase.from("user_roles").select("user_id, email").eq("user_id", borrowerUserId).maybeSingle(),
+  ]);
+
+  if (vehicleError) {
+    redirectToVehicleRecordError(vehicleId, vehicleError.message);
+  }
+
+  if (!vehicle) {
+    redirectToVehicleRecordError(vehicleId, "Vehicle not found.");
+  }
+
+  if (borrowerError) {
+    redirectToVehicleRecordError(vehicleId, borrowerError.message);
+  }
+
+  if (!borrower) {
+    redirectToVehicleRecordError(vehicleId, "Borrower not found. Ask the user to sign in once, then try again.");
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.from("vehicle_loans").insert({
+    vehicle_id: vehicleId,
+    borrowed_by_user_id: borrower.user_id,
+    borrower_email: borrower.email,
+    driver_name: driverName,
+    purpose,
+    start_odometer: startOdometer,
+    end_odometer: endOdometer,
+    borrow_notes: borrowNotes,
+    return_notes: returnNotes,
+    borrowed_at: borrowedAt,
+    expected_return_at: expectedReturnAt,
+    returned_at: returnedAt,
+  });
+
+  if (error) {
+    redirectToVehicleRecordError(vehicleId, error.message);
+  }
+
+  revalidateVehicleLoanViews(vehicleId);
+  redirect(`/admin/vehicles/${vehicleId}?message=Historical borrow record added successfully.`);
+}
+
+export async function updateHistoricalLoan(formData: FormData) {
+  const loanId = String(formData.get("loanId") ?? "").trim();
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const borrowerUserId = String(formData.get("borrowerUserId") ?? "").trim();
+  const driverName = String(formData.get("driverName") ?? "").trim();
+  const purpose = String(formData.get("purpose") ?? "").trim();
+  const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
+  const returnNotes = String(formData.get("returnNotes") ?? "").trim() || null;
+  const startOdometer = parseOptionalNonNegativeInteger(formData.get("startOdometer"));
+  const endOdometer = parseOptionalNonNegativeInteger(formData.get("endOdometer"));
+  const borrowedAtValue = String(formData.get("borrowedAt") ?? "").trim();
+  const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
+  const returnedAtValue = String(formData.get("returnedAt") ?? "").trim();
+  const borrowedAt = borrowedAtValue ? parseDateTimeLocalToUtcIso(borrowedAtValue) : null;
+  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
+  const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
+
+  if (!loanId || !vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt || !returnedAt) {
+    redirectToVehicleRecordError(vehicleId, "Please complete the borrower, driver, purpose, borrowed time, and returned time.");
+  }
+
+  if (Number.isNaN(startOdometer) || Number.isNaN(endOdometer)) {
+    redirectToVehicleRecordError(vehicleId, "Odometer values must be whole numbers greater than or equal to zero.");
+  }
+
+  if (startOdometer !== null && endOdometer !== null && endOdometer < startOdometer) {
+    redirectToVehicleRecordError(vehicleId, "Return odometer cannot be less than the borrow odometer.");
+  }
+
+  if (new Date(returnedAt).getTime() <= new Date(borrowedAt).getTime()) {
+    redirectToVehicleRecordError(vehicleId, "Returned time must be after borrowed time.");
+  }
+
+  if (expectedReturnAt && new Date(expectedReturnAt).getTime() <= new Date(borrowedAt).getTime()) {
+    redirectToVehicleRecordError(vehicleId, "Expected return time must be after borrowed time.");
+  }
+
+  const supabase = await requireAdmin();
+  const [{ data: existingLoan, error: loanLoadError }, { data: borrower, error: borrowerError }] = await Promise.all([
+    supabase.from("vehicle_loans").select("id, returned_at").eq("id", loanId).eq("vehicle_id", vehicleId).maybeSingle(),
+    supabase.from("user_roles").select("user_id, email").eq("user_id", borrowerUserId).maybeSingle(),
+  ]);
+
+  if (loanLoadError) {
+    redirectToVehicleRecordError(vehicleId, loanLoadError.message);
+  }
+
+  if (!existingLoan) {
+    redirectToVehicleRecordError(vehicleId, "Borrow record not found.");
+  }
+
+  if (!existingLoan.returned_at) {
+    redirectToVehicleRecordError(vehicleId, "Active borrow records should be closed with Admin return before editing history.");
+  }
+
+  if (borrowerError) {
+    redirectToVehicleRecordError(vehicleId, borrowerError.message);
+  }
+
+  if (!borrower) {
+    redirectToVehicleRecordError(vehicleId, "Borrower not found. Ask the user to sign in once, then try again.");
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("vehicle_loans")
+    .update({
+      borrowed_by_user_id: borrower.user_id,
+      borrower_email: borrower.email,
+      driver_name: driverName,
+      purpose,
+      start_odometer: startOdometer,
+      end_odometer: endOdometer,
+      borrow_notes: borrowNotes,
+      return_notes: returnNotes,
+      borrowed_at: borrowedAt,
+      expected_return_at: expectedReturnAt,
+      returned_at: returnedAt,
+    })
+    .eq("id", loanId)
+    .eq("vehicle_id", vehicleId);
+
+  if (error) {
+    redirectToVehicleRecordError(vehicleId, error.message);
+  }
+
+  revalidateVehicleLoanViews(vehicleId);
+  redirect(`/admin/vehicles/${vehicleId}?message=Borrow record updated successfully.`);
 }
 
 export async function retireVehicle(formData: FormData) {
