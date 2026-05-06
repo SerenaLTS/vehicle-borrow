@@ -1003,6 +1003,50 @@ textarea {
   color: var(--muted);
 }
 
+.miniDuckLoader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1;
+}
+
+.miniDuckPond {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 24px;
+  overflow: hidden;
+}
+
+.miniDuckWater {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  height: 8px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 8px 4px, rgba(255, 255, 255, 0.45) 0 3px, transparent 4px),
+    linear-gradient(180deg, rgba(109, 187, 231, 0.42), rgba(52, 125, 191, 0.62));
+  animation: duck-waterline 1.7s ease-in-out infinite;
+}
+
+.miniDuckScale {
+  position: absolute;
+  left: -5px;
+  top: -25px;
+  width: 84px;
+  height: 84px;
+  transform: scale(0.46);
+  transform-origin: top left;
+}
+
+.miniDuckScale .duckIllustration {
+  animation: duck-bob 1.2s ease-in-out infinite;
+}
+
 @keyframes shimmer {
   from {
     background-position: 100% 0;

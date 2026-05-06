@@ -380,7 +380,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
               </label>
             </div>
 
-            <SubmitButton className="primaryButton" idleLabel="Add past record" pendingLabel="Saving..." />
+            <SubmitButton className="primaryButton" idleLabel="Add past record" pendingLabel="Saving..." showPendingDuck />
           </form>
         )}
       </section>
@@ -476,7 +476,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                       </label>
                     </div>
 
-                  <SubmitButton className="primaryButton" idleLabel="Update record" pendingLabel="Saving..." />
+                  <SubmitButton className="primaryButton" idleLabel="Update record" pendingLabel="Saving..." showPendingDuck />
                 </ConfirmForm>
               </details>
             </article>
