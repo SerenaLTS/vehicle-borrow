@@ -68,7 +68,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
 
             <label className="fieldLabel">
               Return odometer (km)
-              <input min="0" name="endOdometer" required type="number" />
+              <input min="0" name="endOdometer" placeholder="Optional" type="number" />
             </label>
 
             <label className="fieldLabel">

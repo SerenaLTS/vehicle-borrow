@@ -8,10 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function returnVehicle(formData: FormData) {
   const loanId = String(formData.get("loanId") ?? "");
-  const endOdometer = Number(formData.get("endOdometer") ?? 0);
+  const endOdometerValue = String(formData.get("endOdometer") ?? "").trim();
+  const endOdometer = endOdometerValue ? Number(endOdometerValue) : null;
   const returnNotes = String(formData.get("returnNotes") ?? "").trim() || null;
 
-  if (!loanId || Number.isNaN(endOdometer) || endOdometer < 0) {
+  if (!loanId || (endOdometer !== null && (Number.isNaN(endOdometer) || endOdometer < 0))) {
     redirect("/return?error=Please complete the return details.");
   }
 
