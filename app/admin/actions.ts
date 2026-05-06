@@ -500,8 +500,8 @@ export async function createHistoricalLoan(formData: FormData) {
   const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
 
-  if (!vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt || !returnedAt) {
-    redirectToVehicleRecordError(vehicleId, "Please complete the borrower, driver, purpose, borrowed time, and returned time.");
+  if (!vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt) {
+    redirectToVehicleRecordError(vehicleId, "Please complete the borrower, driver, purpose, and borrowed time.");
   }
 
   if (Number.isNaN(startOdometer) || Number.isNaN(endOdometer)) {
@@ -512,7 +512,7 @@ export async function createHistoricalLoan(formData: FormData) {
     redirectToVehicleRecordError(vehicleId, "Return odometer cannot be less than the borrow odometer.");
   }
 
-  if (new Date(returnedAt).getTime() <= new Date(borrowedAt).getTime()) {
+  if (returnedAt && new Date(returnedAt).getTime() <= new Date(borrowedAt).getTime()) {
     redirectToVehicleRecordError(vehicleId, "Returned time must be after borrowed time.");
   }
 
@@ -583,8 +583,8 @@ export async function updateHistoricalLoan(formData: FormData) {
   const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
 
-  if (!loanId || !vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt || !returnedAt) {
-    redirectToVehicleRecordError(vehicleId, "Please complete the borrower, driver, purpose, borrowed time, and returned time.");
+  if (!loanId || !vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt) {
+    redirectToVehicleRecordError(vehicleId, "Please complete the borrower, driver, purpose, and borrowed time.");
   }
 
   if (Number.isNaN(startOdometer) || Number.isNaN(endOdometer)) {
@@ -595,7 +595,7 @@ export async function updateHistoricalLoan(formData: FormData) {
     redirectToVehicleRecordError(vehicleId, "Return odometer cannot be less than the borrow odometer.");
   }
 
-  if (new Date(returnedAt).getTime() <= new Date(borrowedAt).getTime()) {
+  if (returnedAt && new Date(returnedAt).getTime() <= new Date(borrowedAt).getTime()) {
     redirectToVehicleRecordError(vehicleId, "Returned time must be after borrowed time.");
   }
 
@@ -605,7 +605,7 @@ export async function updateHistoricalLoan(formData: FormData) {
 
   const supabase = await requireAdmin();
   const [{ data: existingLoan, error: loanLoadError }, { data: borrower, error: borrowerError }] = await Promise.all([
-    supabase.from("vehicle_loans").select("id, returned_at").eq("id", loanId).eq("vehicle_id", vehicleId).maybeSingle(),
+    supabase.from("vehicle_loans").select("id").eq("id", loanId).eq("vehicle_id", vehicleId).maybeSingle(),
     supabase.from("user_roles").select("user_id, email").eq("user_id", borrowerUserId).maybeSingle(),
   ]);
 
@@ -615,10 +615,6 @@ export async function updateHistoricalLoan(formData: FormData) {
 
   if (!existingLoan) {
     redirectToVehicleRecordError(vehicleId, "Borrow record not found.");
-  }
-
-  if (!existingLoan.returned_at) {
-    redirectToVehicleRecordError(vehicleId, "Active borrow records should be closed with Admin return before editing history.");
   }
 
   if (borrowerError) {

@@ -311,7 +311,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
 
       <section className="panel">
         <h2>Add past borrow record</h2>
-        <p className="muted">Use the admin portal account as borrowed by, then enter the colleague or contact who actually drove the vehicle.</p>
+        <p className="muted">Use the admin portal account as borrowed by, then enter the colleague or contact who actually drove the vehicle. Return time can be left blank when the old record does not have one.</p>
         {userRoles.length === 0 ? (
           <div className="emptyState">No users are available yet. Ask the borrower to sign in once, then add the historical record.</div>
         ) : (
@@ -354,7 +354,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
               </label>
               <label className="fieldLabel">
                 Returned time
-                <input name="returnedAt" required type="datetime-local" />
+                <input name="returnedAt" type="datetime-local" />
               </label>
             </div>
 
@@ -388,7 +388,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       <section className="sectionHeader">
         <div>
           <h2>Borrow records</h2>
-          <p className="muted">All recorded loans for this vehicle, newest first. Returned records can be edited here.</p>
+          <p className="muted">All recorded loans for this vehicle, newest first. Admin-created records can be edited even when return time is blank.</p>
         </div>
       </section>
 
@@ -411,29 +411,28 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <span>End KM: {loan.end_odometer?.toLocaleString() ?? "-"}</span>
               </div>
 
-              {loan.returned_at ? (
-                <details className="extensionDisclosure">
-                  <summary>Edit returned record</summary>
-                  <ConfirmForm action={updateHistoricalLoan} className="extensionForm" confirmMessage="Confirm updating this returned borrow record?">
-                    <input name="loanId" type="hidden" value={loan.id} />
-                    <input name="vehicleId" type="hidden" value={record.id} />
+              <details className="extensionDisclosure">
+                <summary>Edit borrow record</summary>
+                <ConfirmForm action={updateHistoricalLoan} className="extensionForm" confirmMessage="Confirm updating this borrow record?">
+                  <input name="loanId" type="hidden" value={loan.id} />
+                  <input name="vehicleId" type="hidden" value={record.id} />
 
-                      <div className="formGrid">
-                        <label className="fieldLabel">
+                  <div className="formGrid">
+                    <label className="fieldLabel">
                         Borrowed by portal account
-                        <select name="borrowerUserId" required defaultValue={loan.borrowed_by_user_id}>
-                          {userRoles.map((role) => (
-                            <option key={role.user_id} value={role.user_id}>
-                              {role.email}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="fieldLabel">
-                        Actual driver
-                        <input defaultValue={loan.driver_name} name="driverName" required />
-                      </label>
-                    </div>
+                      <select name="borrowerUserId" required defaultValue={loan.borrowed_by_user_id}>
+                        {userRoles.map((role) => (
+                          <option key={role.user_id} value={role.user_id}>
+                            {role.email}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="fieldLabel">
+                      Actual driver
+                      <input defaultValue={loan.driver_name} name="driverName" required />
+                    </label>
+                  </div>
 
                     <label className="fieldLabel">
                       Purpose
@@ -451,7 +450,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                       </label>
                       <label className="fieldLabel">
                         Returned time
-                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.returned_at)} name="returnedAt" required type="datetime-local" />
+                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.returned_at)} name="returnedAt" type="datetime-local" />
                       </label>
                     </div>
 
@@ -477,12 +476,9 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                       </label>
                     </div>
 
-                    <SubmitButton className="primaryButton" idleLabel="Update record" pendingLabel="Saving..." />
-                  </ConfirmForm>
-                </details>
-              ) : (
-                <p className="muted">Use Admin return to close this active borrow before editing it as history.</p>
-              )}
+                  <SubmitButton className="primaryButton" idleLabel="Update record" pendingLabel="Saving..." />
+                </ConfirmForm>
+              </details>
             </article>
           ))}
         </div>
