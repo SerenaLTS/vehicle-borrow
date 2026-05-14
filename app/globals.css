@@ -602,6 +602,85 @@ button:disabled {
   color: var(--muted);
 }
 
+.historyCalendarSection,
+.historyTableSection {
+  display: grid;
+  gap: 16px;
+}
+
+.historyCalendar {
+  display: grid;
+  gap: 8px;
+}
+
+.historyCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.historyCalendarDay {
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.historyCalendarDay:hover {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--line));
+}
+
+.historyCalendarDay-empty {
+  cursor: default;
+  background: transparent;
+  border-style: dashed;
+}
+
+.historyCalendarDay-hasLoans {
+  background: color-mix(in srgb, var(--green) 10%, var(--panel-strong));
+}
+
+.historyCalendarDay-selected {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.historyCalendarCount {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.historyCalendarDay-hasLoans .historyCalendarCount {
+  background: var(--green);
+  color: white;
+}
+
+.historyCalendarDetails {
+  display: grid;
+  gap: 12px;
+}
+
+.historyCalendarDetails h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
 .vehicleCardHeader {
   display: flex;
   flex-direction: column;
@@ -1168,16 +1247,58 @@ textarea {
   }
 }
 
+.tableScrollArea {
+  position: relative;
+}
+
+.tableScrollHint {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  min-height: 28px;
+  margin: -6px 4px 8px;
+  pointer-events: none;
+}
+
+.scrollHintTrack {
+  width: 58px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green) 46%, transparent);
+}
+
+.scrollChevron {
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid var(--green);
+  border-right: 2px solid var(--green);
+}
+
+.scrollChevron-left {
+  transform: rotate(-135deg);
+}
+
+.scrollChevron-right {
+  transform: rotate(45deg);
+}
+
 .tableWrap {
   overflow-x: auto;
   border-radius: 20px;
   border: 1px solid var(--line);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   background: var(--panel-strong);
+}
+
+.historyTable {
+  min-width: 1120px;
 }
 
 th,
