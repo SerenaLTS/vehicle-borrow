@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendKeyCollectionReminderEmail } from "@/lib/booking-notifications";
+import { APP_TIME_ZONE, parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,38 @@ function isAuthorized(request: Request) {
   return request.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
+function getSydneyParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  return {
+    year: Number(values.get("year")),
+    month: Number(values.get("month")),
+    day: Number(values.get("day")),
+    hour: Number(values.get("hour")),
+  };
+}
+
+function getSydneyNineAmWindow(date: Date) {
+  const parts = getSydneyParts(date);
+  const startLocal = `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T09:00`;
+  const nextDay = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + 1));
+  const endLocal = `${nextDay.getUTCFullYear()}-${String(nextDay.getUTCMonth() + 1).padStart(2, "0")}-${String(nextDay.getUTCDate()).padStart(2, "0")}T09:00`;
+
+  return {
+    isSydneyNineAmHour: parts.hour === 9,
+    windowStart: parseDateTimeLocalToUtcIso(startLocal) ?? date.toISOString(),
+    windowEnd: parseDateTimeLocalToUtcIso(endLocal) ?? new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,8 +63,11 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   const now = new Date();
-  const windowStart = now.toISOString();
-  const windowEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const { isSydneyNineAmHour, windowStart, windowEnd } = getSydneyNineAmWindow(now);
+
+  if (process.env.NODE_ENV === "production" && !isSydneyNineAmHour) {
+    return NextResponse.json({ skipped: true, reason: "Not Sydney 9am hour.", windowStart, windowEnd, checked: 0, sent: [], failed: [] });
+  }
 
   const { data, error } = await supabase
     .from("vehicle_bookings")

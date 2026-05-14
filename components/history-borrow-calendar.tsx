@@ -117,13 +117,30 @@ function getInitialMonth(loans: LoanRow[]) {
   return loans[0] ? getMonthKey(loans[0].borrowed_at) : todayMonth;
 }
 
+function getInitialDay(loans: LoanRow[], monthKey: string) {
+  const todayKey = getTodayKey();
+
+  if (todayKey.startsWith(monthKey) && loans.some((loan) => isLoanActiveOnDay(loan, todayKey))) {
+    return todayKey;
+  }
+
+  const matchingLoan = loans.find((loan) => getMonthKey(loan.borrowed_at) === monthKey);
+
+  if (matchingLoan) {
+    return toDayKey(getZonedParts(matchingLoan.borrowed_at));
+  }
+
+  return `${monthKey}-01`;
+}
+
 function getVehicleLabel(loan: LoanRow) {
   return [loan.vehicle?.plate_number, loan.vehicle?.model].filter(Boolean).join(" - ") || "Unknown vehicle";
 }
 
 export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(() => getInitialMonth(loans));
-  const [selectedDay, setSelectedDay] = useState(() => getTodayKey());
+  const initialMonth = useMemo(() => getInitialMonth(loans), [loans]);
+  const [currentMonth, setCurrentMonth] = useState(initialMonth);
+  const [selectedDay, setSelectedDay] = useState(() => getInitialDay(loans, initialMonth));
   const [yearText, monthText] = currentMonth.split("-");
   const year = Number(yearText);
   const month = Number(monthText);
@@ -198,7 +215,7 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
                 type="button"
               >
                 <span className="calendarDayNumber">{cell.day}</span>
-                <span className="historyCalendarCount">{vehicleCount > 0 ? `${vehicleCount} out` : "-"}</span>
+                {vehicleCount > 0 ? <span className="historyCalendarCount">{vehicleCount} out</span> : null}
               </button>
             );
           })}
