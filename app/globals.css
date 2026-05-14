@@ -646,12 +646,18 @@ button:disabled {
 }
 
 .historyCalendarDay-hasLoans {
-  background: color-mix(in srgb, var(--green) 10%, var(--panel-strong));
+  background: var(--green);
+  color: white;
 }
 
 .historyCalendarDay-selected {
   border-color: var(--green);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.historyCalendarDay-hasLoans.historyCalendarDay-selected {
+  border-color: color-mix(in srgb, white 72%, var(--green));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 26%, transparent);
 }
 
 .historyCalendarCount {
@@ -667,7 +673,11 @@ button:disabled {
 }
 
 .historyCalendarDay-hasLoans .historyCalendarCount {
-  background: var(--green);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--green);
+}
+
+.historyCalendarDay-hasLoans .calendarDayNumber {
   color: white;
 }
 
