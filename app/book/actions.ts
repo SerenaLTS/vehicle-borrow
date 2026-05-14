@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
-import { sendBookingNotificationEmail } from "@/lib/booking-notifications";
+import { sendBookingNotificationEmail, sendImmediateKeyCollectionReminderIfDue } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
@@ -70,6 +70,22 @@ export async function createBooking(formData: FormData) {
     });
   } catch (notificationError) {
     console.error("Failed to send booking confirmation email.", notificationError);
+  }
+
+  try {
+    await sendImmediateKeyCollectionReminderIfDue({
+      supabase,
+      booking: {
+        bookingId: createdBooking.id,
+        vehicleId: createdBooking.vehicle_id,
+        bookedByEmail: createdBooking.booked_by_email,
+        startsAt: createdBooking.starts_at,
+        endsAt: createdBooking.ends_at,
+        comments: createdBooking.comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send immediate key collection reminder email.", notificationError);
   }
 
   clearFleetSnapshotCache();
@@ -169,6 +185,22 @@ export async function updateOwnBooking(formData: FormData) {
     });
   } catch (notificationError) {
     console.error("Failed to send booking update email.", notificationError);
+  }
+
+  try {
+    await sendImmediateKeyCollectionReminderIfDue({
+      supabase,
+      booking: {
+        bookingId,
+        vehicleId,
+        bookedByEmail: booking.booked_by_email,
+        startsAt,
+        endsAt,
+        comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send immediate key collection reminder email.", notificationError);
   }
 
   clearFleetSnapshotCache();

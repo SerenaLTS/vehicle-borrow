@@ -6,6 +6,10 @@ import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 
+function formatReturnedStatus(returnedAt: string | null) {
+  return returnedAt ? formatDateTime(returnedAt) : "Not returned yet";
+}
+
 export default async function HistoryPage() {
   const supabase = await createClient();
   const {
@@ -60,6 +64,7 @@ export default async function HistoryPage() {
                 <th>Borrowed</th>
                 <th>Expected return</th>
                 <th>Returned</th>
+                <th>Status</th>
                 <th>Start KM</th>
                 <th>End KM</th>
               </tr>
@@ -75,7 +80,8 @@ export default async function HistoryPage() {
                   <td>{loan.purpose}</td>
                   <td>{formatDateTime(loan.borrowed_at)}</td>
                   <td>{formatDateTime(loan.expected_return_at)}</td>
-                  <td>{formatDateTime(loan.returned_at)}</td>
+                  <td>{formatReturnedStatus(loan.returned_at)}</td>
+                  <td>{loan.returned_at ? "Returned" : "Active"}</td>
                   <td>{loan.start_odometer?.toLocaleString() ?? "-"}</td>
                   <td>{loan.end_odometer?.toLocaleString() ?? "-"}</td>
                 </tr>

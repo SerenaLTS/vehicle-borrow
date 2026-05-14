@@ -401,7 +401,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
               <StatusPill status={loan.returned_at ? "available" : "borrowed"} />
               <h3>{loan.borrower_email}</h3>
               <p className="muted">
-                {formatDateTime(loan.borrowed_at)} to {formatDateTime(loan.returned_at)}
+                Borrowed {formatDateTime(loan.borrowed_at)} to {loan.returned_at ? formatDateTime(loan.returned_at) : "not returned yet"}
               </p>
               <div className="vehicleMeta">
                 <span>Driver: {loan.driver_name}</span>

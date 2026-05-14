@@ -1,15 +1,21 @@
 import nodemailer from "nodemailer";
 import { APP_NAME } from "@/lib/app-config";
+import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { formatDateTime } from "@/lib/utils";
 
 type SupabaseNotificationClient = {
-  from: (table: "vehicles" | "user_roles") => {
+  from: (table: "vehicles" | "user_roles" | "vehicle_bookings") => {
     select: (columns: string) => {
       eq: (column: string, value: string | boolean) => {
         maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error?: { message: string } | null }>;
       };
       order?: (column: string, options?: { ascending?: boolean }) => {
         then?: never;
+      };
+    };
+    update?: (values: Record<string, unknown>) => {
+      eq: (column: string, value: string) => {
+        is: (column: string, value: null) => Promise<{ error?: { message: string } | null }>;
       };
     };
   };
@@ -71,6 +77,59 @@ function getMailConfig(): MailConfig | null {
   const secure = secureSetting ? secureSetting === "true" : port === 465;
 
   return { host, port, secure, user, pass, from };
+}
+
+function getSydneyDateTimeParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Sydney",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  return {
+    year: Number(values.get("year")),
+    month: Number(values.get("month")),
+    day: Number(values.get("day")),
+    hour: Number(values.get("hour")),
+    minute: Number(values.get("minute")),
+  };
+}
+
+function addOneSydneyDay(parts: ReturnType<typeof getSydneyDateTimeParts>) {
+  const utcDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + 1));
+
+  return {
+    year: utcDate.getUTCFullYear(),
+    month: utcDate.getUTCMonth() + 1,
+    day: utcDate.getUTCDate(),
+    hour: parts.hour,
+    minute: parts.minute,
+  };
+}
+
+function toDateTimeLocalValue(parts: ReturnType<typeof getSydneyDateTimeParts>) {
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
+
+function getNextSydneyNineAmIso(now = new Date()) {
+  const nowParts = getSydneyDateTimeParts(now);
+  const cutoffParts = nowParts.hour >= 9 ? addOneSydneyDay(nowParts) : nowParts;
+  const cutoffLocalValue = toDateTimeLocalValue({ ...cutoffParts, hour: 9, minute: 0 });
+
+  return parseDateTimeLocalToUtcIso(cutoffLocalValue);
+}
+
+function shouldSendImmediateKeyCollectionReminder(startsAt: string) {
+  const startTime = new Date(startsAt).getTime();
+  const cutoffIso = getNextSydneyNineAmIso();
+  const cutoffTime = cutoffIso ? new Date(cutoffIso).getTime() : Number.NaN;
+
+  return Number.isFinite(startTime) && Number.isFinite(cutoffTime) && startTime < cutoffTime;
 }
 
 function getActionLabel(action: BookingNotificationAction) {
@@ -237,7 +296,7 @@ export async function sendKeyCollectionReminderEmail({
   const mailConfig = getMailConfig();
 
   if (!mailConfig) {
-    return;
+    return false;
   }
 
   const vehicle = await getVehicleForNotification(supabase, booking.vehicleId);
@@ -245,7 +304,7 @@ export async function sendKeyCollectionReminderEmail({
   const recipient = booking.bookedByEmail.trim().toLowerCase();
 
   if (!recipient) {
-    return;
+    return false;
   }
 
   const transporter = nodemailer.createTransport({
@@ -261,18 +320,52 @@ export async function sendKeyCollectionReminderEmail({
   await transporter.sendMail({
     from: mailConfig.from,
     to: recipient,
-    subject: `Have you collected the key? ${vehicleLabel}`,
+    subject: `Upcoming key collection reminder: ${vehicleLabel}`,
     text: [
-      "Your vehicle booking has reached its start time.",
+      "You have a vehicle booking coming up in the next 24 hours.",
       "",
       `Vehicle: ${vehicleLabel}`,
       `Start time: ${formatDateTime(booking.startsAt)}`,
       `End time: ${formatDateTime(booking.endsAt)}`,
       `Comments: ${booking.comments || "-"}`,
       "",
-      `If you have collected the key, open ${APP_NAME} and select Key collected on your booking. This will convert the booking into an active borrow.`,
+      `When you collect the key, open ${APP_NAME} and select Key collected on your booking. This will convert the booking into an active borrow.`,
       "",
       "Booking alone is not enough once the key has been collected.",
     ].join("\n"),
   });
+
+  return true;
+}
+
+export async function sendImmediateKeyCollectionReminderIfDue({
+  supabase,
+  booking,
+}: {
+  supabase: unknown;
+  booking: KeyCollectionReminderSnapshot;
+}) {
+  if (!shouldSendImmediateKeyCollectionReminder(booking.startsAt)) {
+    return false;
+  }
+
+  const sent = await sendKeyCollectionReminderEmail({ supabase, booking });
+
+  if (!sent) {
+    return false;
+  }
+
+  const client = supabase as SupabaseNotificationClient;
+  const { error } =
+    (await client
+      .from("vehicle_bookings")
+      .update?.({ key_collection_reminded_at: new Date().toISOString() })
+      .eq("id", booking.bookingId)
+      .is("key_collection_reminded_at", null)) ?? {};
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return true;
 }

@@ -29,13 +29,15 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const now = new Date().toISOString();
+  const now = new Date();
+  const windowStart = now.toISOString();
+  const windowEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from("vehicle_bookings")
     .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
-    .lte("starts_at", now)
-    .gte("ends_at", now)
+    .gte("starts_at", windowStart)
+    .lt("starts_at", windowEnd)
     .is("key_collection_reminded_at", null)
     .order("starts_at", { ascending: true })
     .limit(25);
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
 
   for (const booking of bookings) {
     try {
-      await sendKeyCollectionReminderEmail({
+      const sentReminder = await sendKeyCollectionReminderEmail({
         supabase,
         booking: {
           bookingId: booking.id,
@@ -61,6 +63,10 @@ export async function GET(request: Request) {
           comments: booking.comments,
         },
       });
+
+      if (!sentReminder) {
+        continue;
+      }
 
       const { error: updateError } = await supabase
         .from("vehicle_bookings")
@@ -81,5 +87,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ checked: bookings.length, sent, failed });
+  return NextResponse.json({ windowStart, windowEnd, checked: bookings.length, sent, failed });
 }

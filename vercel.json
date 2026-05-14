@@ -2,7 +2,11 @@
   "crons": [
     {
       "path": "/api/booking-key-reminders",
-      "schedule": "0 9 * * *"
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/booking-key-reminders",
+      "schedule": "0 23 * * *"
     }
   ]
 }

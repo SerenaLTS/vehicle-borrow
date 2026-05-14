@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
-import { sendBookingNotificationEmail } from "@/lib/booking-notifications";
+import { sendBookingNotificationEmail, sendImmediateKeyCollectionReminderIfDue } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
@@ -316,6 +316,22 @@ export async function createAdminBooking(formData: FormData) {
     console.error("Failed to send admin booking confirmation email.", notificationError);
   }
 
+  try {
+    await sendImmediateKeyCollectionReminderIfDue({
+      supabase,
+      booking: {
+        bookingId: createdBooking.id,
+        vehicleId: createdBooking.vehicle_id,
+        bookedByEmail: createdBooking.booked_by_email,
+        startsAt: createdBooking.starts_at,
+        endsAt: createdBooking.ends_at,
+        comments: createdBooking.comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send immediate key collection reminder email.", notificationError);
+  }
+
   clearFleetSnapshotCache();
   clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
@@ -408,6 +424,22 @@ export async function updateAdminBooking(formData: FormData) {
     });
   } catch (notificationError) {
     console.error("Failed to send admin booking update email.", notificationError);
+  }
+
+  try {
+    await sendImmediateKeyCollectionReminderIfDue({
+      supabase,
+      booking: {
+        bookingId,
+        vehicleId,
+        bookedByEmail: existingBooking.booked_by_email,
+        startsAt,
+        endsAt,
+        comments,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to send immediate key collection reminder email.", notificationError);
   }
 
   clearFleetSnapshotCache();
