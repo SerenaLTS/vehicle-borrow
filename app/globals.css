@@ -606,6 +606,8 @@ button:disabled {
 .historyTableSection {
   display: grid;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .historyCalendar {
@@ -1259,6 +1261,9 @@ textarea {
 
 .tableScrollArea {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .tableScrollHint {
@@ -1294,11 +1299,16 @@ textarea {
 }
 
 .tableWrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   border-radius: 20px;
   border: 1px solid var(--line);
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
+  touch-action: pan-x;
 }
 
 table {
