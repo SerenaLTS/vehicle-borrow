@@ -236,7 +236,7 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
                   <span>Driver: {loan.driver_name}</span>
                   <span>Purpose: {loan.purpose}</span>
                   <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                  <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
+                  <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                   <span>Returned: {loan.returned_at ? formatDateTime(loan.returned_at) : "Not returned yet"}</span>
                 </div>
               </article>

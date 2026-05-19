@@ -53,13 +53,13 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     supabase
       .from("vehicle_loans")
       .select(
-        "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
+        "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
       )
       .eq("vehicle_id", vehicleId)
       .order("borrowed_at", { ascending: false }),
     supabase
       .from("vehicle_bookings")
-      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .eq("vehicle_id", vehicleId)
       .order("starts_at", { ascending: true }),
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
@@ -95,7 +95,8 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const currentYear = new Date().getFullYear();
   const requestedMonth = typeof pageParams.month === "string" && /^\d{4}-\d{2}$/.test(pageParams.month) ? pageParams.month : undefined;
   const loadedYear = Number((requestedMonth ?? `${currentYear}-01`).slice(0, 4));
-  const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && (!booking.ends_at || new Date(booking.ends_at).getTime() > now)) ?? null;
+  const currentBooking =
+    bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false))) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
   const calendarEvents: VehicleCalendarEvent[] = [
     ...bookings.map((booking) => ({
@@ -209,11 +210,11 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           </div>
           <div>
             <strong>Expected return</strong>
-            <span>{formatDateTime(currentLoan?.expected_return_at ?? null)}</span>
+            <span>{currentLoan?.is_long_term ? "Long term" : formatDateTime(currentLoan?.expected_return_at ?? null)}</span>
           </div>
           <div>
             <strong>Current booking</strong>
-            <span>{currentBooking ? `${formatDateTime(currentBooking.starts_at)} to ${currentBooking.ends_at ? formatDateTime(currentBooking.ends_at) : "Long term"}` : "-"}</span>
+            <span>{currentBooking ? `${formatDateTime(currentBooking.starts_at)} to ${currentBooking.is_long_term ? "Long term" : formatDateTime(currentBooking.ends_at)}` : "-"}</span>
           </div>
           <div>
             <strong>Booked by</strong>
@@ -221,7 +222,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           </div>
           <div>
             <strong>Next booking</strong>
-            <span>{nextUpcomingBooking ? `${formatDateTime(nextUpcomingBooking.starts_at)} to ${nextUpcomingBooking.ends_at ? formatDateTime(nextUpcomingBooking.ends_at) : "Long term"}` : "-"}</span>
+            <span>{nextUpcomingBooking ? `${formatDateTime(nextUpcomingBooking.starts_at)} to ${nextUpcomingBooking.is_long_term ? "Long term" : formatDateTime(nextUpcomingBooking.ends_at)}` : "-"}</span>
           </div>
           <div>
             <strong>Comments</strong>
@@ -236,13 +237,20 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           <input name="vehicleId" type="hidden" value={record.id} />
 
           <div className="formGrid">
-            <label className="fieldLabel">
-              Start time
-              <input name="startsAt" required type="datetime-local" />
-            </label>
-            <label className="fieldLabel">
+            <div className="timeFieldGroup">
+              <label className="fieldLabel">
+                Start time
+                <input name="startsAt" required type="datetime-local" />
+              </label>
+              <label className="checkboxLabel">
+                <input name="isLongTerm" type="checkbox" />
+                <span>Long term</span>
+              </label>
+              <p className="fieldHint">Long term bookings will notify admins.</p>
+            </div>
+            <label className="fieldLabel longTermHidden">
               End time
-              <input name="endsAt" required type="datetime-local" />
+              <input name="endsAt" type="datetime-local" />
             </label>
           </div>
 
@@ -268,10 +276,10 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         <div className="cardsGrid">
           {bookings.map((booking) => (
             <article className="vehicleCard" key={booking.id}>
-              <StatusPill status={new Date(booking.starts_at).getTime() <= now && (!booking.ends_at || new Date(booking.ends_at).getTime() > now) ? "booked" : "available"} />
+              <StatusPill status={new Date(booking.starts_at).getTime() <= now && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false)) ? "booked" : "available"} />
               <h3>{booking.booked_by_email}</h3>
               <p className="muted">
-                {formatDateTime(booking.starts_at)} to {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}
+                {formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}
               </p>
               <div className="vehicleMeta">
                 <span>Comments: {booking.comments || "-"}</span>
@@ -287,11 +295,17 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                     Start time
                     <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
                   </label>
-                  <label className="fieldLabel">
+                  <label className="fieldLabel longTermHidden">
                     End time
                     <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
                   </label>
                 </div>
+
+                <label className="checkboxLabel">
+                  <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
+                  <span>Long term</span>
+                </label>
+                <p className="fieldHint">Long term bookings will notify admins.</p>
 
                 <label className="fieldLabel">
                   Comments
@@ -410,7 +424,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
               <div className="vehicleMeta">
                 <span>Driver: {loan.driver_name}</span>
                 <span>Purpose: {loan.purpose}</span>
-                <span>Expected return: {loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "Long term"}</span>
+                <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                 <span>Start KM: {loan.start_odometer?.toLocaleString() ?? "-"}</span>
                 <span>End KM: {loan.end_odometer?.toLocaleString() ?? "-"}</span>
               </div>

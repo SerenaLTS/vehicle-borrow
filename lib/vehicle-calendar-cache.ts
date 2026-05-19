@@ -71,7 +71,7 @@ export async function getVehicleCalendarSnapshotForYear(
         }).maybeSingle?.() ?? Promise.resolve({ data: null, error: null })),
         (((client
           .from("vehicle_bookings")
-          .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+          .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
           .eq("vehicle_id", vehicleId) as {
           lt: (column: string, value: string) => {
             or: (filters: string) => {
@@ -83,12 +83,12 @@ export async function getVehicleCalendarSnapshotForYear(
           };
         })
           .lt("starts_at", yearEndIso)
-          .or(`ends_at.is.null,ends_at.gte.${yearStartIso}`)
+          .or(`is_long_term.eq.true,ends_at.gte.${yearStartIso}`)
           .order("starts_at", { ascending: true })) ?? Promise.resolve({ data: [], error: null })),
         (((client
           .from("vehicle_loans")
           .select(
-            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
+            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
           )
           .eq("vehicle_id", vehicleId) as {
           lt: (column: string, value: string) => {

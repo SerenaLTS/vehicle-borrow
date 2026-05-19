@@ -31,13 +31,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const [{ data: activeLoans }, { data: bookingData }, { data: extensionData }, isAdmin, snapshot] = await Promise.all([
     supabase
       .from("vehicle_loans")
-      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
       .eq("borrowed_by_user_id", user.id)
       .is("returned_at", null)
       .order("borrowed_at", { ascending: false }),
     supabase
       .from("vehicle_bookings")
-      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .eq("booked_by_user_id", user.id)
       .order("starts_at", { ascending: true }),
     supabase
@@ -52,7 +52,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const loans = ((activeLoans ?? []) as RawLoanRow[]).map(normalizeLoan);
   const bookings = ((bookingData ?? []) as RawVehicleBooking[])
     .map(normalizeVehicleBooking)
-    .filter((booking) => !booking.ends_at || new Date(booking.ends_at).getTime() >= Date.now());
+    .filter((booking) => booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() >= Date.now() : false));
   const extensionsByLoanId = ((extensionData ?? []) as LoanExtension[]).reduce<Map<string, LoanExtension[]>>((grouped, extension) => {
     const existing = grouped.get(extension.loan_id) ?? [];
     existing.push(extension);
@@ -134,7 +134,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <span>Driver: {loan.driver_name}</span>
                   <span>Purpose: {loan.purpose}</span>
                   <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                  <span>Expected return: {loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "Long term"}</span>
+                  <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                   <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
                 </div>
                 {extensions.length > 0 ? (
@@ -191,7 +191,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
                 <div className="vehicleMeta">
                   <span>From: {formatDateTime(booking.starts_at)}</span>
-                  <span>Until: {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}</span>
+                  <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
                   <span>Comments: {booking.comments || "-"}</span>
                 </div>
                 <div className="actionsRow">

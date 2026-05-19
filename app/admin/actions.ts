@@ -258,10 +258,11 @@ export async function createAdminBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const startsAtValue = String(formData.get("startsAt") ?? "").trim();
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
+  const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   const supabase = await requireAdmin();
   const {
@@ -276,6 +277,7 @@ export async function createAdminBooking(formData: FormData) {
     vehicleId,
     startsAt,
     endsAt,
+    isLongTerm,
   });
 
   if (validationError) {
@@ -290,9 +292,10 @@ export async function createAdminBooking(formData: FormData) {
       booked_by_email: user.email ?? "",
       starts_at: startsAt,
       ends_at: endsAt,
+      is_long_term: isLongTerm,
       comments,
     })
-    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .single();
 
   if (error) {
@@ -310,6 +313,7 @@ export async function createAdminBooking(formData: FormData) {
         bookedByEmail: createdBooking.booked_by_email,
         startsAt: createdBooking.starts_at,
         endsAt: createdBooking.ends_at,
+        isLongTerm: createdBooking.is_long_term,
         comments: createdBooking.comments,
       },
       notifyAdmins: true,
@@ -318,7 +322,7 @@ export async function createAdminBooking(formData: FormData) {
     console.error("Failed to send admin booking confirmation email.", notificationError);
   }
 
-  if (createdBooking.ends_at) {
+  if (!createdBooking.is_long_term && createdBooking.ends_at) {
     try {
       await sendImmediateKeyCollectionReminderIfDue({
         supabase,
@@ -328,6 +332,7 @@ export async function createAdminBooking(formData: FormData) {
           bookedByEmail: createdBooking.booked_by_email,
           startsAt: createdBooking.starts_at,
           endsAt: createdBooking.ends_at,
+          isLongTerm: createdBooking.is_long_term,
           comments: createdBooking.comments,
         },
       });
@@ -350,10 +355,11 @@ export async function updateAdminBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const startsAtValue = String(formData.get("startsAt") ?? "").trim();
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
+  const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   if (!bookingId || !vehicleId) {
     redirect("/admin?error=Booking not found.");
@@ -370,7 +376,7 @@ export async function updateAdminBooking(formData: FormData) {
 
   const { data: existingBooking, error: loadBookingError } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .eq("id", bookingId)
     .maybeSingle();
 
@@ -386,6 +392,7 @@ export async function updateAdminBooking(formData: FormData) {
     vehicleId,
     startsAt,
     endsAt,
+    isLongTerm,
     excludeBookingId: bookingId,
   });
 
@@ -398,6 +405,7 @@ export async function updateAdminBooking(formData: FormData) {
     .update({
       starts_at: startsAt,
       ends_at: endsAt,
+      is_long_term: isLongTerm,
       comments,
     })
     .eq("id", bookingId);
@@ -417,11 +425,13 @@ export async function updateAdminBooking(formData: FormData) {
         bookedByEmail: existingBooking.booked_by_email,
         startsAt,
         endsAt,
+        isLongTerm,
         comments,
       },
       previousBooking: {
         startsAt: existingBooking.starts_at,
         endsAt: existingBooking.ends_at,
+        isLongTerm: existingBooking.is_long_term,
         comments: existingBooking.comments,
       },
       notifyAdmins: true,
@@ -430,20 +440,23 @@ export async function updateAdminBooking(formData: FormData) {
     console.error("Failed to send admin booking update email.", notificationError);
   }
 
-  try {
-    await sendImmediateKeyCollectionReminderIfDue({
-      supabase,
-      booking: {
-        bookingId,
-        vehicleId,
-        bookedByEmail: existingBooking.booked_by_email,
-        startsAt,
-        endsAt,
-        comments,
-      },
-    });
-  } catch (notificationError) {
-    console.error("Failed to send immediate key collection reminder email.", notificationError);
+  if (!isLongTerm && endsAt) {
+    try {
+      await sendImmediateKeyCollectionReminderIfDue({
+        supabase,
+        booking: {
+          bookingId,
+          vehicleId,
+          bookedByEmail: existingBooking.booked_by_email,
+          startsAt,
+          endsAt,
+          isLongTerm,
+          comments,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to send immediate key collection reminder email.", notificationError);
+    }
   }
 
   clearFleetSnapshotCache();
@@ -474,7 +487,7 @@ export async function deleteAdminBooking(formData: FormData) {
 
   const { data: booking, error: loadBookingError } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .eq("id", bookingId)
     .maybeSingle();
 
@@ -503,6 +516,7 @@ export async function deleteAdminBooking(formData: FormData) {
         bookedByEmail: booking.booked_by_email,
         startsAt: booking.starts_at,
         endsAt: booking.ends_at,
+        isLongTerm: booking.is_long_term,
         comments: booking.comments,
       },
       notifyAdmins: true,

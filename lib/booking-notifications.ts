@@ -37,6 +37,7 @@ export type BookingNotificationSnapshot = {
   bookedByEmail: string;
   startsAt: string;
   endsAt: string | null;
+  isLongTerm: boolean;
   comments: string | null;
 };
 
@@ -59,7 +60,7 @@ type BookingNotificationParams = {
   action: BookingNotificationAction;
   actorEmail: string;
   booking: BookingNotificationSnapshot;
-  previousBooking?: Pick<BookingNotificationSnapshot, "startsAt" | "endsAt" | "comments"> | null;
+  previousBooking?: Pick<BookingNotificationSnapshot, "startsAt" | "endsAt" | "isLongTerm" | "comments"> | null;
   notifyAdmins?: boolean;
 };
 
@@ -207,7 +208,7 @@ function buildSubject(action: BookingNotificationAction, vehicleLabel: string) {
 }
 
 function isLongTermBooking(booking: BookingNotificationSnapshot) {
-  return booking.endsAt === null;
+  return booking.isLongTerm;
 }
 
 function buildTextBody({
@@ -220,7 +221,7 @@ function buildTextBody({
   action: BookingNotificationAction;
   actorEmail: string;
   booking: BookingNotificationSnapshot;
-  previousBooking?: Pick<BookingNotificationSnapshot, "startsAt" | "endsAt" | "comments"> | null;
+  previousBooking?: Pick<BookingNotificationSnapshot, "startsAt" | "endsAt" | "isLongTerm" | "comments"> | null;
   vehicleLabel: string;
 }) {
   const lines = [
@@ -240,7 +241,7 @@ function buildTextBody({
     lines.push("");
     lines.push("Previous booking details:");
     lines.push(`Start time: ${formatDateTime(previousBooking.startsAt)}`);
-    lines.push(`End time: ${previousBooking.endsAt === null ? "Long term" : formatDateTime(previousBooking.endsAt)}`);
+    lines.push(`End time: ${previousBooking.isLongTerm ? "Long term" : formatDateTime(previousBooking.endsAt)}`);
     lines.push(`Comments: ${previousBooking.comments || "-"}`);
   }
 
@@ -416,7 +417,7 @@ export async function sendImmediateKeyCollectionReminderIfDue({
   supabase: unknown;
   booking: KeyCollectionReminderSnapshot;
 }) {
-  if (!booking.endsAt || !shouldSendImmediateKeyCollectionReminder(booking.startsAt)) {
+  if (booking.isLongTerm || !booking.endsAt || !shouldSendImmediateKeyCollectionReminder(booking.startsAt)) {
     return false;
   }
 

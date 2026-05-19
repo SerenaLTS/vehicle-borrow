@@ -18,7 +18,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("vehicle_loans")
-    .select("driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, borrower_email, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+    .select("driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, borrower_email, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false });
 
   if (error) {
@@ -52,7 +52,7 @@ export async function GET() {
         escapeCsv((row as { purpose?: string | null }).purpose ?? ""),
         escapeCsv((row as { returned_at?: string | null }).returned_at ? "returned" : "active"),
         escapeCsv((row as { borrowed_at?: string | null }).borrowed_at ?? ""),
-        escapeCsv((row as { expected_return_at?: string | null }).expected_return_at ?? ""),
+        escapeCsv((row as { is_long_term?: boolean }).is_long_term ? "Long term" : ((row as { expected_return_at?: string | null }).expected_return_at ?? "")),
         escapeCsv((row as { returned_at?: string | null }).returned_at ?? ""),
         escapeCsv((row as { start_odometer?: number | null }).start_odometer ?? ""),
         escapeCsv((row as { end_odometer?: number | null }).end_odometer ?? ""),

@@ -10,7 +10,8 @@ type ReminderBookingRow = {
   vehicle_id: string;
   booked_by_email: string;
   starts_at: string;
-  ends_at: string;
+  ends_at: string | null;
+  is_long_term: boolean;
   comments: string | null;
 };
 
@@ -71,9 +72,10 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .gte("starts_at", windowStart)
     .lt("starts_at", windowEnd)
+    .eq("is_long_term", false)
     .is("key_collection_reminded_at", null)
     .order("starts_at", { ascending: true })
     .limit(25);
@@ -96,6 +98,7 @@ export async function GET(request: Request) {
           bookedByEmail: booking.booked_by_email,
           startsAt: booking.starts_at,
           endsAt: booking.ends_at,
+          isLongTerm: booking.is_long_term,
           comments: booking.comments,
         },
       });

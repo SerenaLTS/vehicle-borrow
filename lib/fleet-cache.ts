@@ -129,13 +129,13 @@ export async function getFleetSnapshot(supabase: unknown): Promise<FleetSnapshot
         Promise.resolve({ data: [] }),
       client
         .from("vehicle_bookings")
-        .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+        .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
         .order?.("starts_at", { ascending: true }) ?? Promise.resolve({ data: [] }),
       client.from("vehicle_loans").select("vehicle_id").is?.("returned_at", null) ?? Promise.resolve({ data: [] }),
       client
         .from("vehicle_loans")
         .select(
-          "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
+          "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
         )
         .gte?.("borrowed_at", timelineWindowStartIso)
         .order("borrowed_at", { ascending: true }) ?? Promise.resolve({ data: [] }),
@@ -144,7 +144,7 @@ export async function getFleetSnapshot(supabase: unknown): Promise<FleetSnapshot
     const vehicles = ((vehicleData ?? []) as unknown[]) as Vehicle[];
     const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
       .map(normalizeVehicleBooking)
-      .filter((booking) => !booking.ends_at || new Date(booking.ends_at).getTime() >= new Date(nowIso).getTime());
+      .filter((booking) => booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() >= new Date(nowIso).getTime() : false));
     const timelineBookings = upcomingBookings;
     const timelineLoans = ((loanTimelineData ?? []) as RawLoanRow[]).map(normalizeLoan);
     const activeLoanVehicleIds = (activeLoanData ?? []).map((loan) => loan.vehicle_id);

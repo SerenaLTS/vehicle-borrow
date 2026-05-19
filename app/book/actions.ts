@@ -32,6 +32,7 @@ export async function createBooking(formData: FormData) {
     vehicleId,
     startsAt,
     endsAt,
+    isLongTerm,
   });
 
   if (validationError) {
@@ -46,9 +47,10 @@ export async function createBooking(formData: FormData) {
       booked_by_email: user.email ?? "",
       starts_at: startsAt,
       ends_at: endsAt,
+      is_long_term: isLongTerm,
       comments,
     })
-    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .single();
 
   if (error) {
@@ -66,15 +68,16 @@ export async function createBooking(formData: FormData) {
         bookedByEmail: createdBooking.booked_by_email,
         startsAt: createdBooking.starts_at,
         endsAt: createdBooking.ends_at,
+        isLongTerm: createdBooking.is_long_term,
         comments: createdBooking.comments,
       },
-      notifyAdmins: isLongTerm,
+      notifyAdmins: createdBooking.is_long_term,
     });
   } catch (notificationError) {
     console.error("Failed to send booking confirmation email.", notificationError);
   }
 
-  if (!isLongTerm) {
+  if (!createdBooking.is_long_term) {
     try {
       await sendImmediateKeyCollectionReminderIfDue({
         supabase,
@@ -84,6 +87,7 @@ export async function createBooking(formData: FormData) {
           bookedByEmail: createdBooking.booked_by_email,
           startsAt: createdBooking.starts_at,
           endsAt: createdBooking.ends_at,
+          isLongTerm: createdBooking.is_long_term,
           comments: createdBooking.comments,
         },
       });
@@ -107,9 +111,10 @@ export async function updateOwnBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const startsAtValue = String(formData.get("startsAt") ?? "").trim();
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const comments = String(formData.get("comments") ?? "").trim() || null;
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
+  const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   if (!bookingId || !vehicleId) {
     redirect("/book?error=Booking not found.");
@@ -126,7 +131,7 @@ export async function updateOwnBooking(formData: FormData) {
 
   const { data: booking, error } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .eq("id", bookingId)
     .eq("booked_by_user_id", user.id)
     .maybeSingle();
@@ -147,6 +152,7 @@ export async function updateOwnBooking(formData: FormData) {
     vehicleId,
     startsAt,
     endsAt,
+    isLongTerm,
     excludeBookingId: bookingId,
   });
 
@@ -159,6 +165,7 @@ export async function updateOwnBooking(formData: FormData) {
     .update({
       starts_at: startsAt,
       ends_at: endsAt,
+      is_long_term: isLongTerm,
       comments,
     })
     .eq("id", bookingId)
@@ -179,11 +186,13 @@ export async function updateOwnBooking(formData: FormData) {
         bookedByEmail: booking.booked_by_email,
         startsAt,
         endsAt,
+        isLongTerm,
         comments,
       },
       previousBooking: {
         startsAt: booking.starts_at,
         endsAt: booking.ends_at,
+        isLongTerm: booking.is_long_term,
         comments: booking.comments,
       },
     });
@@ -191,7 +200,7 @@ export async function updateOwnBooking(formData: FormData) {
     console.error("Failed to send booking update email.", notificationError);
   }
 
-  if (endsAt) {
+  if (!isLongTerm && endsAt) {
     try {
       await sendImmediateKeyCollectionReminderIfDue({
         supabase,
@@ -201,6 +210,7 @@ export async function updateOwnBooking(formData: FormData) {
           bookedByEmail: booking.booked_by_email,
           startsAt,
           endsAt,
+          isLongTerm,
           comments,
         },
       });
@@ -238,7 +248,7 @@ export async function cancelOwnBooking(formData: FormData) {
 
   const { data: booking, error } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, comments")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .eq("id", bookingId)
     .eq("booked_by_user_id", user.id)
     .maybeSingle();
@@ -276,6 +286,7 @@ export async function cancelOwnBooking(formData: FormData) {
         bookedByEmail: booking.booked_by_email,
         startsAt: booking.starts_at,
         endsAt: booking.ends_at,
+        isLongTerm: booking.is_long_term,
         comments: booking.comments,
       },
     });

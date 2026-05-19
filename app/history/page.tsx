@@ -24,7 +24,7 @@ export default async function HistoryPage() {
   const [{ data }, isAdmin] = await Promise.all([
     supabase
       .from("vehicle_loans")
-      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
       .order("borrowed_at", { ascending: false })
       .limit(200),
     getIsAdmin(supabase, user.id),
@@ -96,7 +96,7 @@ export default async function HistoryPage() {
                         <td>{loan.driver_name}</td>
                         <td>{loan.purpose}</td>
                         <td>{formatDateTime(loan.borrowed_at)}</td>
-                        <td>{formatDateTime(loan.expected_return_at)}</td>
+                        <td>{loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</td>
                         <td>{formatReturnedStatus(loan.returned_at)}</td>
                         <td>{loan.returned_at ? "Returned" : "Active"}</td>
                         <td>{loan.start_odometer?.toLocaleString() ?? "-"}</td>

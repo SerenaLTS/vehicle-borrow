@@ -44,7 +44,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
     supabase
       .from("vehicle_bookings")
-      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .order("starts_at", { ascending: true }),
   ]);
 
@@ -67,7 +67,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       ? await supabase
           .from("vehicle_loans")
           .select(
-            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
+            "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
           )
           .in("vehicle_id", vehicleIds)
           .is("returned_at", null)
@@ -82,7 +82,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
     .map(normalizeVehicleBooking)
-    .filter((booking) => !booking.ends_at || new Date(booking.ends_at).getTime() >= Date.now());
+    .filter((booking) => booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() >= Date.now() : false));
   const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
 
   for (const booking of activeOrUpcomingBookings) {
@@ -210,7 +210,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
           const isActivelyBorrowed = Boolean(activeLoan);
-          const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && (!nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now) : false;
+          const isBookingActive = nextBooking
+            ? new Date(nextBooking.starts_at).getTime() <= now && (nextBooking.is_long_term || (nextBooking.ends_at ? new Date(nextBooking.ends_at).getTime() > now : false))
+            : false;
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
             hasActiveLoan: Boolean(activeLoan),
@@ -292,7 +294,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </span>
                   <span>
                     <strong>Booked until</strong>
-                    {nextBooking.ends_at ? formatDateTime(nextBooking.ends_at) : "Long term"}
+                    {nextBooking.is_long_term ? "Long term" : formatDateTime(nextBooking.ends_at)}
                   </span>
                 </div>
               ) : null}

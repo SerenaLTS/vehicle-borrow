@@ -133,7 +133,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
                 <div className="vehicleMeta">
                   <span>From: {formatDateTime(booking.starts_at)}</span>
-                  <span>Until: {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}</span>
+                  <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
                   <span>Comments: {booking.comments || "-"}</span>
                   <span>Created: {formatDateTime(booking.created_at)}</span>
                 </div>
@@ -157,11 +157,17 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                           Start time
                           <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
                         </label>
-                        <label className="fieldLabel">
+                        <label className="fieldLabel longTermHidden">
                           End time
                           <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
                         </label>
                       </div>
+
+                      <label className="checkboxLabel">
+                        <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
+                        <span>Long term</span>
+                      </label>
+                      <p className="fieldHint">Long term bookings will notify admins.</p>
 
                       <label className="fieldLabel">
                         Comments
@@ -196,7 +202,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       <div className="cardsGrid">
         {fleet.map((vehicle) => {
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-          const hasUpcomingBooking = nextBooking ? !nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now : false;
+          const hasUpcomingBooking = nextBooking ? nextBooking.is_long_term || (nextBooking.ends_at ? new Date(nextBooking.ends_at).getTime() > now : false) : false;
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
             hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
@@ -219,7 +225,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 <div className="vehicleMeta">
                   <span>Booked by: {nextBooking.booked_by_email}</span>
                   <span>From: {formatDateTime(nextBooking.starts_at)}</span>
-                  <span>Until: {nextBooking.ends_at ? formatDateTime(nextBooking.ends_at) : "Long term"}</span>
+                  <span>Until: {nextBooking.is_long_term ? "Long term" : formatDateTime(nextBooking.ends_at)}</span>
                   <span>Comments: {nextBooking.comments || "-"}</span>
                 </div>
               ) : (

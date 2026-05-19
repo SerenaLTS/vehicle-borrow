@@ -31,7 +31,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     getFleetSnapshot(supabase),
     supabase
       .from("vehicle_loans")
-      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
       .eq("borrowed_by_user_id", user.id)
       .is("returned_at", null)
       .order("borrowed_at", { ascending: false }),
@@ -55,7 +55,9 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
   const now = Date.now();
   const availableVehicles = vehicles.filter((vehicle) => {
     const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && (!nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now) : false;
+    const isBookingActive = nextBooking
+      ? new Date(nextBooking.starts_at).getTime() <= now && (nextBooking.is_long_term || (nextBooking.ends_at ? new Date(nextBooking.ends_at).getTime() > now : false))
+      : false;
     const displayStatus = getVehicleDisplayStatus({
       storedStatus: vehicle.status,
       hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
@@ -67,7 +69,9 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
   const bookedVehicles = vehicles.filter((vehicle) => {
     const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && (!nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now) : false;
+    const isBookingActive = nextBooking
+      ? new Date(nextBooking.starts_at).getTime() <= now && (nextBooking.is_long_term || (nextBooking.ends_at ? new Date(nextBooking.ends_at).getTime() > now : false))
+      : false;
     const displayStatus = getVehicleDisplayStatus({
       storedStatus: vehicle.status,
       hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
@@ -112,7 +116,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                   <div className="vehicleMeta">
                     <span>Purpose: {loan.purpose}</span>
                     <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                    <span>Current expected return: {loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "Long term"}</span>
+                    <span>Current expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                   </div>
                   {extensions.length > 0 ? (
                     <div className="extensionHistory">
@@ -246,7 +250,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 <div className="vehicleMeta">
                   <span>Booked by: {nextBooking.booked_by_email}</span>
                   <span>From: {formatDateTime(nextBooking.starts_at)}</span>
-                  <span>Until: {nextBooking.ends_at ? formatDateTime(nextBooking.ends_at) : "Long term"}</span>
+                  <span>Until: {nextBooking.is_long_term ? "Long term" : formatDateTime(nextBooking.ends_at)}</span>
                   <span>Comments: {nextBooking.comments || "-"}</span>
                 </div>
               ) : null}
@@ -293,7 +297,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                     <div className="vehicleMeta">
                       <span>Booked by: {booking.booked_by_email}</span>
                       <span>From: {formatDateTime(booking.starts_at)}</span>
-                      <span>Until: {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}</span>
+                      <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
                       <span>Comments: {booking.comments || "-"}</span>
                     </div>
                   );
