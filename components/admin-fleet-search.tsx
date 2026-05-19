@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type AdminFleetSearchProps = {
   children: ReactNode;
@@ -8,19 +8,35 @@ type AdminFleetSearchProps = {
 };
 
 export function AdminFleetSearch({ children, totalCount }: AdminFleetSearchProps) {
+  const gridRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
-  const normalizedQuery = query.trim().toLowerCase();
-  const childArray = useMemo(() => (Array.isArray(children) ? children : [children]), [children]);
-  const visibleCount = normalizedQuery
-    ? childArray.filter((child) => {
-        if (!child || typeof child !== "object" || !("props" in child)) {
-          return false;
-        }
+  const [visibleCount, setVisibleCount] = useState(totalCount);
+  const normalizedQuery = useMemo(() => normalizeSearchText(query), [query]);
 
-        const searchable = String((child.props as { "data-search"?: string })["data-search"] ?? "").toLowerCase();
-        return searchable.includes(normalizedQuery);
-      }).length
-    : totalCount;
+  useEffect(() => {
+    const cards = Array.from(gridRef.current?.querySelectorAll<HTMLElement>("[data-fleet-card]") ?? []);
+
+    if (!normalizedQuery) {
+      cards.forEach((card) => {
+        card.hidden = false;
+      });
+      setVisibleCount(totalCount);
+      return;
+    }
+
+    let nextVisibleCount = 0;
+
+    cards.forEach((card) => {
+      const searchable = normalizeSearchText(`${card.dataset.search ?? ""} ${card.textContent ?? ""}`);
+      const isVisible = searchable.includes(normalizedQuery);
+      card.hidden = !isVisible;
+      if (isVisible) {
+        nextVisibleCount += 1;
+      }
+    });
+
+    setVisibleCount(nextVisibleCount);
+  }, [normalizedQuery, totalCount]);
 
   return (
     <>
@@ -38,16 +54,17 @@ export function AdminFleetSearch({ children, totalCount }: AdminFleetSearchProps
         <p className="fieldHint">{visibleCount} of {totalCount} vehicles shown</p>
       </div>
 
-      <div className="cardsGrid">
-        {childArray.map((child, index) => {
-          if (!normalizedQuery || !child || typeof child !== "object" || !("props" in child)) {
-            return child;
-          }
-
-          const searchable = String((child.props as { "data-search"?: string })["data-search"] ?? "").toLowerCase();
-          return searchable.includes(normalizedQuery) ? child : null;
-        })}
+      <div className="cardsGrid" ref={gridRef}>
+        {children}
       </div>
     </>
   );
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
 }

@@ -223,7 +223,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           return (
             <article
               className="vehicleCard"
+              data-fleet-card
               data-search={[
+                "rego",
+                "registration",
+                "plate",
+                "vin",
+                "colour",
+                "color",
+                "model",
+                "location",
                 vehicle.plate_number,
                 vehicle.model,
                 vehicle.vin,
