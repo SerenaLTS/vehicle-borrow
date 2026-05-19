@@ -291,21 +291,22 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <input name="vehicleId" type="hidden" value={record.id} />
 
                 <div className="formGrid">
-                  <label className="fieldLabel">
-                    Start time
-                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
-                  </label>
+                  <div className="timeFieldGroup">
+                    <label className="fieldLabel">
+                      Start time
+                      <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
+                    </label>
+                    <label className="checkboxLabel">
+                      <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
+                      <span>Long term</span>
+                    </label>
+                    <p className="fieldHint">Long term bookings will notify admins.</p>
+                  </div>
                   <label className="fieldLabel longTermHidden">
                     End time
                     <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
                   </label>
                 </div>
-
-                <label className="checkboxLabel">
-                  <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
-                  <span>Long term</span>
-                </label>
-                <p className="fieldHint">Long term bookings will notify admins.</p>
 
                 <label className="fieldLabel">
                   Comments
