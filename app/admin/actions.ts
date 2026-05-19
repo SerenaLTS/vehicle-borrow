@@ -68,6 +68,57 @@ function isEditableStatus(value: string): value is AdminVehicleStatus {
   return value === "available" || value === "maintenance" || value === "retired";
 }
 
+async function syncVehicleStateFromActiveLoan(adminClient: ReturnType<typeof createAdminClient>, vehicleId: string) {
+  const { data: activeLoan, error: activeLoanError } = await adminClient
+    .from("vehicle_loans")
+    .select("borrowed_by_user_id")
+    .eq("vehicle_id", vehicleId)
+    .is("returned_at", null)
+    .order("borrowed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeLoanError) {
+    return activeLoanError.message;
+  }
+
+  if (activeLoan) {
+    const { error } = await adminClient
+      .from("vehicles")
+      .update({
+        status: "borrowed",
+        current_holder_user_id: activeLoan.borrowed_by_user_id,
+      })
+      .eq("id", vehicleId);
+
+    return error?.message ?? null;
+  }
+
+  const { data: vehicle, error: vehicleError } = await adminClient
+    .from("vehicles")
+    .select("status")
+    .eq("id", vehicleId)
+    .maybeSingle();
+
+  if (vehicleError) {
+    return vehicleError.message;
+  }
+
+  if (vehicle?.status !== "borrowed") {
+    return null;
+  }
+
+  const { error } = await adminClient
+    .from("vehicles")
+    .update({
+      status: "available",
+      current_holder_user_id: null,
+    })
+    .eq("id", vehicleId);
+
+  return error?.message ?? null;
+}
+
 export async function createVehicle(formData: FormData) {
   const plateNumber = String(formData.get("plateNumber") ?? "").trim().toUpperCase();
   const model = String(formData.get("model") ?? "").trim();
@@ -598,6 +649,23 @@ export async function createHistoricalLoan(formData: FormData) {
   }
 
   const adminClient = createAdminClient();
+  if (!returnedAt) {
+    const { data: activeLoan, error: activeLoanError } = await adminClient
+      .from("vehicle_loans")
+      .select("id")
+      .eq("vehicle_id", vehicleId)
+      .is("returned_at", null)
+      .maybeSingle();
+
+    if (activeLoanError) {
+      redirectToVehicleRecordError(vehicleId, activeLoanError.message);
+    }
+
+    if (activeLoan) {
+      redirectToVehicleRecordError(vehicleId, "This vehicle already has an active borrow record.");
+    }
+  }
+
   const { error } = await adminClient.from("vehicle_loans").insert({
     vehicle_id: vehicleId,
     borrowed_by_user_id: borrower.user_id,
@@ -616,6 +684,12 @@ export async function createHistoricalLoan(formData: FormData) {
 
   if (error) {
     redirectToVehicleRecordError(vehicleId, error.message);
+  }
+
+  const syncError = await syncVehicleStateFromActiveLoan(adminClient, vehicleId);
+
+  if (syncError) {
+    redirectToVehicleRecordError(vehicleId, syncError);
   }
 
   revalidateVehicleLoanViews(vehicleId);
@@ -687,6 +761,24 @@ export async function updateHistoricalLoan(formData: FormData) {
   }
 
   const adminClient = createAdminClient();
+  if (!returnedAt) {
+    const { data: activeLoan, error: activeLoanError } = await adminClient
+      .from("vehicle_loans")
+      .select("id")
+      .eq("vehicle_id", vehicleId)
+      .is("returned_at", null)
+      .neq("id", loanId)
+      .maybeSingle();
+
+    if (activeLoanError) {
+      redirectToVehicleRecordError(vehicleId, activeLoanError.message);
+    }
+
+    if (activeLoan) {
+      redirectToVehicleRecordError(vehicleId, "This vehicle already has another active borrow record.");
+    }
+  }
+
   const { error } = await adminClient
     .from("vehicle_loans")
     .update({
@@ -708,6 +800,12 @@ export async function updateHistoricalLoan(formData: FormData) {
 
   if (error) {
     redirectToVehicleRecordError(vehicleId, error.message);
+  }
+
+  const syncError = await syncVehicleStateFromActiveLoan(adminClient, vehicleId);
+
+  if (syncError) {
+    redirectToVehicleRecordError(vehicleId, syncError);
   }
 
   revalidateVehicleLoanViews(vehicleId);
