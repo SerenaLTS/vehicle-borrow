@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendKeyCollectionReminderEmail } from "@/lib/booking-notifications";
+import { sendBorrowOverdueReminderEmail, sendKeyCollectionReminderEmail } from "@/lib/booking-notifications";
 import { APP_TIME_ZONE, parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -13,6 +13,16 @@ type ReminderBookingRow = {
   ends_at: string | null;
   is_long_term: boolean;
   comments: string | null;
+};
+
+type OverdueLoanRow = {
+  id: string;
+  vehicle_id: string;
+  borrower_email: string;
+  driver_name: string;
+  purpose: string;
+  borrowed_at: string;
+  expected_return_at: string;
 };
 
 function isAuthorized(request: Request) {
@@ -126,5 +136,66 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ windowStart, windowEnd, checked: bookings.length, sent, failed });
+  const { data: overdueLoanData, error: overdueLoanError } = await supabase
+    .from("vehicle_loans")
+    .select("id, vehicle_id, borrower_email, driver_name, purpose, borrowed_at, expected_return_at")
+    .is("returned_at", null)
+    .eq("is_long_term", false)
+    .lt("expected_return_at", now.toISOString())
+    .is("borrow_overdue_reminded_at", null)
+    .order("expected_return_at", { ascending: true })
+    .limit(25);
+
+  if (overdueLoanError) {
+    return NextResponse.json({ error: overdueLoanError.message }, { status: 500 });
+  }
+
+  const overdueLoans = (overdueLoanData ?? []) as OverdueLoanRow[];
+  const overdueSent: string[] = [];
+  const overdueFailed: Array<{ loanId: string; error: string }> = [];
+
+  for (const loan of overdueLoans) {
+    try {
+      const sentReminder = await sendBorrowOverdueReminderEmail({
+        supabase,
+        loan: {
+          loanId: loan.id,
+          vehicleId: loan.vehicle_id,
+          borrowerEmail: loan.borrower_email,
+          driverName: loan.driver_name,
+          purpose: loan.purpose,
+          borrowedAt: loan.borrowed_at,
+          expectedReturnAt: loan.expected_return_at,
+        },
+      });
+
+      if (!sentReminder) {
+        continue;
+      }
+
+      const { error: updateError } = await supabase
+        .from("vehicle_loans")
+        .update({ borrow_overdue_reminded_at: new Date().toISOString() })
+        .eq("id", loan.id)
+        .is("borrow_overdue_reminded_at", null);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
+      overdueSent.push(loan.id);
+    } catch (reminderError) {
+      overdueFailed.push({
+        loanId: loan.id,
+        error: reminderError instanceof Error ? reminderError.message : "Unknown borrow overdue reminder error",
+      });
+    }
+  }
+
+  return NextResponse.json({
+    windowStart,
+    windowEnd,
+    bookingKeyReminders: { checked: bookings.length, sent, failed },
+    borrowOverdueReminders: { checked: overdueLoans.length, sent: overdueSent, failed: overdueFailed },
+  });
 }

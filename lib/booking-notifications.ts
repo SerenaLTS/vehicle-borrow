@@ -4,7 +4,7 @@ import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { formatDateTime } from "@/lib/utils";
 
 type SupabaseNotificationClient = {
-  from: (table: "vehicles" | "user_roles" | "vehicle_bookings") => {
+  from: (table: "vehicles" | "user_roles" | "vehicle_bookings" | "vehicle_loans") => {
     select: (columns: string) => {
       eq: (column: string, value: string | boolean) => {
         maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error?: { message: string } | null }>;
@@ -55,6 +55,28 @@ type LongTermBorrowNotificationParams = {
   borrowNotes: string | null;
 };
 
+type BorrowConfirmationParams = {
+  supabase: unknown;
+  borrowerEmail: string;
+  vehicleId: string;
+  driverName: string;
+  purpose: string;
+  startOdometer: number | null;
+  expectedReturnAt: string | null;
+  isLongTerm: boolean;
+  borrowNotes: string | null;
+};
+
+export type BorrowOverdueReminderSnapshot = {
+  loanId: string;
+  vehicleId: string;
+  borrowerEmail: string;
+  driverName: string;
+  purpose: string;
+  borrowedAt: string;
+  expectedReturnAt: string;
+};
+
 type BookingNotificationParams = {
   supabase: unknown;
   action: BookingNotificationAction;
@@ -73,6 +95,20 @@ type MailConfig = {
   from: string;
 };
 
+const MAIL_FROM_NAME = "serena wang";
+
+function getEmailAddress(value: string) {
+  const bracketMatch = value.match(/<([^>]+)>/);
+
+  return (bracketMatch?.[1] ?? value).trim();
+}
+
+function buildFromAddress(from: string) {
+  const address = getEmailAddress(from);
+
+  return `"${MAIL_FROM_NAME}" <${address}>`;
+}
+
 function getMailConfig(): MailConfig | null {
   const host = process.env.SMTP_HOST?.trim();
   const user = process.env.SMTP_USER?.trim();
@@ -88,7 +124,7 @@ function getMailConfig(): MailConfig | null {
   const secureSetting = process.env.SMTP_SECURE?.trim().toLowerCase();
   const secure = secureSetting ? secureSetting === "true" : port === 465;
 
-  return { host, port, secure, user, pass, from };
+  return { host, port, secure, user, pass, from: buildFromAddress(from) };
 }
 
 function getSydneyDateTimeParts(date: Date) {
@@ -304,6 +340,62 @@ export async function sendLongTermBorrowAdminNotificationEmail({
   });
 }
 
+export async function sendBorrowConfirmationEmail({
+  supabase,
+  borrowerEmail,
+  vehicleId,
+  driverName,
+  purpose,
+  startOdometer,
+  expectedReturnAt,
+  isLongTerm,
+  borrowNotes,
+}: BorrowConfirmationParams) {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
+    return;
+  }
+
+  const recipient = borrowerEmail.trim().toLowerCase();
+
+  if (!recipient) {
+    return;
+  }
+
+  const vehicle = await getVehicleForNotification(supabase, vehicleId);
+  const vehicleLabel = buildVehicleLabel(vehicle);
+  const transporter = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: recipient,
+    subject: `Vehicle borrow confirmed: ${vehicleLabel}`,
+    text: [
+      "Your vehicle borrow has been confirmed.",
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Borrower: ${recipient}`,
+      `Driver: ${driverName || "-"}`,
+      `Purpose: ${purpose}`,
+      `Borrowed at: ${formatDateTime(new Date().toISOString())}`,
+      `Expected return: ${isLongTerm ? "Long term" : formatDateTime(expectedReturnAt)}`,
+      `Start odometer: ${startOdometer === null ? "-" : `${startOdometer.toLocaleString()} km`}`,
+      `Notes: ${borrowNotes || "-"}`,
+      "",
+      `Please open ${APP_NAME} when you return the vehicle so the return is registered.`,
+    ].join("\n"),
+  });
+}
+
 export async function sendBookingNotificationEmail({
   supabase,
   action,
@@ -356,6 +448,59 @@ export async function sendBookingNotificationEmail({
       vehicleLabel,
     }),
   });
+}
+
+export async function sendBorrowOverdueReminderEmail({
+  supabase,
+  loan,
+}: {
+  supabase: unknown;
+  loan: BorrowOverdueReminderSnapshot;
+}) {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
+    return false;
+  }
+
+  const recipient = loan.borrowerEmail.trim().toLowerCase();
+
+  if (!recipient) {
+    return false;
+  }
+
+  const vehicle = await getVehicleForNotification(supabase, loan.vehicleId);
+  const vehicleLabel = buildVehicleLabel(vehicle);
+  const transporter = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: recipient,
+    subject: `Vehicle return reminder: ${vehicleLabel}`,
+    text: [
+      "The expected return time for your active vehicle borrow has passed.",
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Borrower: ${recipient}`,
+      `Driver: ${loan.driverName || "-"}`,
+      `Purpose: ${loan.purpose}`,
+      `Borrowed at: ${formatDateTime(loan.borrowedAt)}`,
+      `Expected return: ${formatDateTime(loan.expectedReturnAt)}`,
+      "",
+      `If you have already returned the vehicle, please open ${APP_NAME} and register the return.`,
+      "If you still need the vehicle, please extend the borrow time.",
+    ].join("\n"),
+  });
+
+  return true;
 }
 
 export async function sendKeyCollectionReminderEmail({

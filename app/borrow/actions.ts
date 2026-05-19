@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
-import { sendLongTermBorrowAdminNotificationEmail } from "@/lib/booking-notifications";
+import { sendBorrowConfirmationEmail, sendLongTermBorrowAdminNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
 
 function getExtendReturnPath(formData: FormData) {
@@ -61,6 +61,22 @@ export async function borrowVehicle(formData: FormData) {
 
   if (error) {
     redirect(`/borrow?error=${encodeURIComponent(error.message)}`);
+  }
+
+  try {
+    await sendBorrowConfirmationEmail({
+      supabase,
+      borrowerEmail: user.email ?? "",
+      vehicleId,
+      driverName,
+      purpose,
+      startOdometer,
+      expectedReturnAt,
+      isLongTerm,
+      borrowNotes,
+    });
+  } catch (notificationError) {
+    console.error("Failed to send borrow confirmation email.", notificationError);
   }
 
   if (isLongTerm) {
@@ -129,6 +145,8 @@ export async function extendVehicleLoan(formData: FormData) {
   if (error) {
     redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
+
+  await supabase.from("vehicle_loans").update({ borrow_overdue_reminded_at: null }).eq("id", loanId);
 
   clearFleetSnapshotCache();
   clearVehicleCalendarCache(loanRecord?.vehicle_id ?? undefined);

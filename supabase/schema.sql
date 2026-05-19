@@ -39,11 +39,13 @@ create table if not exists public.vehicle_loans (
   return_notes text,
   borrowed_at timestamptz not null default timezone('utc', now()),
   expected_return_at timestamptz,
+  borrow_overdue_reminded_at timestamptz,
   is_long_term boolean not null default false,
   returned_at timestamptz
 );
 
 alter table public.vehicle_loans add column if not exists expected_return_at timestamptz;
+alter table public.vehicle_loans add column if not exists borrow_overdue_reminded_at timestamptz;
 alter table public.vehicle_loans add column if not exists is_long_term boolean not null default false;
 
 alter table public.vehicle_loans
@@ -183,6 +185,11 @@ for each row execute procedure public.validate_vehicle_booking();
 create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
 create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
 create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
+create index if not exists idx_vehicle_loans_overdue_reminders
+on public.vehicle_loans (expected_return_at)
+where returned_at is null
+  and is_long_term = false
+  and borrow_overdue_reminded_at is null;
 create index if not exists idx_vehicles_status_plate_number on public.vehicles (status, plate_number);
 create index if not exists idx_user_roles_email on public.user_roles (email);
 create index if not exists idx_vehicle_bookings_vehicle_id on public.vehicle_bookings (vehicle_id);

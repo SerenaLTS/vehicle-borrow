@@ -23,6 +23,7 @@ export type LoanRow = {
   return_notes: string | null;
   borrowed_at: string;
   expected_return_at: string | null;
+  borrow_overdue_reminded_at?: string | null;
   is_long_term: boolean;
   returned_at: string | null;
   vehicle: {
