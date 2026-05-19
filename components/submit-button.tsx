@@ -1,7 +1,6 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { DuckLoader } from "@/components/duck-loader";
 
 type SubmitButtonProps = {
   idleLabel: string;
@@ -15,7 +14,12 @@ export function SubmitButton({ idleLabel, pendingLabel, className = "primaryButt
 
   return (
     <button className={className} disabled={pending} type="submit">
-      {pending && showPendingDuck ? <DuckLoader label={pendingLabel} /> : pending ? pendingLabel : idleLabel}
+      {pending && showPendingDuck ? (
+        <span className="buttonSpinnerLabel">
+          <span aria-hidden="true" className="buttonSpinner" />
+          {pendingLabel}
+        </span>
+      ) : pending ? pendingLabel : idleLabel}
     </button>
   );
 }
