@@ -42,6 +42,18 @@ function sortEvents(events: VehicleCalendarEvent[]) {
   return [...events].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
 }
 
+function getLoanCalendarEndAt(loan: ReturnType<typeof normalizeLoan>, yearEndIso: string) {
+  if (loan.returned_at) {
+    return loan.returned_at;
+  }
+
+  if (loan.expected_return_at) {
+    return loan.expected_return_at;
+  }
+
+  return loan.is_long_term ? yearEndIso : new Date().toISOString();
+}
+
 export async function getVehicleCalendarSnapshot(supabase: unknown, vehicleId: string): Promise<VehicleCalendarSnapshot> {
   const currentYear = new Date().getFullYear();
   return getVehicleCalendarSnapshotForYear(supabase, vehicleId, currentYear);
@@ -118,7 +130,7 @@ export async function getVehicleCalendarSnapshotForYear(
     const loans = ((loanData ?? []) as RawLoanRow[])
       .map(normalizeLoan)
       .filter((loan) => {
-        const loanEnd = loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString();
+        const loanEnd = getLoanCalendarEndAt(loan, yearEndIso);
         return loanEnd >= yearStartIso;
       });
     const events = sortEvents([
@@ -135,7 +147,7 @@ export async function getVehicleCalendarSnapshotForYear(
         kind: "borrowed" as const,
         actor: loan.borrower_email,
         startAt: loan.borrowed_at,
-        endAt: loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString(),
+        endAt: getLoanCalendarEndAt(loan, yearEndIso),
         notes: loan.purpose || loan.borrow_notes || null,
       })),
     ]);

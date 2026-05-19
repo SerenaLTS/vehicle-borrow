@@ -95,6 +95,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const currentYear = new Date().getFullYear();
   const requestedMonth = typeof pageParams.month === "string" && /^\d{4}-\d{2}$/.test(pageParams.month) ? pageParams.month : undefined;
   const loadedYear = Number((requestedMonth ?? `${currentYear}-01`).slice(0, 4));
+  const loadedYearEndIso = new Date(Date.UTC(loadedYear + 1, 0, 1, 0, 0, 0, 0)).toISOString();
   const currentBooking =
     bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false))) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
@@ -112,7 +113,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       kind: "borrowed" as const,
       actor: loan.borrower_email,
       startAt: loan.borrowed_at,
-      endAt: loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString(),
+      endAt: loan.returned_at ?? loan.expected_return_at ?? (loan.is_long_term ? loadedYearEndIso : new Date().toISOString()),
       notes: loan.purpose || loan.borrow_notes || null,
     })),
   ].filter((event) => {

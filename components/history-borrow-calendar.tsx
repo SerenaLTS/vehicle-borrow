@@ -86,18 +86,19 @@ function addMonth(monthKey: string, delta: number) {
 }
 
 function getLoanEndAt(loan: LoanRow) {
+  const today = new Date();
+
   if (loan.returned_at) {
-    return loan.returned_at;
+    return new Date(loan.returned_at).getTime() > today.getTime() ? today.toISOString() : loan.returned_at;
   }
 
-  const now = new Date();
   const expectedReturn = loan.expected_return_at ? new Date(loan.expected_return_at) : null;
 
-  if (loan.expected_return_at && expectedReturn && expectedReturn.getTime() > now.getTime()) {
+  if (loan.expected_return_at && expectedReturn && expectedReturn.getTime() <= today.getTime()) {
     return loan.expected_return_at;
   }
 
-  return now.toISOString();
+  return today.toISOString();
 }
 
 function isLoanActiveOnDay(loan: LoanRow, dayKey: string) {
@@ -162,11 +163,16 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
     return grouped;
   }, [loans, monthWeeks]);
   const selectedLoans = loansByDay.get(selectedDay) ?? [];
+  const todayKey = getTodayKey();
+  const todayMonthKey = getMonthKey(new Date());
+  const canMoveNext = currentMonth < todayMonthKey;
 
   function moveMonth(delta: number) {
     const targetMonth = addMonth(currentMonth, delta);
-    setCurrentMonth(targetMonth);
-    setSelectedDay(`${targetMonth}-01`);
+    const safeTargetMonth = targetMonth > todayMonthKey ? todayMonthKey : targetMonth;
+
+    setCurrentMonth(safeTargetMonth);
+    setSelectedDay(safeTargetMonth === todayMonthKey ? todayKey : `${safeTargetMonth}-01`);
   }
 
   return (
@@ -183,7 +189,7 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
           Previous
         </button>
         <h4>{monthLabel}</h4>
-        <button className="secondaryButton" onClick={() => moveMonth(1)} type="button">
+        <button className="secondaryButton" disabled={!canMoveNext} onClick={() => moveMonth(1)} type="button">
           Next
         </button>
       </div>
@@ -206,10 +212,13 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
             const dayLoans = loansByDay.get(cell.key) ?? [];
             const vehicleCount = new Set(dayLoans.map((loan) => loan.vehicle_id)).size;
             const isSelected = selectedDay === cell.key;
+            const isToday = cell.key === todayKey;
+            const isFuture = cell.key > todayKey;
 
             return (
               <button
-                className={`historyCalendarDay${vehicleCount > 0 ? " historyCalendarDay-hasLoans" : ""}${isSelected ? " historyCalendarDay-selected" : ""}`}
+                className={`historyCalendarDay${vehicleCount > 0 ? " historyCalendarDay-hasLoans" : ""}${isSelected ? " historyCalendarDay-selected" : ""}${isToday ? " historyCalendarDay-today" : ""}${isFuture ? " historyCalendarDay-future" : ""}`}
+                disabled={isFuture}
                 key={cell.key}
                 onClick={() => setSelectedDay(cell.key)}
                 type="button"

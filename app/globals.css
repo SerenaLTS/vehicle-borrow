@@ -641,6 +641,10 @@ button:disabled {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
 }
 
+.historyCalendarDay:disabled {
+  cursor: default;
+}
+
 .historyCalendarDay-empty {
   cursor: default;
   background: transparent;
@@ -655,6 +659,16 @@ button:disabled {
 .historyCalendarDay-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.historyCalendarDay-today {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.historyCalendarDay-future {
+  opacity: 0.48;
+  background: color-mix(in srgb, var(--background) 74%, white);
 }
 
 .historyCalendarDay-hasLoans.historyCalendarDay-selected {
