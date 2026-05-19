@@ -95,7 +95,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const currentYear = new Date().getFullYear();
   const requestedMonth = typeof pageParams.month === "string" && /^\d{4}-\d{2}$/.test(pageParams.month) ? pageParams.month : undefined;
   const loadedYear = Number((requestedMonth ?? `${currentYear}-01`).slice(0, 4));
-  const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && new Date(booking.ends_at).getTime() > now) ?? null;
+  const currentBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && (!booking.ends_at || new Date(booking.ends_at).getTime() > now)) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
   const calendarEvents: VehicleCalendarEvent[] = [
     ...bookings.map((booking) => ({
@@ -189,6 +189,10 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <strong>Color</strong>
                 <span>{record.color || "-"}</span>
               </div>
+              <div>
+                <strong>Location</strong>
+                <span>{record.location || "-"}</span>
+              </div>
             </>
           ) : null}
           <div>
@@ -209,7 +213,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           </div>
           <div>
             <strong>Current booking</strong>
-            <span>{currentBooking ? `${formatDateTime(currentBooking.starts_at)} to ${formatDateTime(currentBooking.ends_at)}` : "-"}</span>
+            <span>{currentBooking ? `${formatDateTime(currentBooking.starts_at)} to ${currentBooking.ends_at ? formatDateTime(currentBooking.ends_at) : "Long term"}` : "-"}</span>
           </div>
           <div>
             <strong>Booked by</strong>
@@ -217,7 +221,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           </div>
           <div>
             <strong>Next booking</strong>
-            <span>{nextUpcomingBooking ? `${formatDateTime(nextUpcomingBooking.starts_at)} to ${formatDateTime(nextUpcomingBooking.ends_at)}` : "-"}</span>
+            <span>{nextUpcomingBooking ? `${formatDateTime(nextUpcomingBooking.starts_at)} to ${nextUpcomingBooking.ends_at ? formatDateTime(nextUpcomingBooking.ends_at) : "Long term"}` : "-"}</span>
           </div>
           <div>
             <strong>Comments</strong>
@@ -264,10 +268,10 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         <div className="cardsGrid">
           {bookings.map((booking) => (
             <article className="vehicleCard" key={booking.id}>
-              <StatusPill status={new Date(booking.starts_at).getTime() <= now && new Date(booking.ends_at).getTime() > now ? "booked" : "available"} />
+              <StatusPill status={new Date(booking.starts_at).getTime() <= now && (!booking.ends_at || new Date(booking.ends_at).getTime() > now) ? "booked" : "available"} />
               <h3>{booking.booked_by_email}</h3>
               <p className="muted">
-                {formatDateTime(booking.starts_at)} to {formatDateTime(booking.ends_at)}
+                {formatDateTime(booking.starts_at)} to {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}
               </p>
               <div className="vehicleMeta">
                 <span>Comments: {booking.comments || "-"}</span>
@@ -285,7 +289,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                   </label>
                   <label className="fieldLabel">
                     End time
-                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" required type="datetime-local" />
+                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
                   </label>
                 </div>
 
@@ -406,7 +410,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
               <div className="vehicleMeta">
                 <span>Driver: {loan.driver_name}</span>
                 <span>Purpose: {loan.purpose}</span>
-                <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
+                <span>Expected return: {loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "Long term"}</span>
                 <span>Start KM: {loan.start_odometer?.toLocaleString() ?? "-"}</span>
                 <span>End KM: {loan.end_odometer?.toLocaleString() ?? "-"}</span>
               </div>

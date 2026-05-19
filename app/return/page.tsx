@@ -103,7 +103,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
                   <span>Driver: {loan.driver_name}</span>
                   <span>Purpose: {loan.purpose}</span>
                   <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                  <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
+                  <span>Expected return: {loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "Long term"}</span>
                   <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
                 </div>
               </article>

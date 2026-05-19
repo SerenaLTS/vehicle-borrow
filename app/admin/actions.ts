@@ -73,6 +73,7 @@ export async function createVehicle(formData: FormData) {
   const model = String(formData.get("model") ?? "").trim();
   const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
   const color = String(formData.get("color") ?? "").trim() || null;
+  const location = String(formData.get("location") ?? "").trim() || null;
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
@@ -87,7 +88,7 @@ export async function createVehicle(formData: FormData) {
     model,
     status,
     comments,
-    ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }),
+    ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }),
   };
   const { error } = await supabase.from("vehicles").insert(insertPayload);
 
@@ -108,6 +109,7 @@ export async function updateVehicle(formData: FormData) {
   const model = String(formData.get("model") ?? "").trim();
   const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
   const color = String(formData.get("color") ?? "").trim() || null;
+  const location = String(formData.get("location") ?? "").trim() || null;
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
@@ -142,13 +144,13 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     isActivelyBorrowed
-      ? { model, comments, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }) }
+      ? { model, comments, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }) }
       : {
           model,
           status,
           comments,
           current_holder_user_id: null,
-          ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color }),
+          ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }),
         };
 
   const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
@@ -259,7 +261,7 @@ export async function createAdminBooking(formData: FormData) {
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
+  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   const supabase = await requireAdmin();
   const {
@@ -316,20 +318,22 @@ export async function createAdminBooking(formData: FormData) {
     console.error("Failed to send admin booking confirmation email.", notificationError);
   }
 
-  try {
-    await sendImmediateKeyCollectionReminderIfDue({
-      supabase,
-      booking: {
-        bookingId: createdBooking.id,
-        vehicleId: createdBooking.vehicle_id,
-        bookedByEmail: createdBooking.booked_by_email,
-        startsAt: createdBooking.starts_at,
-        endsAt: createdBooking.ends_at,
-        comments: createdBooking.comments,
-      },
-    });
-  } catch (notificationError) {
-    console.error("Failed to send immediate key collection reminder email.", notificationError);
+  if (createdBooking.ends_at) {
+    try {
+      await sendImmediateKeyCollectionReminderIfDue({
+        supabase,
+        booking: {
+          bookingId: createdBooking.id,
+          vehicleId: createdBooking.vehicle_id,
+          bookedByEmail: createdBooking.booked_by_email,
+          startsAt: createdBooking.starts_at,
+          endsAt: createdBooking.ends_at,
+          comments: createdBooking.comments,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to send immediate key collection reminder email.", notificationError);
+    }
   }
 
   clearFleetSnapshotCache();
@@ -349,7 +353,7 @@ export async function updateAdminBooking(formData: FormData) {
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
+  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   if (!bookingId || !vehicleId) {
     redirect("/admin?error=Booking not found.");

@@ -4,6 +4,7 @@ export type Vehicle = {
   model: string;
   vin: string | null;
   color: string | null;
+  location: string | null;
   status: "available" | "booked" | "borrowed" | "maintenance" | "retired";
   comments: string | null;
   current_holder_user_id: string | null;
@@ -66,7 +67,7 @@ export type VehicleBooking = {
   booked_by_user_id: string;
   booked_by_email: string;
   starts_at: string;
-  ends_at: string;
+  ends_at: string | null;
   comments: string | null;
   created_at: string;
   vehicle: {

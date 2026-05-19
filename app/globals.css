@@ -765,6 +765,21 @@ input[type="datetime-local"] {
   -webkit-appearance: none;
 }
 
+input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 textarea {
   min-height: 120px;
   resize: vertical;

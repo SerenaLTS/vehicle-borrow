@@ -45,7 +45,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
-      .gte("ends_at", new Date().toISOString())
       .order("starts_at", { ascending: true }),
   ]);
 
@@ -81,7 +80,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const userRoles = (roles ?? []) as UserRole[];
   const activeLoans = ((activeLoanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
-  const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
+  const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
+    .map(normalizeVehicleBooking)
+    .filter((booking) => !booking.ends_at || new Date(booking.ends_at).getTime() >= Date.now());
   const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
 
   for (const booking of activeOrUpcomingBookings) {
@@ -137,12 +138,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Color
                   <input name="color" placeholder="White" />
                 </label>
+                <label className="fieldLabel">
+                  Location
+                  <input name="location" placeholder="Sydney office, warehouse..." />
+                </label>
               </>
             ) : null}
           </div>
 
           {!optionalFieldSupport.enabled ? (
-            <p className="muted">VIN and color fields will appear after those columns are added to the vehicles table.</p>
+            <p className="muted">VIN, color, and location fields will appear after those columns are added to the vehicles table.</p>
           ) : null}
 
           <label className="fieldLabel">
@@ -205,7 +210,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
           const isActivelyBorrowed = Boolean(activeLoan);
-          const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+          const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && (!nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now) : false;
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
             hasActiveLoan: Boolean(activeLoan),
@@ -219,6 +224,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <StatusPill status={displayStatus} />
                   <h3>{vehicle.plate_number}</h3>
                   <p className="muted">{vehicle.model}</p>
+                  {vehicle.location ? <p className="muted">Location: {vehicle.location}</p> : null}
                 </Link>
                 <Link className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
                   View records
@@ -286,7 +292,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </span>
                   <span>
                     <strong>Booked until</strong>
-                    {formatDateTime(nextBooking.ends_at)}
+                    {nextBooking.ends_at ? formatDateTime(nextBooking.ends_at) : "Long term"}
                   </span>
                 </div>
               ) : null}
@@ -308,6 +314,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <label className="fieldLabel">
                       Color
                       <input defaultValue={vehicle.color ?? ""} name="color" placeholder="White" />
+                    </label>
+
+                    <label className="fieldLabel">
+                      Location
+                      <input defaultValue={vehicle.location ?? ""} name="location" placeholder="Sydney office, warehouse..." />
                     </label>
                   </div>
                 ) : null}

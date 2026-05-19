@@ -13,10 +13,11 @@ export async function createBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const startsAtValue = String(formData.get("startsAt") ?? "").trim();
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const comments = String(formData.get("comments") ?? "").trim() || null;
 
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
+  const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   const supabase = await createClient();
   const {
@@ -67,25 +68,28 @@ export async function createBooking(formData: FormData) {
         endsAt: createdBooking.ends_at,
         comments: createdBooking.comments,
       },
+      notifyAdmins: isLongTerm,
     });
   } catch (notificationError) {
     console.error("Failed to send booking confirmation email.", notificationError);
   }
 
-  try {
-    await sendImmediateKeyCollectionReminderIfDue({
-      supabase,
-      booking: {
-        bookingId: createdBooking.id,
-        vehicleId: createdBooking.vehicle_id,
-        bookedByEmail: createdBooking.booked_by_email,
-        startsAt: createdBooking.starts_at,
-        endsAt: createdBooking.ends_at,
-        comments: createdBooking.comments,
-      },
-    });
-  } catch (notificationError) {
-    console.error("Failed to send immediate key collection reminder email.", notificationError);
+  if (!isLongTerm) {
+    try {
+      await sendImmediateKeyCollectionReminderIfDue({
+        supabase,
+        booking: {
+          bookingId: createdBooking.id,
+          vehicleId: createdBooking.vehicle_id,
+          bookedByEmail: createdBooking.booked_by_email,
+          startsAt: createdBooking.starts_at,
+          endsAt: createdBooking.ends_at,
+          comments: createdBooking.comments,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to send immediate key collection reminder email.", notificationError);
+    }
   }
 
   clearFleetSnapshotCache();
@@ -105,7 +109,7 @@ export async function updateOwnBooking(formData: FormData) {
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
-  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : "";
+  const endsAt = endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
   if (!bookingId || !vehicleId) {
     redirect("/book?error=Booking not found.");
@@ -187,20 +191,22 @@ export async function updateOwnBooking(formData: FormData) {
     console.error("Failed to send booking update email.", notificationError);
   }
 
-  try {
-    await sendImmediateKeyCollectionReminderIfDue({
-      supabase,
-      booking: {
-        bookingId,
-        vehicleId,
-        bookedByEmail: booking.booked_by_email,
-        startsAt,
-        endsAt,
-        comments,
-      },
-    });
-  } catch (notificationError) {
-    console.error("Failed to send immediate key collection reminder email.", notificationError);
+  if (endsAt) {
+    try {
+      await sendImmediateKeyCollectionReminderIfDue({
+        supabase,
+        booking: {
+          bookingId,
+          vehicleId,
+          bookedByEmail: booking.booked_by_email,
+          startsAt,
+          endsAt,
+          comments,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to send immediate key collection reminder email.", notificationError);
+    }
   }
 
   clearFleetSnapshotCache();

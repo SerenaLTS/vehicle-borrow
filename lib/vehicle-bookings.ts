@@ -5,7 +5,7 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type BookingValidationArgs = {
   vehicleId: string;
   startsAt: string;
-  endsAt: string;
+  endsAt: string | null;
   excludeBookingId?: string;
 };
 
@@ -14,9 +14,9 @@ export async function validateVehicleBookingWindow(
   { vehicleId, startsAt, endsAt, excludeBookingId }: BookingValidationArgs,
 ) {
   const startsAtDate = new Date(startsAt);
-  const endsAtDate = new Date(endsAt);
+  const endsAtDate = endsAt ? new Date(endsAt) : null;
 
-  if (!vehicleId || Number.isNaN(startsAtDate.getTime()) || Number.isNaN(endsAtDate.getTime()) || endsAtDate <= startsAtDate) {
+  if (!vehicleId || Number.isNaN(startsAtDate.getTime()) || (endsAtDate !== null && (Number.isNaN(endsAtDate.getTime()) || endsAtDate <= startsAtDate))) {
     return "Please choose a valid booking time range.";
   }
 
@@ -55,7 +55,7 @@ export async function validateVehicleBookingWindow(
     const loanStartsAt = new Date(activeLoan.borrowed_at);
     const loanEndsAt = new Date(activeLoan.expected_return_at);
 
-    if (loanStartsAt < endsAtDate && loanEndsAt > startsAtDate) {
+    if ((endsAtDate === null || loanStartsAt < endsAtDate) && loanEndsAt > startsAtDate) {
       return "This booking overlaps with an existing borrow period.";
     }
   }
@@ -64,8 +64,8 @@ export async function validateVehicleBookingWindow(
     .from("vehicle_bookings")
     .select("id", { head: true, count: "exact" })
     .eq("vehicle_id", vehicleId)
-    .lt("starts_at", endsAt)
-    .gt("ends_at", startsAt);
+    .lt("starts_at", endsAt ?? "9999-12-31T23:59:59.999Z")
+    .or(`ends_at.is.null,ends_at.gt.${startsAt}`);
 
   if (excludeBookingId) {
     conflictQuery = conflictQuery.neq("id", excludeBookingId);

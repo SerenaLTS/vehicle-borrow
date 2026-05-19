@@ -55,7 +55,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
   const now = Date.now();
   const availableVehicles = vehicles.filter((vehicle) => {
     const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && (!nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now) : false;
     const displayStatus = getVehicleDisplayStatus({
       storedStatus: vehicle.status,
       hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
@@ -67,7 +67,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
   const bookedVehicles = vehicles.filter((vehicle) => {
     const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && new Date(nextBooking.ends_at).getTime() > now : false;
+    const isBookingActive = nextBooking ? new Date(nextBooking.starts_at).getTime() <= now && (!nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now) : false;
     const displayStatus = getVehicleDisplayStatus({
       storedStatus: vehicle.status,
       hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
@@ -112,7 +112,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                   <div className="vehicleMeta">
                     <span>Purpose: {loan.purpose}</span>
                     <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                    <span>Current expected return: {formatDateTime(loan.expected_return_at)}</span>
+                    <span>Current expected return: {loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "Long term"}</span>
                   </div>
                   {extensions.length > 0 ? (
                     <div className="extensionHistory">
@@ -151,7 +151,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
       <section className="panel">
         <h2>Borrow a vehicle</h2>
-        <p className="muted">Borrowing requires an expected return time. If that window overlaps an existing booking, the system will block the borrow automatically.</p>
+        <p className="muted">Borrowing usually requires an expected return time. Long term borrows can be created without one and will notify admins.</p>
 
         {availableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles are available right now.</div>
@@ -172,6 +172,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.plate_number} • {vehicle.model}
                     {vehicle.color ? ` • ${vehicle.color}` : ""}
+                    {vehicle.location ? ` • ${vehicle.location}` : ""}
                     {vehicle.vin ? ` • VIN ${vehicle.vin}` : ""}
                   </option>
                 ))}
@@ -191,7 +192,12 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
             <label className="fieldLabel">
               Expected return time
-              <input name="expectedReturnAt" required type="datetime-local" />
+              <input name="expectedReturnAt" type="datetime-local" />
+            </label>
+
+            <label className="checkboxLabel">
+              <input name="isLongTerm" type="checkbox" />
+              <span>Long term</span>
             </label>
 
             <label className="fieldLabel">
@@ -228,17 +234,18 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
               <StatusPill status={hasUpcomingBooking ? "booked" : "available"} />
               <h3>{vehicle.plate_number}</h3>
               <p className="muted">{vehicle.model}</p>
-              {vehicle.vin || vehicle.color ? (
+              {vehicle.vin || vehicle.color || vehicle.location ? (
                 <div className="vehicleMeta">
                   <span>VIN: {vehicle.vin || "-"}</span>
                   <span>Color: {vehicle.color || "-"}</span>
+                  <span>Location: {vehicle.location || "-"}</span>
                 </div>
               ) : null}
               {nextBooking ? (
                 <div className="vehicleMeta">
                   <span>Booked by: {nextBooking.booked_by_email}</span>
                   <span>From: {formatDateTime(nextBooking.starts_at)}</span>
-                  <span>Until: {formatDateTime(nextBooking.ends_at)}</span>
+                  <span>Until: {nextBooking.ends_at ? formatDateTime(nextBooking.ends_at) : "Long term"}</span>
                   <span>Comments: {nextBooking.comments || "-"}</span>
                 </div>
               ) : null}
@@ -263,10 +270,11 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                 <StatusPill status="booked" />
                 <h3>{vehicle.plate_number}</h3>
                 <p className="muted">{vehicle.model}</p>
-                {vehicle.vin || vehicle.color ? (
+                {vehicle.vin || vehicle.color || vehicle.location ? (
                   <div className="vehicleMeta">
                     <span>VIN: {vehicle.vin || "-"}</span>
                     <span>Color: {vehicle.color || "-"}</span>
+                    <span>Location: {vehicle.location || "-"}</span>
                   </div>
                 ) : null}
                 {(() => {
@@ -284,7 +292,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                     <div className="vehicleMeta">
                       <span>Booked by: {booking.booked_by_email}</span>
                       <span>From: {formatDateTime(booking.starts_at)}</span>
-                      <span>Until: {formatDateTime(booking.ends_at)}</span>
+                      <span>Until: {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}</span>
                       <span>Comments: {booking.comments || "-"}</span>
                     </div>
                   );

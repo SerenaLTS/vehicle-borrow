@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
+import { sendLongTermBorrowAdminNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
 
 function getExtendReturnPath(formData: FormData) {
@@ -19,14 +20,15 @@ export async function borrowVehicle(formData: FormData) {
   const purpose = String(formData.get("purpose") ?? "").trim();
   const startOdometerValue = String(formData.get("startOdometer") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const startOdometer = startOdometerValue ? Number(startOdometerValue) : null;
-  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
+  const expectedReturnAt = !isLongTerm && expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
 
   if (
     !vehicleId ||
     !purpose ||
-    !expectedReturnAt ||
+    (!isLongTerm && !expectedReturnAt) ||
     (startOdometer !== null && (Number.isNaN(startOdometer) || startOdometer < 0))
   ) {
     redirect("/borrow?error=Please complete all required fields.");
@@ -54,10 +56,27 @@ export async function borrowVehicle(formData: FormData) {
     p_start_odometer: startOdometer,
     p_borrow_notes: borrowNotes,
     p_expected_return_at: expectedReturnAt,
+    p_long_term: isLongTerm,
   });
 
   if (error) {
     redirect(`/borrow?error=${encodeURIComponent(error.message)}`);
+  }
+
+  if (isLongTerm) {
+    try {
+      await sendLongTermBorrowAdminNotificationEmail({
+        supabase,
+        borrowerEmail: user.email ?? "",
+        vehicleId,
+        driverName,
+        purpose,
+        startOdometer,
+        borrowNotes,
+      });
+    } catch (notificationError) {
+      console.error("Failed to send long term borrow admin notification email.", notificationError);
+    }
   }
 
   clearFleetSnapshotCache();

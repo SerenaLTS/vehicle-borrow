@@ -28,6 +28,7 @@ type AdminUserRoleRow = {
 type VehicleRow = {
   plate_number: string | null;
   model: string | null;
+  location?: string | null;
 };
 
 export type BookingNotificationSnapshot = {
@@ -35,13 +36,23 @@ export type BookingNotificationSnapshot = {
   vehicleId: string;
   bookedByEmail: string;
   startsAt: string;
-  endsAt: string;
+  endsAt: string | null;
   comments: string | null;
 };
 
 export type KeyCollectionReminderSnapshot = BookingNotificationSnapshot;
 
 type BookingNotificationAction = "created" | "updated" | "cancelled";
+
+type LongTermBorrowNotificationParams = {
+  supabase: unknown;
+  borrowerEmail: string;
+  vehicleId: string;
+  driverName: string;
+  purpose: string;
+  startOdometer: number | null;
+  borrowNotes: string | null;
+};
 
 type BookingNotificationParams = {
   supabase: unknown;
@@ -150,12 +161,16 @@ function buildVehicleLabel(vehicle: VehicleRow | null) {
   }
 
   const parts = [vehicle.plate_number, vehicle.model].filter(Boolean);
+  if (vehicle.location) {
+    parts.push(vehicle.location);
+  }
+
   return parts.length > 0 ? parts.join(" • ") : "Vehicle booking";
 }
 
 async function getVehicleForNotification(supabase: unknown, vehicleId: string) {
   const client = supabase as SupabaseNotificationClient;
-  const { data, error } = await client.from("vehicles").select("plate_number, model").eq("id", vehicleId).maybeSingle();
+  const { data, error } = await client.from("vehicles").select("plate_number, model, location").eq("id", vehicleId).maybeSingle();
 
   if (error) {
     throw new Error(error.message);
@@ -191,6 +206,10 @@ function buildSubject(action: BookingNotificationAction, vehicleLabel: string) {
   return `Vehicle booking ${getActionLabel(action)}: ${vehicleLabel}`;
 }
 
+function isLongTermBooking(booking: BookingNotificationSnapshot) {
+  return booking.endsAt === null;
+}
+
 function buildTextBody({
   action,
   actorEmail,
@@ -214,14 +233,14 @@ function buildTextBody({
 
   if (action !== "cancelled") {
     lines.push(`Start time: ${formatDateTime(booking.startsAt)}`);
-    lines.push(`End time: ${formatDateTime(booking.endsAt)}`);
+    lines.push(`End time: ${isLongTermBooking(booking) ? "Long term" : formatDateTime(booking.endsAt)}`);
   }
 
   if (action === "updated" && previousBooking) {
     lines.push("");
     lines.push("Previous booking details:");
     lines.push(`Start time: ${formatDateTime(previousBooking.startsAt)}`);
-    lines.push(`End time: ${formatDateTime(previousBooking.endsAt)}`);
+    lines.push(`End time: ${previousBooking.endsAt === null ? "Long term" : formatDateTime(previousBooking.endsAt)}`);
     lines.push(`Comments: ${previousBooking.comments || "-"}`);
   }
 
@@ -230,6 +249,58 @@ function buildTextBody({
   lines.push("If the dashboard looks delayed, please rely on this email as the latest booking notice.");
 
   return lines.join("\n");
+}
+
+export async function sendLongTermBorrowAdminNotificationEmail({
+  supabase,
+  borrowerEmail,
+  vehicleId,
+  driverName,
+  purpose,
+  startOdometer,
+  borrowNotes,
+}: LongTermBorrowNotificationParams) {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
+    return;
+  }
+
+  const [vehicle, adminEmails] = await Promise.all([getVehicleForNotification(supabase, vehicleId), getAdminEmails(supabase)]);
+  const toList = adminEmails.filter(Boolean);
+
+  if (toList.length === 0) {
+    return;
+  }
+
+  const vehicleLabel = buildVehicleLabel(vehicle);
+  const transporter = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: toList.join(", "),
+    subject: `Long term vehicle borrow: ${vehicleLabel}`,
+    text: [
+      "A long term vehicle borrow has been created.",
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Borrower: ${borrowerEmail}`,
+      `Driver: ${driverName || "-"}`,
+      `Purpose: ${purpose}`,
+      `Current odometer: ${startOdometer === null ? "-" : `${startOdometer.toLocaleString()} km`}`,
+      `Notes: ${borrowNotes || "-"}`,
+      "",
+      "No expected return date was provided.",
+    ].join("\n"),
+  });
 }
 
 export async function sendBookingNotificationEmail({
@@ -345,7 +416,7 @@ export async function sendImmediateKeyCollectionReminderIfDue({
   supabase: unknown;
   booking: KeyCollectionReminderSnapshot;
 }) {
-  if (!shouldSendImmediateKeyCollectionReminder(booking.startsAt)) {
+  if (!booking.endsAt || !shouldSendImmediateKeyCollectionReminder(booking.startsAt)) {
     return false;
   }
 

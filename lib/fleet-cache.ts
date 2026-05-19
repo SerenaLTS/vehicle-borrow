@@ -130,8 +130,7 @@ export async function getFleetSnapshot(supabase: unknown): Promise<FleetSnapshot
       client
         .from("vehicle_bookings")
         .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
-        .gte?.("ends_at", nowIso)
-        .order("starts_at", { ascending: true }) ?? Promise.resolve({ data: [] }),
+        .order?.("starts_at", { ascending: true }) ?? Promise.resolve({ data: [] }),
       client.from("vehicle_loans").select("vehicle_id").is?.("returned_at", null) ?? Promise.resolve({ data: [] }),
       client
         .from("vehicle_loans")
@@ -143,7 +142,9 @@ export async function getFleetSnapshot(supabase: unknown): Promise<FleetSnapshot
     ]);
 
     const vehicles = ((vehicleData ?? []) as unknown[]) as Vehicle[];
-    const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[]).map(normalizeVehicleBooking);
+    const upcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
+      .map(normalizeVehicleBooking)
+      .filter((booking) => !booking.ends_at || new Date(booking.ends_at).getTime() >= new Date(nowIso).getTime());
     const timelineBookings = upcomingBookings;
     const timelineLoans = ((loanTimelineData ?? []) as RawLoanRow[]).map(normalizeLoan);
     const activeLoanVehicleIds = (activeLoanData ?? []).map((loan) => loan.vehicle_id);

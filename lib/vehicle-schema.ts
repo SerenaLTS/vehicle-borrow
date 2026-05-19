@@ -9,6 +9,7 @@ export type VehicleOptionalFieldSupport = {
   enabled: boolean;
   vinColumn: string | null;
   colorColumn: string | null;
+  locationColumn: string | null;
 };
 
 let cachedVehicleOptionalFieldSupport: Promise<VehicleOptionalFieldSupport> | null = null;
@@ -47,11 +48,13 @@ export async function getVehicleOptionalFieldSupport(supabase: unknown): Promise
     cachedVehicleOptionalFieldSupport = (async () => {
       const vinColumn = (await hasVehicleColumn(supabase, "vin")) ? "vin" : (await hasVehicleColumn(supabase, "VIN")) ? "VIN" : null;
       const colorColumn = (await hasVehicleColumn(supabase, "color")) ? "color" : (await hasVehicleColumn(supabase, "Color")) ? "Color" : null;
+      const locationColumn = (await hasVehicleColumn(supabase, "location")) ? "location" : (await hasVehicleColumn(supabase, "Location")) ? "Location" : null;
 
       return {
-        enabled: Boolean(vinColumn || colorColumn),
+        enabled: Boolean(vinColumn || colorColumn || locationColumn),
         vinColumn,
         colorColumn,
+        locationColumn,
       };
     })().catch((error) => {
       cachedVehicleOptionalFieldSupport = null;
@@ -66,6 +69,7 @@ export function getVehicleSelectClause(optionalFieldSupport: VehicleOptionalFiel
   const optionalColumns = [
     optionalFieldSupport.vinColumn ? `vin:${optionalFieldSupport.vinColumn}` : null,
     optionalFieldSupport.colorColumn ? `color:${optionalFieldSupport.colorColumn}` : null,
+    optionalFieldSupport.locationColumn ? `location:${optionalFieldSupport.locationColumn}` : null,
   ].filter(Boolean);
 
   return optionalColumns.length > 0 ? `${VEHICLE_BASE_SELECT}, ${optionalColumns.join(", ")}` : VEHICLE_BASE_SELECT;
@@ -73,10 +77,11 @@ export function getVehicleSelectClause(optionalFieldSupport: VehicleOptionalFiel
 
 export function getVehicleOptionalFieldPayload(
   optionalFieldSupport: VehicleOptionalFieldSupport,
-  values: { vin: string | null; color: string | null },
+  values: { vin: string | null; color: string | null; location: string | null },
 ) {
   return {
     ...(optionalFieldSupport.vinColumn ? { [optionalFieldSupport.vinColumn]: values.vin } : {}),
     ...(optionalFieldSupport.colorColumn ? { [optionalFieldSupport.colorColumn]: values.color } : {}),
+    ...(optionalFieldSupport.locationColumn ? { [optionalFieldSupport.locationColumn]: values.location } : {}),
   };
 }

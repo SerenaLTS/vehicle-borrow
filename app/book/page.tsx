@@ -73,6 +73,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.plate_number} • {vehicle.model}
                     {vehicle.color ? ` • ${vehicle.color}` : ""}
+                    {vehicle.location ? ` • ${vehicle.location}` : ""}
                     {vehicle.vin ? ` • VIN ${vehicle.vin}` : ""}
                   </option>
                 ))}
@@ -87,9 +88,14 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
               <label className="fieldLabel">
                 End time
-                <input name="endsAt" required type="datetime-local" />
+                <input name="endsAt" type="datetime-local" />
               </label>
             </div>
+
+            <label className="checkboxLabel">
+              <input name="isLongTerm" type="checkbox" />
+              <span>Long term</span>
+            </label>
 
             <label className="fieldLabel">
               Comments
@@ -124,7 +130,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
                 <div className="vehicleMeta">
                   <span>From: {formatDateTime(booking.starts_at)}</span>
-                  <span>Until: {formatDateTime(booking.ends_at)}</span>
+                  <span>Until: {booking.ends_at ? formatDateTime(booking.ends_at) : "Long term"}</span>
                   <span>Comments: {booking.comments || "-"}</span>
                   <span>Created: {formatDateTime(booking.created_at)}</span>
                 </div>
@@ -150,7 +156,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                         </label>
                         <label className="fieldLabel">
                           End time
-                          <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" required type="datetime-local" />
+                          <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
                         </label>
                       </div>
 
@@ -187,7 +193,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       <div className="cardsGrid">
         {fleet.map((vehicle) => {
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
-          const hasUpcomingBooking = nextBooking ? new Date(nextBooking.ends_at).getTime() > now : false;
+          const hasUpcomingBooking = nextBooking ? !nextBooking.ends_at || new Date(nextBooking.ends_at).getTime() > now : false;
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
             hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
@@ -199,17 +205,18 @@ export default async function BookPage({ searchParams }: BookPageProps) {
               <StatusPill status={displayStatus} />
               <h3>{vehicle.plate_number}</h3>
               <p className="muted">{vehicle.model}</p>
-              {vehicle.vin || vehicle.color ? (
+              {vehicle.vin || vehicle.color || vehicle.location ? (
                 <div className="vehicleMeta">
                   <span>VIN: {vehicle.vin || "-"}</span>
                   <span>Color: {vehicle.color || "-"}</span>
+                  <span>Location: {vehicle.location || "-"}</span>
                 </div>
               ) : null}
               {nextBooking ? (
                 <div className="vehicleMeta">
                   <span>Booked by: {nextBooking.booked_by_email}</span>
                   <span>From: {formatDateTime(nextBooking.starts_at)}</span>
-                  <span>Until: {formatDateTime(nextBooking.ends_at)}</span>
+                  <span>Until: {nextBooking.ends_at ? formatDateTime(nextBooking.ends_at) : "Long term"}</span>
                   <span>Comments: {nextBooking.comments || "-"}</span>
                 </div>
               ) : (

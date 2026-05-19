@@ -74,7 +74,7 @@ export async function getVehicleCalendarSnapshotForYear(
           .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
           .eq("vehicle_id", vehicleId) as {
           lt: (column: string, value: string) => {
-            gte: (column: string, value: string) => {
+            or: (filters: string) => {
               order: (column: string, options?: { ascending?: boolean }) => Promise<{
                 data: unknown[] | null;
                 error?: { message: string } | null;
@@ -83,7 +83,7 @@ export async function getVehicleCalendarSnapshotForYear(
           };
         })
           .lt("starts_at", yearEndIso)
-          .gte("ends_at", yearStartIso)
+          .or(`ends_at.is.null,ends_at.gte.${yearStartIso}`)
           .order("starts_at", { ascending: true })) ?? Promise.resolve({ data: [], error: null })),
         (((client
           .from("vehicle_loans")
