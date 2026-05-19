@@ -6,6 +6,7 @@ create table if not exists public.vehicles (
   model text not null,
   vin text,
   color text,
+  location text,
   status text not null default 'available' check (status in ('available', 'booked', 'borrowed', 'maintenance', 'retired')),
   comments text,
   current_holder_user_id uuid references auth.users (id),
@@ -15,6 +16,7 @@ create table if not exists public.vehicles (
 alter table public.vehicles add column if not exists comments text;
 alter table public.vehicles add column if not exists vin text;
 alter table public.vehicles add column if not exists color text;
+alter table public.vehicles add column if not exists location text;
 alter table public.vehicles drop constraint if exists vehicles_status_check;
 alter table public.vehicles
 add constraint vehicles_status_check
@@ -37,10 +39,12 @@ create table if not exists public.vehicle_loans (
   return_notes text,
   borrowed_at timestamptz not null default timezone('utc', now()),
   expected_return_at timestamptz,
+  is_long_term boolean not null default false,
   returned_at timestamptz
 );
 
 alter table public.vehicle_loans add column if not exists expected_return_at timestamptz;
+alter table public.vehicle_loans add column if not exists is_long_term boolean not null default false;
 
 alter table public.vehicle_loans
 drop constraint if exists vehicle_loans_start_odometer_check;
@@ -70,19 +74,39 @@ create table if not exists public.vehicle_bookings (
   booked_by_user_id uuid not null references auth.users (id),
   booked_by_email text not null,
   starts_at timestamptz not null,
-  ends_at timestamptz not null,
+  ends_at timestamptz,
+  is_long_term boolean not null default false,
   comments text,
   key_collection_reminded_at timestamptz,
   created_at timestamptz not null default timezone('utc', now()),
-  constraint vehicle_bookings_time_check check (ends_at > starts_at)
+  constraint vehicle_bookings_time_check check (
+    (is_long_term = true and ends_at is null)
+    or
+    (is_long_term = false and ends_at is not null and ends_at > starts_at)
+  )
 );
 
 alter table public.vehicle_bookings add column if not exists key_collection_reminded_at timestamptz;
+alter table public.vehicle_bookings add column if not exists is_long_term boolean not null default false;
+alter table public.vehicle_bookings alter column ends_at drop not null;
 
 alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_time_check;
 alter table public.vehicle_bookings
 add constraint vehicle_bookings_time_check
-check (ends_at > starts_at);
+check (
+  (is_long_term = true and ends_at is null)
+  or
+  (is_long_term = false and ends_at is not null and ends_at > starts_at)
+);
+
+alter table public.vehicle_loans drop constraint if exists vehicle_loans_long_term_expected_return_check;
+alter table public.vehicle_loans
+add constraint vehicle_loans_long_term_expected_return_check
+check (
+  returned_at is not null
+  or is_long_term = true
+  or expected_return_at is not null
+);
 
 create or replace function public.validate_vehicle_booking()
 returns trigger
@@ -92,8 +116,13 @@ set search_path = public
 as $$
 declare
   v_vehicle public.vehicles;
+  v_new_ends_at timestamptz := case when new.is_long_term then 'infinity'::timestamptz else new.ends_at end;
 begin
-  if new.ends_at <= new.starts_at then
+  if new.is_long_term and new.ends_at is not null then
+    raise exception 'Long term bookings must not have an end time.';
+  end if;
+
+  if (not new.is_long_term) and (new.ends_at is null or new.ends_at <= new.starts_at) then
     raise exception 'Please choose a valid booking time range.';
   end if;
 
@@ -115,7 +144,7 @@ begin
     from public.vehicle_bookings b
     where b.vehicle_id = new.vehicle_id
       and b.id <> coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid)
-      and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(new.starts_at, new.ends_at, '[)')
+      and tstzrange(b.starts_at, case when b.is_long_term then 'infinity'::timestamptz else b.ends_at end, '[)') && tstzrange(new.starts_at, v_new_ends_at, '[)')
   ) then
     raise exception 'This vehicle is already booked during the selected period.';
   end if;
@@ -125,9 +154,9 @@ begin
     from public.vehicle_loans l
     where l.vehicle_id = new.vehicle_id
       and l.returned_at is null
-      and l.expected_return_at is null
+      and l.is_long_term = true
   ) then
-    raise exception 'This vehicle is currently borrowed and does not have a scheduled return time yet.';
+    raise exception 'This vehicle is currently borrowed long term.';
   end if;
 
   if exists (
@@ -135,8 +164,9 @@ begin
     from public.vehicle_loans l
     where l.vehicle_id = new.vehicle_id
       and l.returned_at is null
+      and l.is_long_term = false
       and l.expected_return_at is not null
-      and tstzrange(l.borrowed_at, l.expected_return_at, '[)') && tstzrange(new.starts_at, new.ends_at, '[)')
+      and tstzrange(l.borrowed_at, l.expected_return_at, '[)') && tstzrange(new.starts_at, v_new_ends_at, '[)')
   ) then
     raise exception 'This booking overlaps with an existing borrow period.';
   end if;
@@ -275,6 +305,8 @@ to authenticated
 using (user_id = auth.uid() or public.is_admin());
 
 drop function if exists public.borrow_vehicle(uuid, text, text, integer, text);
+drop function if exists public.borrow_vehicle(uuid, text, text, integer, text, timestamptz);
+drop function if exists public.borrow_vehicle(uuid, text, text, integer, text, timestamptz, boolean);
 
 create or replace function public.borrow_vehicle(
   p_vehicle_id uuid,
@@ -282,7 +314,8 @@ create or replace function public.borrow_vehicle(
   p_purpose text,
   p_start_odometer integer default null,
   p_borrow_notes text default null,
-  p_expected_return_at timestamptz default null
+  p_expected_return_at timestamptz default null,
+  p_long_term boolean default false
 )
 returns public.vehicle_loans
 language plpgsql
@@ -300,8 +333,12 @@ begin
     raise exception 'You must be logged in to borrow a vehicle.';
   end if;
 
-  if p_expected_return_at is null or p_expected_return_at <= v_now then
+  if (not p_long_term) and (p_expected_return_at is null or p_expected_return_at <= v_now) then
     raise exception 'Please choose a valid expected return time.';
+  end if;
+
+  if p_long_term and p_expected_return_at is not null then
+    raise exception 'Long term borrows must not have an expected return time.';
   end if;
 
   select *
@@ -318,13 +355,22 @@ begin
     raise exception 'This vehicle is not currently available.';
   end if;
 
-  if exists (
+  if not p_long_term and exists (
     select 1
     from public.vehicle_bookings b
     where b.vehicle_id = p_vehicle_id
-      and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(v_now, p_expected_return_at, '[)')
+      and tstzrange(b.starts_at, case when b.is_long_term then 'infinity'::timestamptz else b.ends_at end, '[)') && tstzrange(v_now, p_expected_return_at, '[)')
   ) then
     raise exception 'This vehicle is already booked during the selected period.';
+  end if;
+
+  if p_long_term and exists (
+    select 1
+    from public.vehicle_bookings b
+    where b.vehicle_id = p_vehicle_id
+      and (b.is_long_term = true or b.ends_at > v_now)
+  ) then
+    raise exception 'This vehicle already has an active or upcoming booking.';
   end if;
 
   insert into public.vehicle_loans (
@@ -335,17 +381,23 @@ begin
     purpose,
     start_odometer,
     borrow_notes,
-    expected_return_at
+    expected_return_at,
+    is_long_term
   )
   values (
     p_vehicle_id,
     v_user_id,
     coalesce(v_email, ''),
-    p_driver_name,
+    coalesce(nullif(trim(p_driver_name), ''), coalesce(v_email, '')),
     p_purpose,
     p_start_odometer,
-    p_borrow_notes,
-    p_expected_return_at
+    case
+      when p_long_term and nullif(trim(coalesce(p_borrow_notes, '')), '') is null then 'Long term borrow.'
+      when p_long_term then concat('Long term borrow.', E'\n\n', p_borrow_notes)
+      else p_borrow_notes
+    end,
+    case when p_long_term then null else p_expected_return_at end,
+    p_long_term
   )
   returning *
   into v_loan;
@@ -359,7 +411,7 @@ begin
 end;
 $$;
 
-grant execute on function public.borrow_vehicle(uuid, text, text, integer, text, timestamptz) to authenticated;
+grant execute on function public.borrow_vehicle(uuid, text, text, integer, text, timestamptz, boolean) to authenticated;
 
 create or replace function public.collect_booking_key(
   p_booking_id uuid
@@ -395,7 +447,7 @@ begin
     raise exception 'You can only collect keys for your own bookings.';
   end if;
 
-  if v_booking.ends_at <= v_now then
+  if (not v_booking.is_long_term) and v_booking.ends_at <= v_now then
     raise exception 'This booking has already ended.';
   end if;
 
@@ -427,7 +479,7 @@ begin
     from public.vehicle_bookings b
     where b.vehicle_id = v_booking.vehicle_id
       and b.id <> v_booking.id
-      and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(v_now, v_booking.ends_at, '[)')
+      and tstzrange(b.starts_at, case when b.is_long_term then 'infinity'::timestamptz else b.ends_at end, '[)') && tstzrange(v_now, case when v_booking.is_long_term then 'infinity'::timestamptz else v_booking.ends_at end, '[)')
   ) then
     raise exception 'This vehicle has another booking during the borrow period.';
   end if;
@@ -440,7 +492,8 @@ begin
     purpose,
     start_odometer,
     borrow_notes,
-    expected_return_at
+    expected_return_at,
+    is_long_term
   )
   values (
     v_booking.vehicle_id,
@@ -449,8 +502,12 @@ begin
     coalesce(v_email, v_booking.booked_by_email, ''),
     coalesce(nullif(trim(v_booking.comments), ''), 'Booking converted after key collection'),
     null,
-    concat('Converted from booking ', v_booking.id::text, ' after key collection.'),
-    v_booking.ends_at
+    case
+      when v_booking.is_long_term then concat('Long term booking ', v_booking.id::text, ' converted after key collection.')
+      else concat('Converted from booking ', v_booking.id::text, ' after key collection.')
+    end,
+    case when v_booking.is_long_term then null else v_booking.ends_at end,
+    v_booking.is_long_term
   )
   returning *
   into v_loan;
@@ -549,7 +606,7 @@ begin
     select 1
     from public.vehicle_bookings b
     where b.vehicle_id = v_loan.vehicle_id
-      and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(v_loan.borrowed_at, p_expected_return_at, '[)')
+      and tstzrange(b.starts_at, case when b.is_long_term then 'infinity'::timestamptz else b.ends_at end, '[)') && tstzrange(v_loan.borrowed_at, p_expected_return_at, '[)')
   ) then
     raise exception 'Extend failed: this vehicle is booked during the requested extension period.';
   end if;
@@ -565,6 +622,7 @@ begin
 
   update public.vehicle_loans
   set expected_return_at = p_expected_return_at,
+      is_long_term = false,
       borrow_notes = case
         when nullif(trim(coalesce(borrow_notes, '')), '') is null then v_extension_note
         else concat(borrow_notes, E'\n\n', v_extension_note)
