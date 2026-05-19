@@ -363,11 +363,18 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             </label>
 
             <div className="formGrid">
-              <label className="fieldLabel">
-                Borrowed time
-                <input name="borrowedAt" required type="datetime-local" />
-              </label>
-              <label className="fieldLabel">
+              <div className="timeFieldGroup">
+                <label className="fieldLabel">
+                  Borrowed time
+                  <input name="borrowedAt" required type="datetime-local" />
+                </label>
+                <label className="checkboxLabel">
+                  <input name="isLongTerm" type="checkbox" />
+                  <span>Long term</span>
+                </label>
+                <p className="fieldHint">Long term borrow records do not need an expected return time.</p>
+              </div>
+              <label className="fieldLabel longTermHidden">
                 Expected return
                 <input name="expectedReturnAt" type="datetime-local" />
               </label>
@@ -459,11 +466,18 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                     </label>
 
                     <div className="formGrid">
-                      <label className="fieldLabel">
-                        Borrowed time
-                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.borrowed_at)} name="borrowedAt" required type="datetime-local" />
-                      </label>
-                      <label className="fieldLabel">
+                      <div className="timeFieldGroup">
+                        <label className="fieldLabel">
+                          Borrowed time
+                          <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.borrowed_at)} name="borrowedAt" required type="datetime-local" />
+                        </label>
+                        <label className="checkboxLabel">
+                          <input defaultChecked={loan.is_long_term} name="isLongTerm" type="checkbox" />
+                          <span>Long term</span>
+                        </label>
+                        <p className="fieldHint">Long term borrow records do not need an expected return time.</p>
+                      </div>
+                      <label className="fieldLabel longTermHidden">
                         Expected return
                         <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" type="datetime-local" />
                       </label>

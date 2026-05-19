@@ -545,9 +545,10 @@ export async function createHistoricalLoan(formData: FormData) {
   const endOdometer = parseOptionalNonNegativeInteger(formData.get("endOdometer"));
   const borrowedAtValue = String(formData.get("borrowedAt") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const returnedAtValue = String(formData.get("returnedAt") ?? "").trim();
   const borrowedAt = borrowedAtValue ? parseDateTimeLocalToUtcIso(borrowedAtValue) : null;
-  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
+  const expectedReturnAt = !isLongTerm && expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
 
   if (!vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt) {
@@ -568,6 +569,10 @@ export async function createHistoricalLoan(formData: FormData) {
 
   if (expectedReturnAt && new Date(expectedReturnAt).getTime() <= new Date(borrowedAt).getTime()) {
     redirectToVehicleRecordError(vehicleId, "Expected return time must be after borrowed time.");
+  }
+
+  if (!returnedAt && !isLongTerm && !expectedReturnAt) {
+    redirectToVehicleRecordError(vehicleId, "Active borrow records need an expected return time or Long term selected.");
   }
 
   const supabase = await requireAdmin();
@@ -605,6 +610,7 @@ export async function createHistoricalLoan(formData: FormData) {
     return_notes: returnNotes,
     borrowed_at: borrowedAt,
     expected_return_at: expectedReturnAt,
+    is_long_term: isLongTerm,
     returned_at: returnedAt,
   });
 
@@ -628,9 +634,10 @@ export async function updateHistoricalLoan(formData: FormData) {
   const endOdometer = parseOptionalNonNegativeInteger(formData.get("endOdometer"));
   const borrowedAtValue = String(formData.get("borrowedAt") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
+  const isLongTerm = formData.get("isLongTerm") === "on";
   const returnedAtValue = String(formData.get("returnedAt") ?? "").trim();
   const borrowedAt = borrowedAtValue ? parseDateTimeLocalToUtcIso(borrowedAtValue) : null;
-  const expectedReturnAt = expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
+  const expectedReturnAt = !isLongTerm && expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
 
   if (!loanId || !vehicleId || !borrowerUserId || !driverName || !purpose || !borrowedAt) {
@@ -651,6 +658,10 @@ export async function updateHistoricalLoan(formData: FormData) {
 
   if (expectedReturnAt && new Date(expectedReturnAt).getTime() <= new Date(borrowedAt).getTime()) {
     redirectToVehicleRecordError(vehicleId, "Expected return time must be after borrowed time.");
+  }
+
+  if (!returnedAt && !isLongTerm && !expectedReturnAt) {
+    redirectToVehicleRecordError(vehicleId, "Active borrow records need an expected return time or Long term selected.");
   }
 
   const supabase = await requireAdmin();
@@ -689,6 +700,7 @@ export async function updateHistoricalLoan(formData: FormData) {
       return_notes: returnNotes,
       borrowed_at: borrowedAt,
       expected_return_at: expectedReturnAt,
+      is_long_term: isLongTerm,
       returned_at: returnedAt,
     })
     .eq("id", loanId)
