@@ -777,7 +777,22 @@ input[type="checkbox"] {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 4px;
+}
+
+.timeFieldGroup {
+  display: grid;
+  align-content: start;
+}
+
+.fieldHint {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+form:has(input[name="isLongTerm"]:checked) .longTermHidden {
+  display: none;
 }
 
 textarea {

@@ -190,14 +190,15 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
               </label>
             </div>
 
-            <label className="fieldLabel">
-              Expected return time
-              <input name="expectedReturnAt" type="datetime-local" />
-            </label>
-
             <label className="checkboxLabel">
               <input name="isLongTerm" type="checkbox" />
               <span>Long term</span>
+            </label>
+            <p className="fieldHint">Long term borrows will notify admins.</p>
+
+            <label className="fieldLabel longTermHidden">
+              Expected return time
+              <input name="expectedReturnAt" type="datetime-local" />
             </label>
 
             <label className="fieldLabel">

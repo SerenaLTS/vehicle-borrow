@@ -81,21 +81,24 @@ export default async function BookPage({ searchParams }: BookPageProps) {
             </label>
 
             <div className="formGrid">
-              <label className="fieldLabel">
-                Start time
-                <input name="startsAt" required type="datetime-local" />
-              </label>
+              <div className="timeFieldGroup">
+                <label className="fieldLabel">
+                  Start time
+                  <input name="startsAt" required type="datetime-local" />
+                </label>
 
-              <label className="fieldLabel">
+                <label className="checkboxLabel">
+                  <input name="isLongTerm" type="checkbox" />
+                  <span>Long term</span>
+                </label>
+                <p className="fieldHint">Long term bookings will notify admins.</p>
+              </div>
+
+              <label className="fieldLabel longTermHidden">
                 End time
                 <input name="endsAt" type="datetime-local" />
               </label>
             </div>
-
-            <label className="checkboxLabel">
-              <input name="isLongTerm" type="checkbox" />
-              <span>Long term</span>
-            </label>
 
             <label className="fieldLabel">
               Comments
