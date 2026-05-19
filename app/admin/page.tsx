@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
 import { adminReturnVehicle, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
 import { ConfirmForm } from "@/components/confirm-form";
@@ -205,7 +206,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       </section>
 
-      <div className="cardsGrid">
+      <AdminFleetSearch totalCount={fleet.length}>
         {fleet.map((vehicle) => {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
           const nextBooking = nextBookingByVehicleId.get(vehicle.id);
@@ -220,7 +221,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           });
 
           return (
-            <article className="vehicleCard" key={vehicle.id}>
+            <article
+              className="vehicleCard"
+              data-search={[
+                vehicle.plate_number,
+                vehicle.model,
+                vehicle.vin,
+                vehicle.color,
+                vehicle.location,
+                vehicle.comments,
+                activeLoan?.borrower_email,
+                activeLoan?.driver_name,
+                nextBooking?.booked_by_email,
+              ].filter(Boolean).join(" ")}
+              key={vehicle.id}
+            >
               <div className="vehicleCardHeader">
                 <Link className="vehicleCardLink" href={`/admin/vehicles/${vehicle.id}`}>
                   <StatusPill status={displayStatus} />
@@ -367,7 +382,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </article>
           );
         })}
-      </div>
+      </AdminFleetSearch>
     </AppShell>
   );
 }
