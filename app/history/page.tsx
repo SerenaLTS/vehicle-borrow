@@ -24,7 +24,7 @@ export default async function HistoryPage() {
     redirect("/");
   }
 
-  const [{ data: recentLoans }, { data: activeLoans }, isAdmin] = await Promise.all([
+  const [{ data: recentLoans, error: recentLoansError }, { data: activeLoans, error: activeLoansError }, isAdmin] = await Promise.all([
     supabase
       .from("vehicle_loans")
       .select(LOAN_SELECT)
@@ -34,10 +34,14 @@ export default async function HistoryPage() {
     getIsAdmin(supabase, user.id),
   ]);
 
+  const loadError = recentLoansError?.message ?? activeLoansError?.message ?? null;
+
   const historyById = new Map<string, RawLoanRow>();
 
-  for (const loan of [...((recentLoans ?? []) as RawLoanRow[]), ...((activeLoans ?? []) as RawLoanRow[])]) {
-    historyById.set(loan.id, loan);
+  if (!loadError) {
+    for (const loan of [...((recentLoans ?? []) as RawLoanRow[]), ...((activeLoans ?? []) as RawLoanRow[])]) {
+      historyById.set(loan.id, loan);
+    }
   }
 
   const history = Array.from(historyById.values())
@@ -63,7 +67,9 @@ export default async function HistoryPage() {
         </Link>
       </section>
 
-      {history.length === 0 ? (
+      {loadError ? (
+        <p className="message error">{loadError}</p>
+      ) : history.length === 0 ? (
         <div className="emptyState">No borrowing history has been recorded yet.</div>
       ) : (
         <>
