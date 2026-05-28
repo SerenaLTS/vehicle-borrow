@@ -56,7 +56,7 @@ export default async function HistoryPage() {
       <section className="sectionHeader">
         <div>
           <h2>Borrowing history</h2>
-          <p className="muted">Showing the most recent 200 records.</p>
+          <p className="muted">Showing the most recent 200 records plus any active loans.</p>
         </div>
         <Link className="primaryButton" href="/history/export">
           Export CSV
