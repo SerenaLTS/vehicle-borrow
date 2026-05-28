@@ -93,12 +93,6 @@ function getLoanEndAt(loan: LoanRow) {
     return new Date(loan.returned_at).getTime() > today.getTime() ? today.toISOString() : loan.returned_at;
   }
 
-  const expectedReturn = loan.expected_return_at ? new Date(loan.expected_return_at) : null;
-
-  if (loan.expected_return_at && expectedReturn && expectedReturn.getTime() <= today.getTime()) {
-    return loan.expected_return_at;
-  }
-
   return today.toISOString();
 }
 
@@ -139,6 +133,14 @@ function getVehicleLabel(loan: LoanRow) {
   return [loan.vehicle?.plate_number, loan.vehicle?.model].filter(Boolean).join(" - ") || "Unknown vehicle";
 }
 
+function formatExpectedReturn(loan: LoanRow) {
+  if (loan.is_long_term) {
+    return "Long term";
+  }
+
+  return loan.expected_return_at ? formatDateTime(loan.expected_return_at) : "-";
+}
+
 function groupLoansByVehicle(loans: LoanRow[]) {
   const grouped = new Map<string, { vehicleLabel: string; loans: LoanRow[] }>();
 
@@ -159,9 +161,9 @@ function groupLoansByVehicle(loans: LoanRow[]) {
     .map(([vehicleId, group]) => ({
       vehicleId,
       vehicleLabel: group.vehicleLabel,
-      loans: group.loans.toSorted((first, second) => new Date(first.borrowed_at).getTime() - new Date(second.borrowed_at).getTime()),
+      loans: [...group.loans].sort((first, second) => new Date(first.borrowed_at).getTime() - new Date(second.borrowed_at).getTime()),
     }))
-    .toSorted((first, second) => first.vehicleLabel.localeCompare(second.vehicleLabel));
+    .sort((first, second) => first.vehicleLabel.localeCompare(second.vehicleLabel));
 }
 
 export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
@@ -276,6 +278,7 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
                       </div>
                       <div className="historyLoanTimes">
                         <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
+                        <span>Expected return: {formatExpectedReturn(loan)}</span>
                         <span>Returned: {loan.returned_at ? formatDateTime(loan.returned_at) : "Not returned yet"}</span>
                       </div>
                       <span className="historyLoanPurpose">{loan.purpose}</span>

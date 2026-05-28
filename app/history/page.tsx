@@ -7,6 +7,9 @@ import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 
+const LOAN_SELECT =
+  "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)";
+
 function formatReturnedStatus(returnedAt: string | null) {
   return returnedAt ? formatDateTime(returnedAt) : "Not returned yet";
 }
@@ -21,16 +24,25 @@ export default async function HistoryPage() {
     redirect("/");
   }
 
-  const [{ data }, isAdmin] = await Promise.all([
+  const [{ data: recentLoans }, { data: activeLoans }, isAdmin] = await Promise.all([
     supabase
       .from("vehicle_loans")
-      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .select(LOAN_SELECT)
       .order("borrowed_at", { ascending: false })
       .limit(200),
+    supabase.from("vehicle_loans").select(LOAN_SELECT).is("returned_at", null).order("borrowed_at", { ascending: false }),
     getIsAdmin(supabase, user.id),
   ]);
 
-  const history = ((data ?? []) as RawLoanRow[]).map(normalizeLoan);
+  const historyById = new Map<string, RawLoanRow>();
+
+  for (const loan of [...((recentLoans ?? []) as RawLoanRow[]), ...((activeLoans ?? []) as RawLoanRow[])]) {
+    historyById.set(loan.id, loan);
+  }
+
+  const history = Array.from(historyById.values())
+    .sort((first, second) => new Date(second.borrowed_at).getTime() - new Date(first.borrowed_at).getTime())
+    .map(normalizeLoan);
 
   return (
     <AppShell
