@@ -10,6 +10,7 @@ type HistoryBorrowCalendarProps = {
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EMPTY_LOANS: LoanRow[] = [];
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat("en-AU", {
   timeZone: APP_TIME_ZONE,
   month: "long",
@@ -138,6 +139,31 @@ function getVehicleLabel(loan: LoanRow) {
   return [loan.vehicle?.plate_number, loan.vehicle?.model].filter(Boolean).join(" - ") || "Unknown vehicle";
 }
 
+function groupLoansByVehicle(loans: LoanRow[]) {
+  const grouped = new Map<string, { vehicleLabel: string; loans: LoanRow[] }>();
+
+  for (const loan of loans) {
+    const existing = grouped.get(loan.vehicle_id);
+
+    if (existing) {
+      existing.loans.push(loan);
+    } else {
+      grouped.set(loan.vehicle_id, {
+        vehicleLabel: getVehicleLabel(loan),
+        loans: [loan],
+      });
+    }
+  }
+
+  return Array.from(grouped.entries())
+    .map(([vehicleId, group]) => ({
+      vehicleId,
+      vehicleLabel: group.vehicleLabel,
+      loans: group.loans.toSorted((first, second) => new Date(first.borrowed_at).getTime() - new Date(second.borrowed_at).getTime()),
+    }))
+    .toSorted((first, second) => first.vehicleLabel.localeCompare(second.vehicleLabel));
+}
+
 export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
   const initialMonth = useMemo(() => getInitialMonth(loans), [loans]);
   const [currentMonth, setCurrentMonth] = useState(initialMonth);
@@ -162,7 +188,8 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
 
     return grouped;
   }, [loans, monthWeeks]);
-  const selectedLoans = loansByDay.get(selectedDay) ?? [];
+  const selectedLoans = loansByDay.get(selectedDay) ?? EMPTY_LOANS;
+  const selectedVehicleGroups = useMemo(() => groupLoansByVehicle(selectedLoans), [selectedLoans]);
   const todayKey = getTodayKey();
   const todayMonthKey = getMonthKey(new Date());
   const canMoveNext = currentMonth < todayMonthKey;
@@ -233,20 +260,27 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
 
       <div className="historyCalendarDetails">
         <h3>{selectedDay}</h3>
-        {selectedLoans.length === 0 ? (
+        {selectedVehicleGroups.length === 0 ? (
           <div className="emptyState">No vehicles were on loan for this day.</div>
         ) : (
           <div className="cardsGrid">
-            {selectedLoans.map((loan) => (
-              <article className="vehicleCard" key={loan.id}>
-                <h3>{getVehicleLabel(loan)}</h3>
-                <div className="vehicleMeta">
-                  <span>Borrower: {loan.borrower_email}</span>
-                  <span>Driver: {loan.driver_name}</span>
-                  <span>Purpose: {loan.purpose}</span>
-                  <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
-                  <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
-                  <span>Returned: {loan.returned_at ? formatDateTime(loan.returned_at) : "Not returned yet"}</span>
+            {selectedVehicleGroups.map((group) => (
+              <article className="vehicleCard historyVehicleCard" key={group.vehicleId}>
+                <h3>{group.vehicleLabel}</h3>
+                <div className="historyLoanList">
+                  {group.loans.map((loan) => (
+                    <div className="historyLoanItem" key={loan.id}>
+                      <div className="historyLoanPeople">
+                        <strong>{loan.driver_name}</strong>
+                        <span>{loan.borrower_email}</span>
+                      </div>
+                      <div className="historyLoanTimes">
+                        <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
+                        <span>Returned: {loan.returned_at ? formatDateTime(loan.returned_at) : "Not returned yet"}</span>
+                      </div>
+                      <span className="historyLoanPurpose">{loan.purpose}</span>
+                    </div>
+                  ))}
                 </div>
               </article>
             ))}

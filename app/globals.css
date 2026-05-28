@@ -707,6 +707,48 @@ button:disabled {
   font-size: 1.05rem;
 }
 
+.historyVehicleCard {
+  display: grid;
+  gap: 14px;
+}
+
+.historyLoanList {
+  display: grid;
+  gap: 12px;
+}
+
+.historyLoanItem {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.historyLoanItem:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.historyLoanPeople,
+.historyLoanTimes {
+  display: grid;
+  gap: 4px;
+}
+
+.historyLoanPeople strong {
+  line-height: 1.25;
+}
+
+.historyLoanPeople span,
+.historyLoanTimes,
+.historyLoanPurpose {
+  color: var(--muted);
+}
+
+.historyLoanTimes {
+  font-size: 0.94rem;
+}
+
 .vehicleCardHeader {
   display: flex;
   flex-direction: column;
