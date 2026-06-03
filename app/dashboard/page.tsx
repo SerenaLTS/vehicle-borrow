@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
-import { cancelOwnBooking } from "@/app/book/actions";
+import { cancelOwnBooking, collectBookingKey } from "@/app/book/actions";
 import { extendVehicleLoan } from "@/app/borrow/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
@@ -62,6 +62,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const message = typeof params.message === "string" ? params.message : null;
   const error = typeof params.error === "string" ? params.error : null;
   const now = Date.now();
+  const activeUnconfirmedBookings = bookings.filter((booking) => {
+    const startsAt = new Date(booking.starts_at).getTime();
+    const endsAt = booking.ends_at ? new Date(booking.ends_at).getTime() : Number.POSITIVE_INFINITY;
+
+    return startsAt <= now && (booking.is_long_term || endsAt > now);
+  });
 
   return (
     <AppShell
@@ -99,6 +105,37 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       {message ? <p className="message">{message}</p> : null}
       {error ? <p className="message error">{error}</p> : null}
+
+      {activeUnconfirmedBookings.length > 0 ? (
+        <section className="actionRequiredPanel">
+          <div>
+            <p className="actionRequiredLabel">Action required</p>
+            <h2>Confirm your active booking</h2>
+            <p>
+              You have a booking that has already started. If you have collected the key and are already using the car, <strong>make sure to click borrow the vehicle.</strong>
+            </p>
+          </div>
+
+          <div className="actionRequiredList">
+            {activeUnconfirmedBookings.map((booking) => (
+              <article className="actionRequiredItem" key={booking.id}>
+                <div>
+                  <strong>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</strong>
+                  <span>{booking.vehicle?.model ?? "Vehicle"}</span>
+                  <span>
+                    {formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}
+                  </span>
+                </div>
+                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
+                  <input name="bookingId" type="hidden" value={booking.id} />
+                  <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                  <SubmitButton className="primaryButton urgentButton" idleLabel="Key collected / Borrow vehicle" pendingLabel="Converting..." />
+                </ConfirmForm>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="statsGrid">
         <article className="statCard">
@@ -185,7 +222,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             const hasStarted = new Date(booking.starts_at).getTime() <= now;
 
             return (
-              <article className="vehicleCard" key={booking.id}>
+              <article className={hasStarted ? "vehicleCard activeBookingCard" : "vehicleCard"} key={booking.id}>
                 <StatusPill status="booked" />
                 <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
                 <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
@@ -198,6 +235,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <Link className="secondaryButton" href={`/book#booking-${booking.id}`}>
                     {hasStarted ? "View booking" : "Edit booking"}
                   </Link>
+                  {hasStarted ? (
+                    <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
+                      <input name="bookingId" type="hidden" value={booking.id} />
+                      <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                      <SubmitButton className="primaryButton" idleLabel="Key collected / Borrow vehicle" pendingLabel="Converting..." />
+                    </ConfirmForm>
+                  ) : null}
                 </div>
                 {!hasStarted ? (
                   <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this booking?">
