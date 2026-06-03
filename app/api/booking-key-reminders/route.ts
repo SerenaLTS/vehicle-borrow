@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendBorrowOverdueReminderEmail, sendKeyCollectionReminderEmail } from "@/lib/booking-notifications";
+import { sendBookingBorrowReminderEmail, sendBorrowOverdueReminderEmail, sendKeyCollectionReminderEmail } from "@/lib/booking-notifications";
 import { APP_TIME_ZONE, parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -54,6 +54,12 @@ function getSydneyParts(date: Date) {
   };
 }
 
+function getSydneyDateString(date: Date) {
+  const parts = getSydneyParts(date);
+
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
 function getSydneyNineAmWindow(date: Date) {
   const parts = getSydneyParts(date);
   const startLocal = `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T09:00`;
@@ -74,6 +80,8 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   const now = new Date();
+  const nowIso = now.toISOString();
+  const todaySydney = getSydneyDateString(now);
   const { isSydneyNineAmHour, windowStart, windowEnd } = getSydneyNineAmWindow(now);
 
   if (process.env.NODE_ENV === "production" && !isSydneyNineAmHour) {
@@ -132,6 +140,61 @@ export async function GET(request: Request) {
       failed.push({
         bookingId: booking.id,
         error: reminderError instanceof Error ? reminderError.message : "Unknown reminder error",
+      });
+    }
+  }
+
+  const { data: activeBookingData, error: activeBookingError } = await supabase
+    .from("vehicle_bookings")
+    .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
+    .lte("starts_at", nowIso)
+    .or(`ends_at.gt.${nowIso},is_long_term.eq.true`)
+    .or(`borrow_click_reminded_on.is.null,borrow_click_reminded_on.neq.${todaySydney}`)
+    .order("starts_at", { ascending: true })
+    .limit(25);
+
+  if (activeBookingError) {
+    return NextResponse.json({ error: activeBookingError.message }, { status: 500 });
+  }
+
+  const activeBookings = (activeBookingData ?? []) as ReminderBookingRow[];
+  const activeBookingSent: string[] = [];
+  const activeBookingFailed: Array<{ bookingId: string; error: string }> = [];
+
+  for (const booking of activeBookings) {
+    try {
+      const sentReminder = await sendBookingBorrowReminderEmail({
+        supabase,
+        booking: {
+          bookingId: booking.id,
+          vehicleId: booking.vehicle_id,
+          bookedByEmail: booking.booked_by_email,
+          startsAt: booking.starts_at,
+          endsAt: booking.ends_at,
+          isLongTerm: booking.is_long_term,
+          comments: booking.comments,
+        },
+      });
+
+      if (!sentReminder) {
+        continue;
+      }
+
+      const { error: updateError } = await supabase
+        .from("vehicle_bookings")
+        .update({ borrow_click_reminded_on: todaySydney })
+        .eq("id", booking.id)
+        .or(`borrow_click_reminded_on.is.null,borrow_click_reminded_on.neq.${todaySydney}`);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
+      activeBookingSent.push(booking.id);
+    } catch (reminderError) {
+      activeBookingFailed.push({
+        bookingId: booking.id,
+        error: reminderError instanceof Error ? reminderError.message : "Unknown active booking reminder error",
       });
     }
   }
@@ -196,6 +259,7 @@ export async function GET(request: Request) {
     windowStart,
     windowEnd,
     bookingKeyReminders: { checked: bookings.length, sent, failed },
+    bookingBorrowReminders: { checked: activeBookings.length, sent: activeBookingSent, failed: activeBookingFailed },
     borrowOverdueReminders: { checked: overdueLoans.length, sent: overdueSent, failed: overdueFailed },
   });
 }

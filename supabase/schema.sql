@@ -80,6 +80,7 @@ create table if not exists public.vehicle_bookings (
   is_long_term boolean not null default false,
   comments text,
   key_collection_reminded_at timestamptz,
+  borrow_click_reminded_on date,
   created_at timestamptz not null default timezone('utc', now()),
   constraint vehicle_bookings_time_check check (
     (is_long_term = true and ends_at is null)
@@ -89,6 +90,7 @@ create table if not exists public.vehicle_bookings (
 );
 
 alter table public.vehicle_bookings add column if not exists key_collection_reminded_at timestamptz;
+alter table public.vehicle_bookings add column if not exists borrow_click_reminded_on date;
 alter table public.vehicle_bookings add column if not exists is_long_term boolean not null default false;
 alter table public.vehicle_bookings alter column ends_at drop not null;
 
@@ -195,6 +197,8 @@ create index if not exists idx_user_roles_email on public.user_roles (email);
 create index if not exists idx_vehicle_bookings_vehicle_id on public.vehicle_bookings (vehicle_id);
 create index if not exists idx_vehicle_bookings_starts_at on public.vehicle_bookings (starts_at);
 create index if not exists idx_vehicle_bookings_vehicle_window on public.vehicle_bookings (vehicle_id, starts_at, ends_at);
+create index if not exists idx_vehicle_bookings_borrow_click_reminders
+on public.vehicle_bookings (starts_at, ends_at, borrow_click_reminded_on);
 
 alter table public.vehicles enable row level security;
 alter table public.vehicle_loans enable row level security;

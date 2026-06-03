@@ -141,7 +141,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
                   <input name="bookingId" type="hidden" value={booking.id} />
                   <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                  <SubmitButton className="primaryButton" idleLabel="Key collected" pendingLabel="Converting..." />
+                  <SubmitButton className="primaryButton" idleLabel="Key collected / Borrow vehicle" pendingLabel="Converting..." />
                 </ConfirmForm>
 
                 {hasStarted ? (

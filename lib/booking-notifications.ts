@@ -42,6 +42,7 @@ export type BookingNotificationSnapshot = {
 };
 
 export type KeyCollectionReminderSnapshot = BookingNotificationSnapshot;
+export type BookingBorrowReminderSnapshot = BookingNotificationSnapshot;
 
 type BookingNotificationAction = "created" | "updated" | "cancelled";
 
@@ -550,6 +551,69 @@ export async function sendKeyCollectionReminderEmail({
       "",
       "Booking alone is not enough once the key has been collected.",
     ].join("\n"),
+  });
+
+  return true;
+}
+
+export async function sendBookingBorrowReminderEmail({
+  supabase,
+  booking,
+}: {
+  supabase: unknown;
+  booking: BookingBorrowReminderSnapshot;
+}) {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
+    return false;
+  }
+
+  const vehicle = await getVehicleForNotification(supabase, booking.vehicleId);
+  const vehicleLabel = buildVehicleLabel(vehicle);
+  const recipient = booking.bookedByEmail.trim().toLowerCase();
+
+  if (!recipient) {
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: recipient,
+    subject: `Vehicle borrow action needed: ${vehicleLabel}`,
+    text: [
+      "Your vehicle booking is currently active, but it has not been converted into an active borrow yet.",
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Start time: ${formatDateTime(booking.startsAt)}`,
+      `End time: ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}`,
+      `Comments: ${booking.comments || "-"}`,
+      "",
+      "if you collect the key and already using the car, make sure to click borrow the vehicle.",
+      "",
+      `Open ${APP_NAME}, go to Book, and select Key collected / Borrow vehicle on your booking.`,
+    ].join("\n"),
+    html: [
+      "<p>Your vehicle booking is currently active, but it has not been converted into an active borrow yet.</p>",
+      "<ul>",
+      `<li><strong>Vehicle:</strong> ${vehicleLabel}</li>`,
+      `<li><strong>Start time:</strong> ${formatDateTime(booking.startsAt)}</li>`,
+      `<li><strong>End time:</strong> ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}</li>`,
+      `<li><strong>Comments:</strong> ${booking.comments || "-"}</li>`,
+      "</ul>",
+      '<p>if you collect the key and already using the car, <strong style="font-size: 18px;">make sure to click borrow the vehicle.</strong></p>',
+      `<p>Open ${APP_NAME}, go to Book, and select Key collected / Borrow vehicle on your booking.</p>`,
+    ].join(""),
   });
 
   return true;
