@@ -1065,6 +1065,17 @@ textarea {
   color: var(--danger);
 }
 
+.navigationLoadingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--background);
+}
+
+.navigationLoadingOverlay .loadingScreen {
+  min-height: 100vh;
+}
+
 .emptyState {
   padding: 28px;
   border: 1px dashed var(--line);

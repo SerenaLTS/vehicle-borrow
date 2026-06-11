@@ -1,21 +1,19 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 
 type LoadingLinkProps = {
   href: string;
   children: React.ReactNode;
   className?: string;
-  loadingLabel?: string;
   ariaLabel?: string;
 };
 
-export function LoadingLink({ href, children, className, loadingLabel = "Loading...", ariaLabel }: LoadingLinkProps) {
+export function LoadingLink({ href, children, className, ariaLabel }: LoadingLinkProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(false);
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
@@ -31,20 +29,13 @@ export function LoadingLink({ href, children, className, loadingLabel = "Loading
       return;
     }
 
-    setIsLoading(true);
+    window.dispatchEvent(new CustomEvent("app:navigation-start"));
     router.push(href);
   }
 
   return (
-    <a aria-label={ariaLabel} aria-busy={isLoading} className={className} href={href} onClick={handleClick}>
-      {isLoading ? (
-        <span className="buttonSpinnerLabel">
-          <span aria-hidden="true" className="buttonSpinner" />
-          {loadingLabel}
-        </span>
-      ) : (
-        children
-      )}
+    <a aria-label={ariaLabel} className={className} href={href} onClick={handleClick}>
+      {children}
     </a>
   );
 }

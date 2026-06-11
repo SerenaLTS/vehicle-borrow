@@ -15,7 +15,10 @@ export function ConfirmForm({ action, children, confirmMessage, className }: Con
       onSubmit={(event) => {
         if (!window.confirm(confirmMessage)) {
           event.preventDefault();
+          return;
         }
+
+        window.dispatchEvent(new CustomEvent("app:navigation-start"));
       }}
     >
       {children}
