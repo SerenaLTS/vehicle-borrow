@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { sendBookingBorrowReminderEmail, sendBorrowOverdueReminderEmail, sendKeyCollectionReminderEmail } from "@/lib/booking-notifications";
+import {
+  sendBookingBorrowReminderEmail,
+  sendBookingHandoverConflictReminderEmail,
+  sendBorrowOverdueReminderEmail,
+  sendKeyCollectionReminderEmail,
+  type ActiveLoanForBookingConflictSnapshot,
+} from "@/lib/booking-notifications";
 import { APP_TIME_ZONE, parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -23,6 +29,17 @@ type OverdueLoanRow = {
   purpose: string;
   borrowed_at: string;
   expected_return_at: string;
+};
+
+type ActiveLoanConflictRow = {
+  id: string;
+  vehicle_id: string;
+  borrower_email: string;
+  driver_name: string;
+  purpose: string;
+  borrowed_at: string;
+  expected_return_at: string | null;
+  is_long_term: boolean;
 };
 
 function isAuthorized(request: Request) {
@@ -71,6 +88,37 @@ function getSydneyNineAmWindow(date: Date) {
     windowStart: parseDateTimeLocalToUtcIso(startLocal) ?? date.toISOString(),
     windowEnd: parseDateTimeLocalToUtcIso(endLocal) ?? new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString(),
   };
+}
+
+async function getActiveLoanForBookingConflict(vehicleId: string) {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("vehicle_loans")
+    .select("id, vehicle_id, borrower_email, driver_name, purpose, borrowed_at, expected_return_at, is_long_term")
+    .eq("vehicle_id", vehicleId)
+    .is("returned_at", null)
+    .order("borrowed_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const loan = ((data ?? []) as ActiveLoanConflictRow[])[0];
+
+  if (!loan) {
+    return null;
+  }
+
+  return {
+    loanId: loan.id,
+    borrowerEmail: loan.borrower_email,
+    driverName: loan.driver_name,
+    purpose: loan.purpose,
+    borrowedAt: loan.borrowed_at,
+    expectedReturnAt: loan.expected_return_at,
+    isLongTerm: loan.is_long_term,
+  } satisfies ActiveLoanForBookingConflictSnapshot;
 }
 
 export async function GET(request: Request) {
@@ -163,18 +211,27 @@ export async function GET(request: Request) {
 
   for (const booking of activeBookings) {
     try {
-      const sentReminder = await sendBookingBorrowReminderEmail({
-        supabase,
-        booking: {
-          bookingId: booking.id,
-          vehicleId: booking.vehicle_id,
-          bookedByEmail: booking.booked_by_email,
-          startsAt: booking.starts_at,
-          endsAt: booking.ends_at,
-          isLongTerm: booking.is_long_term,
-          comments: booking.comments,
-        },
-      });
+      const reminderBooking = {
+        bookingId: booking.id,
+        vehicleId: booking.vehicle_id,
+        bookedByEmail: booking.booked_by_email,
+        startsAt: booking.starts_at,
+        endsAt: booking.ends_at,
+        isLongTerm: booking.is_long_term,
+        comments: booking.comments,
+      };
+      const activeLoan = await getActiveLoanForBookingConflict(booking.vehicle_id);
+      const sentReminder =
+        activeLoan && activeLoan.borrowerEmail.trim().toLowerCase() !== booking.booked_by_email.trim().toLowerCase()
+          ? await sendBookingHandoverConflictReminderEmail({
+              supabase,
+              booking: reminderBooking,
+              activeLoan,
+            })
+          : await sendBookingBorrowReminderEmail({
+              supabase,
+              booking: reminderBooking,
+            });
 
       if (!sentReminder) {
         continue;

@@ -44,6 +44,16 @@ export type BookingNotificationSnapshot = {
 export type KeyCollectionReminderSnapshot = BookingNotificationSnapshot;
 export type BookingBorrowReminderSnapshot = BookingNotificationSnapshot;
 
+export type ActiveLoanForBookingConflictSnapshot = {
+  loanId: string;
+  borrowerEmail: string;
+  driverName: string;
+  purpose: string;
+  borrowedAt: string;
+  expectedReturnAt: string | null;
+  isLongTerm: boolean;
+};
+
 type BookingNotificationAction = "created" | "updated" | "cancelled";
 
 type LongTermBorrowNotificationParams = {
@@ -613,6 +623,81 @@ export async function sendBookingBorrowReminderEmail({
       "</ul>",
       '<p>if you collect the key and already using the car, <strong style="font-size: 18px;">make sure to click borrow the vehicle.</strong></p>',
       `<p>Open ${APP_NAME}, go to Book, and select Key collected / Borrow vehicle on your booking.</p>`,
+    ].join(""),
+  });
+
+  return true;
+}
+
+export async function sendBookingHandoverConflictReminderEmail({
+  supabase,
+  booking,
+  activeLoan,
+}: {
+  supabase: unknown;
+  booking: BookingBorrowReminderSnapshot;
+  activeLoan: ActiveLoanForBookingConflictSnapshot;
+}) {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
+    return false;
+  }
+
+  const bookingRecipient = booking.bookedByEmail.trim().toLowerCase();
+  const borrowerRecipient = activeLoan.borrowerEmail.trim().toLowerCase();
+  const recipients = Array.from(new Set([bookingRecipient, borrowerRecipient])).filter(Boolean);
+
+  if (recipients.length === 0) {
+    return false;
+  }
+
+  const vehicle = await getVehicleForNotification(supabase, booking.vehicleId);
+  const vehicleLabel = buildVehicleLabel(vehicle);
+  const transporter = nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: {
+      user: mailConfig.user,
+      pass: mailConfig.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: recipients.join(", "),
+    subject: `Vehicle handover coordination needed: ${vehicleLabel}`,
+    text: [
+      "A vehicle booking has started, but the vehicle is still recorded as borrowed.",
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Booked for: ${bookingRecipient || "-"}`,
+      `Booking start: ${formatDateTime(booking.startsAt)}`,
+      `Booking end: ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}`,
+      `Current borrower: ${borrowerRecipient || "-"}`,
+      `Current driver: ${activeLoan.driverName || "-"}`,
+      `Borrow purpose: ${activeLoan.purpose || "-"}`,
+      `Borrowed at: ${formatDateTime(activeLoan.borrowedAt)}`,
+      `Expected return: ${activeLoan.isLongTerm ? "Long term" : formatDateTime(activeLoan.expectedReturnAt)}`,
+      "",
+      "Please coordinate the handover directly. The booking can be converted into an active borrow after the previous borrow is returned.",
+      "",
+      `Open ${APP_NAME} to return the vehicle or check the booking details.`,
+    ].join("\n"),
+    html: [
+      "<p>A vehicle booking has started, but the vehicle is still recorded as borrowed.</p>",
+      "<ul>",
+      `<li><strong>Vehicle:</strong> ${vehicleLabel}</li>`,
+      `<li><strong>Booked for:</strong> ${bookingRecipient || "-"}</li>`,
+      `<li><strong>Booking start:</strong> ${formatDateTime(booking.startsAt)}</li>`,
+      `<li><strong>Booking end:</strong> ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}</li>`,
+      `<li><strong>Current borrower:</strong> ${borrowerRecipient || "-"}</li>`,
+      `<li><strong>Current driver:</strong> ${activeLoan.driverName || "-"}</li>`,
+      `<li><strong>Expected return:</strong> ${activeLoan.isLongTerm ? "Long term" : formatDateTime(activeLoan.expectedReturnAt)}</li>`,
+      "</ul>",
+      "<p>Please coordinate the handover directly. The booking can be converted into an active borrow after the previous borrow is returned.</p>",
+      `<p>Open ${APP_NAME} to return the vehicle or check the booking details.</p>`,
     ].join(""),
   });
 

@@ -153,28 +153,6 @@ begin
     raise exception 'This vehicle is already booked during the selected period.';
   end if;
 
-  if exists (
-    select 1
-    from public.vehicle_loans l
-    where l.vehicle_id = new.vehicle_id
-      and l.returned_at is null
-      and l.is_long_term = true
-  ) then
-    raise exception 'This vehicle is currently borrowed long term.';
-  end if;
-
-  if exists (
-    select 1
-    from public.vehicle_loans l
-    where l.vehicle_id = new.vehicle_id
-      and l.returned_at is null
-      and l.is_long_term = false
-      and l.expected_return_at is not null
-      and tstzrange(l.borrowed_at, l.expected_return_at, '[)') && tstzrange(new.starts_at, v_new_ends_at, '[)')
-  ) then
-    raise exception 'This booking overlaps with an existing borrow period.';
-  end if;
-
   return new;
 end;
 $$;

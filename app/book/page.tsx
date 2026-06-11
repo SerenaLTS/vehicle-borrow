@@ -32,7 +32,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
 
-  const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance" && !activeLoanVehicleIds.has(vehicle.id));
+  const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance");
   const error = typeof params.error === "string" ? params.error : null;
   const message = typeof params.message === "string" ? params.message : null;
   const yourBookings = upcomingBookings.filter((booking) => booking.booked_by_user_id === user.id);
@@ -52,7 +52,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
       <section className="panel">
         <h2>Book a vehicle</h2>
-        <p className="muted">Bookings reserve a time slot. Vehicles with existing bookings are still shown here, but you should avoid overlapping the booked time window shown below.</p>
+        <p className="muted">Bookings reserve a time slot. Vehicles that are currently borrowed can still be booked for later; if the previous borrower has not returned it by your booking time, both people will be notified to coordinate.</p>
 
         {bookableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles can be booked right now.</div>
@@ -72,6 +72,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 {bookableVehicles.map((vehicle) => (
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.plate_number} • {vehicle.model}
+                    {activeLoanVehicleIds.has(vehicle.id) ? " • currently borrowed" : ""}
                     {vehicle.color ? ` • ${vehicle.color}` : ""}
                     {vehicle.location ? ` • ${vehicle.location}` : ""}
                     {vehicle.vin ? ` • VIN ${vehicle.vin}` : ""}

@@ -26,14 +26,7 @@ export async function validateVehicleBookingWindow(
     return "Please choose a valid booking time range.";
   }
 
-  const [{ data: vehicle, error: vehicleError }, { data: activeLoans, error: loanError }] = await Promise.all([
-    supabase.from("vehicles").select("id, status, current_holder_user_id").eq("id", vehicleId).maybeSingle(),
-    supabase
-      .from("vehicle_loans")
-      .select("id, borrowed_at, expected_return_at, is_long_term, returned_at")
-      .eq("vehicle_id", vehicleId)
-      .is("returned_at", null),
-  ]);
+  const { data: vehicle, error: vehicleError } = await supabase.from("vehicles").select("id, status, current_holder_user_id").eq("id", vehicleId).maybeSingle();
 
   if (vehicleError) {
     return vehicleError.message;
@@ -45,29 +38,6 @@ export async function validateVehicleBookingWindow(
 
   if (vehicle.status === "retired" || vehicle.status === "maintenance") {
     return "This vehicle cannot be booked in its current status.";
-  }
-
-  if (loanError) {
-    return loanError.message;
-  }
-
-  const activeLoan = activeLoans?.[0];
-
-  if (activeLoan) {
-    if (activeLoan.is_long_term) {
-      return "This vehicle is currently borrowed long term.";
-    }
-
-    if (!activeLoan.expected_return_at) {
-      return "This vehicle is currently borrowed and does not have a scheduled return time yet.";
-    }
-
-    const loanStartsAt = new Date(activeLoan.borrowed_at);
-    const loanEndsAt = new Date(activeLoan.expected_return_at);
-
-    if ((endsAtDate === null || loanStartsAt < endsAtDate) && loanEndsAt > startsAtDate) {
-      return "This booking overlaps with an existing borrow period.";
-    }
   }
 
   let conflictQuery = supabase
