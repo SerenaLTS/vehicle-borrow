@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmForm } from "@/components/confirm-form";
+import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
-import { createAdminBooking, createHistoricalLoan, deleteAdminBooking, updateAdminBooking, updateHistoricalLoan } from "@/app/admin/actions";
+import { adminStartReservationBorrow, createAdminBooking, createHistoricalLoan, deleteAdminBooking, updateAdminBooking, updateHistoricalLoan } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
@@ -167,9 +167,9 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <h2>{record.model}</h2>
             <p className="muted">Vehicle ID: {record.id}</p>
           </div>
-          <Link className="secondaryButton" href="/admin">
+          <LoadingLink className="secondaryButton" href="/admin">
             All vehicles
-          </Link>
+          </LoadingLink>
         </div>
 
         <div className="detailList">
@@ -264,7 +264,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <input name="isLongTerm" type="checkbox" />
                 <span>Long term</span>
               </label>
-              <p className="fieldHint">Long term bookings will notify admins.</p>
+              <p className="fieldHint">Long term reservations will notify admins.</p>
             </div>
             <label className="fieldLabel longTermHidden">
               End time
@@ -292,57 +292,70 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         <div className="emptyState">No bookings have been recorded for this vehicle yet.</div>
       ) : (
         <div className="cardsGrid">
-          {bookings.map((booking) => (
-            <article className="vehicleCard" key={booking.id}>
-              <StatusPill status={new Date(booking.starts_at).getTime() <= now && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false)) ? "booked" : "available"} />
-              <h3>{booking.booked_by_email}</h3>
-              <p className="muted">
-                {formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}
-              </p>
-              <div className="vehicleMeta">
-                <span>Comments: {booking.comments || "-"}</span>
-                <span>Created: {formatDateTime(booking.created_at)}</span>
-              </div>
+          {bookings.map((booking) => {
+            const hasStarted = new Date(booking.starts_at).getTime() <= now;
+            const isActiveReservation = hasStarted && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false));
 
-              <ConfirmForm action={updateAdminBooking} confirmMessage="Confirm updating this reservation?">
-                <input name="bookingId" type="hidden" value={booking.id} />
-                <input name="vehicleId" type="hidden" value={record.id} />
+            return (
+              <article className="vehicleCard" key={booking.id}>
+                <StatusPill status={isActiveReservation ? "booked" : "available"} />
+                <h3>{booking.booked_by_email}</h3>
+                <p className="muted">
+                  {formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}
+                </p>
+                <div className="vehicleMeta">
+                  <span>Comments: {booking.comments || "-"}</span>
+                  <span>Created: {formatDateTime(booking.created_at)}</span>
+                </div>
 
-                <div className="formGrid">
-                  <div className="timeFieldGroup">
-                    <label className="fieldLabel">
-                      Start time
-                      <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
+                {isActiveReservation ? (
+                  <ConfirmForm action={adminStartReservationBorrow} confirmMessage="Start this reservation as an active borrow for the reserved user?">
+                    <input name="bookingId" type="hidden" value={booking.id} />
+                    <input name="vehicleId" type="hidden" value={record.id} />
+                    <SubmitButton className="primaryButton" idleLabel="Start borrow" pendingLabel="Starting..." />
+                  </ConfirmForm>
+                ) : null}
+
+                <ConfirmForm action={updateAdminBooking} confirmMessage="Confirm updating this reservation?">
+                  <input name="bookingId" type="hidden" value={booking.id} />
+                  <input name="vehicleId" type="hidden" value={record.id} />
+
+                  <div className="formGrid">
+                    <div className="timeFieldGroup">
+                      <label className="fieldLabel">
+                        Start time
+                        <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.starts_at)} name="startsAt" required type="datetime-local" />
+                      </label>
+                      <label className="checkboxLabel">
+                        <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
+                        <span>Long term</span>
+                      </label>
+                      <p className="fieldHint">Long term reservations will notify admins.</p>
+                    </div>
+                    <label className="fieldLabel longTermHidden">
+                      End time
+                      <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
                     </label>
-                    <label className="checkboxLabel">
-                      <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
-                      <span>Long term</span>
-                    </label>
-                    <p className="fieldHint">Long term reservations will notify admins.</p>
                   </div>
-                  <label className="fieldLabel longTermHidden">
-                    End time
-                    <input defaultValue={formatUtcIsoForDateTimeLocalInput(booking.ends_at)} name="endsAt" type="datetime-local" />
+
+                  <label className="fieldLabel">
+                    Comments
+                    <textarea defaultValue={booking.comments ?? ""} name="comments" />
                   </label>
-                </div>
 
-                <label className="fieldLabel">
-                  Comments
-                  <textarea defaultValue={booking.comments ?? ""} name="comments" />
-                </label>
+                  <div className="actionsRow">
+                    <SubmitButton className="primaryButton" idleLabel="Update reservation" pendingLabel="Saving..." />
+                  </div>
+                </ConfirmForm>
 
-                <div className="actionsRow">
-                  <SubmitButton className="primaryButton" idleLabel="Update reservation" pendingLabel="Saving..." />
-                </div>
-              </ConfirmForm>
-
-              <ConfirmForm action={deleteAdminBooking} confirmMessage="Confirm deleting this reservation? This cannot be undone.">
-                <input name="bookingId" type="hidden" value={booking.id} />
-                <input name="vehicleId" type="hidden" value={record.id} />
-                <SubmitButton className="ghostButton" idleLabel="Delete booking" pendingLabel="Deleting..." />
-              </ConfirmForm>
-            </article>
-          ))}
+                <ConfirmForm action={deleteAdminBooking} confirmMessage="Confirm deleting this reservation? This cannot be undone.">
+                  <input name="bookingId" type="hidden" value={booking.id} />
+                  <input name="vehicleId" type="hidden" value={record.id} />
+                  <SubmitButton className="ghostButton" idleLabel="Delete reservation" pendingLabel="Deleting..." />
+                </ConfirmForm>
+              </article>
+            );
+          })}
         </div>
       )}
 

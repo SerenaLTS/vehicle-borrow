@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { adminReturnVehicle, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { adminReturnVehicle, adminStartReservationBorrow, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
 import { ConfirmForm } from "@/components/confirm-form";
+import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
@@ -121,18 +121,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       {error ? <p className="message error">{error}</p> : null}
 
       <nav className="tabNav" aria-label="Admin sections">
-        <Link className={activeTab === "fleet" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("fleet")}>
+        <LoadingLink className={activeTab === "fleet" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("fleet")}>
           Fleet
-        </Link>
-        <Link className={activeTab === "bookings" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("bookings")}>
+        </LoadingLink>
+        <LoadingLink className={activeTab === "bookings" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("bookings")}>
           Bookings
-        </Link>
-        <Link className={activeTab === "loans" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("loans")}>
+        </LoadingLink>
+        <LoadingLink className={activeTab === "loans" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("loans")}>
           Loans
-        </Link>
-        <Link className={activeTab === "users" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("users")}>
+        </LoadingLink>
+        <LoadingLink className={activeTab === "users" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("users")}>
           Users
-        </Link>
+        </LoadingLink>
       </nav>
 
       <section className="statsGrid adminStatsGrid">
@@ -294,15 +294,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               key={vehicle.id}
             >
               <div className="vehicleCardHeader">
-                <Link className="vehicleCardLink" href={`/admin/vehicles/${vehicle.id}`}>
+                <LoadingLink className="vehicleCardLink" href={`/admin/vehicles/${vehicle.id}`}>
                   <StatusPill status={displayStatus} />
                   <h3>{vehicle.plate_number}</h3>
                   <p className="muted">{vehicle.model}</p>
                   {vehicle.location ? <p className="muted">Location: {vehicle.location}</p> : null}
-                </Link>
-                <Link className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
+                </LoadingLink>
+                <LoadingLink className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
                   View records
-                </Link>
+                </LoadingLink>
               </div>
 
               {activeLoan ? (
@@ -467,9 +467,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>{booking.booked_by_email}</span>
                       <span>{formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
                     </div>
-                    <Link className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
+                    <LoadingLink className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
                       Open vehicle
-                    </Link>
+                    </LoadingLink>
                   </article>
                 ))}
               </div>
@@ -480,22 +480,36 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <div className="emptyState">No active or upcoming reservations.</div>
           ) : (
             <div className="cardsGrid">
-              {activeOrUpcomingBookings.map((booking) => (
-                <article className="vehicleCard" key={booking.id}>
-                  <StatusPill status="booked" />
-                  <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
-                  <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
-                  <div className="vehicleMeta">
-                    <span>Reserved for: {booking.booked_by_email}</span>
-                    <span>From: {formatDateTime(booking.starts_at)}</span>
-                    <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
-                    <span>Comments: {booking.comments || "-"}</span>
-                  </div>
-                  <Link className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
-                    Manage
-                  </Link>
-                </article>
-              ))}
+              {activeOrUpcomingBookings.map((booking) => {
+                const hasStarted = new Date(booking.starts_at).getTime() <= now;
+                const isActiveReservation = hasStarted && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false));
+
+                return (
+                  <article className="vehicleCard" key={booking.id}>
+                    <StatusPill status="booked" />
+                    <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                    <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
+                    <div className="vehicleMeta">
+                      <span>Reserved for: {booking.booked_by_email}</span>
+                      <span>From: {formatDateTime(booking.starts_at)}</span>
+                      <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
+                      <span>Comments: {booking.comments || "-"}</span>
+                    </div>
+                    <div className="actionsRow">
+                      <LoadingLink className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
+                        Manage
+                      </LoadingLink>
+                      {isActiveReservation ? (
+                        <ConfirmForm action={adminStartReservationBorrow} confirmMessage="Start this reservation as an active borrow for the reserved user?">
+                          <input name="bookingId" type="hidden" value={booking.id} />
+                          <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                          <SubmitButton className="primaryButton" idleLabel="Start borrow" pendingLabel="Starting..." />
+                        </ConfirmForm>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </>
@@ -518,9 +532,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>{loan.borrower_email}</span>
                       <span>Expected: {formatDateTime(loan.expected_return_at)}</span>
                     </div>
-                    <Link className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
+                    <LoadingLink className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
                       Open vehicle
-                    </Link>
+                    </LoadingLink>
                   </article>
                 ))}
               </div>
@@ -553,9 +567,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                       <span>Purpose: {loan.purpose}</span>
                     </div>
-                    <Link className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
+                    <LoadingLink className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
                       Manage
-                    </Link>
+                    </LoadingLink>
                   </article>
                 );
               })}
@@ -581,9 +595,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
                       <span>Purpose: {loan.purpose}</span>
                     </div>
-                    <Link className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
+                    <LoadingLink className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
                       Manage
-                    </Link>
+                    </LoadingLink>
                   </article>
                 ))}
               </div>

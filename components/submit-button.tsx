@@ -9,17 +9,17 @@ type SubmitButtonProps = {
   showPendingDuck?: boolean;
 };
 
-export function SubmitButton({ idleLabel, pendingLabel, className = "primaryButton", showPendingDuck = false }: SubmitButtonProps) {
+export function SubmitButton({ idleLabel, pendingLabel, className = "primaryButton" }: SubmitButtonProps) {
   const { pending } = useFormStatus();
 
   return (
     <button className={className} disabled={pending} type="submit">
-      {pending && showPendingDuck ? (
+      {pending ? (
         <span className="buttonSpinnerLabel">
           <span aria-hidden="true" className="buttonSpinner" />
           {pendingLabel}
         </span>
-      ) : pending ? pendingLabel : idleLabel}
+      ) : idleLabel}
     </button>
   );
 }

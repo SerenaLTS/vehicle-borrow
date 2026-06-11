@@ -604,6 +604,121 @@ export async function deleteAdminBooking(formData: FormData) {
   redirect(`/admin/vehicles/${vehicleId}?message=Reservation deleted successfully.`);
 }
 
+export async function adminStartReservationBorrow(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+
+  if (!bookingId || !vehicleId) {
+    redirect("/admin?error=Reservation not found.");
+  }
+
+  const supabase = await requireAdmin();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const adminClient = createAdminClient();
+  const now = new Date();
+
+  const { data: booking, error: bookingError } = await adminClient
+    .from("vehicle_bookings")
+    .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
+    .eq("id", bookingId)
+    .eq("vehicle_id", vehicleId)
+    .maybeSingle();
+
+  if (bookingError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(bookingError.message)}`);
+  }
+
+  if (!booking) {
+    redirect(`/admin/vehicles/${vehicleId}?error=Reservation not found.`);
+  }
+
+  if (new Date(booking.starts_at).getTime() > now.getTime()) {
+    redirect(`/admin/vehicles/${vehicleId}?error=This reservation has not started yet.`);
+  }
+
+  if (!booking.is_long_term && booking.ends_at && new Date(booking.ends_at).getTime() <= now.getTime()) {
+    redirect(`/admin/vehicles/${vehicleId}?error=This reservation has already ended.`);
+  }
+
+  const [{ data: vehicle, error: vehicleError }, { data: activeLoan, error: activeLoanError }] = await Promise.all([
+    adminClient.from("vehicles").select("id, status, current_holder_user_id").eq("id", vehicleId).maybeSingle(),
+    adminClient
+      .from("vehicle_loans")
+      .select("id, borrower_email")
+      .eq("vehicle_id", vehicleId)
+      .is("returned_at", null)
+      .maybeSingle(),
+  ]);
+
+  if (vehicleError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(vehicleError.message)}`);
+  }
+
+  if (!vehicle || vehicle.status === "retired" || vehicle.status === "maintenance") {
+    redirect(`/admin/vehicles/${vehicleId}?error=This vehicle cannot be borrowed in its current status.`);
+  }
+
+  if (activeLoanError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(activeLoanError.message)}`);
+  }
+
+  if (activeLoan) {
+    redirect(`/admin/vehicles/${vehicleId}?error=This vehicle is still borrowed by ${encodeURIComponent(String(activeLoan.borrower_email ?? "another user"))}. Return it first, then start the reservation borrow.`);
+  }
+
+  const adminNote = `Admin started borrow from reservation ${booking.id} by ${user?.email ?? "admin"}.`;
+  const { error: insertError } = await adminClient
+    .from("vehicle_loans")
+    .insert({
+      vehicle_id: booking.vehicle_id,
+      borrowed_by_user_id: booking.booked_by_user_id,
+      borrower_email: booking.booked_by_email,
+      driver_name: booking.booked_by_email,
+      purpose: booking.comments?.trim() || "Reservation converted by admin",
+      start_odometer: null,
+      borrow_notes: booking.comments ? `${adminNote}\n\nReservation comments: ${booking.comments}` : adminNote,
+      expected_return_at: booking.is_long_term ? null : booking.ends_at,
+      is_long_term: booking.is_long_term,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(insertError.message)}`);
+  }
+
+  const { error: deleteError } = await adminClient.from("vehicle_bookings").delete().eq("id", booking.id);
+
+  if (deleteError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(deleteError.message)}`);
+  }
+
+  const { error: vehicleUpdateError } = await adminClient
+    .from("vehicles")
+    .update({
+      status: "borrowed",
+      current_holder_user_id: booking.booked_by_user_id,
+    })
+    .eq("id", vehicleId);
+
+  if (vehicleUpdateError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(vehicleUpdateError.message)}`);
+  }
+
+  clearFleetSnapshotCache();
+  clearVehicleCalendarCache(vehicleId);
+  revalidatePath("/dashboard");
+  revalidatePath("/book");
+  revalidatePath("/borrow");
+  revalidatePath("/return");
+  revalidatePath("/history");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vehicles/${vehicleId}`);
+  redirect(`/admin/vehicles/${vehicleId}?message=Reservation started as borrow for ${encodeURIComponent(booking.booked_by_email)}.`);
+}
+
 export async function createHistoricalLoan(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const borrowerUserId = String(formData.get("borrowerUserId") ?? "").trim();

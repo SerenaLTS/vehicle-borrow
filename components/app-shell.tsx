@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { LoadingLink } from "@/components/loading-link";
 import { LogoutButton } from "@/components/logout-button";
 import { APP_NAME } from "@/lib/app-config";
 
@@ -35,14 +36,14 @@ export function AppShell({ title, subtitle, userLabel, backHref, backLabel = "Ba
             <p className="signedInAs userIdentity">{userLabel}</p>
             <div className="headerActions">
               {adminHref ? (
-                <Link className="ghostButton" href={adminHref}>
+                <LoadingLink className="ghostButton" href={adminHref}>
                   Admin
-                </Link>
+                </LoadingLink>
               ) : null}
               {backHref ? (
-                <Link className="backLink" href={backHref}>
+                <LoadingLink className="backLink" href={backHref}>
                   {backLabel}
-                </Link>
+                </LoadingLink>
               ) : null}
               <LogoutButton />
             </div>
