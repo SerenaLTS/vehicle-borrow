@@ -918,6 +918,40 @@ input[type="checkbox"] {
   max-width: 640px;
 }
 
+.tabNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.tabLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 16px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.activeTabLink {
+  border-color: rgba(31, 107, 82, 0.36);
+  color: var(--accent-strong);
+  background: rgba(31, 107, 82, 0.12);
+}
+
+.adminStatsGrid {
+  margin-bottom: 18px;
+}
+
+.filterForm {
+  display: grid;
+  gap: 14px;
+}
+
 form:has(input[name="isLongTerm"]:checked) .longTermHidden {
   display: none;
 }

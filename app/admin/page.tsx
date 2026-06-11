@@ -16,6 +16,8 @@ type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+type AdminTab = "fleet" | "bookings" | "loans" | "users";
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -95,6 +97,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const message = typeof params.message === "string" ? params.message : null;
   const error = typeof params.error === "string" ? params.error : null;
   const now = Date.now();
+  const activeTab = params.tab === "bookings" || params.tab === "loans" || params.tab === "users" ? params.tab : "fleet";
+  const tabHref = (tab: AdminTab) => `/admin${tab === "fleet" ? "" : `?tab=${tab}`}`;
+  const overdueLoans = activeLoans.filter((loan) => !loan.is_long_term && loan.expected_return_at && new Date(loan.expected_return_at).getTime() < now);
+  const longTermLoans = activeLoans.filter((loan) => loan.is_long_term);
+  const startedUnconvertedBookings = activeOrUpcomingBookings.filter((booking) => {
+    const startsAt = new Date(booking.starts_at).getTime();
+    const endsAt = booking.ends_at ? new Date(booking.ends_at).getTime() : Number.POSITIVE_INFINITY;
+
+    return startsAt <= now && (booking.is_long_term || endsAt > now);
+  });
 
   return (
     <AppShell
@@ -108,6 +120,38 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       {message ? <p className="message">{message}</p> : null}
       {error ? <p className="message error">{error}</p> : null}
 
+      <nav className="tabNav" aria-label="Admin sections">
+        <Link className={activeTab === "fleet" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("fleet")}>
+          Fleet
+        </Link>
+        <Link className={activeTab === "bookings" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("bookings")}>
+          Bookings
+        </Link>
+        <Link className={activeTab === "loans" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("loans")}>
+          Loans
+        </Link>
+        <Link className={activeTab === "users" ? "tabLink activeTabLink" : "tabLink"} href={tabHref("users")}>
+          Users
+        </Link>
+      </nav>
+
+      <section className="statsGrid adminStatsGrid">
+        <article className="statCard">
+          <p className="statLabel">Active loans</p>
+          <p className="statValue">{activeLoans.length}</p>
+        </article>
+        <article className="statCard">
+          <p className="statLabel">Overdue</p>
+          <p className="statValue">{overdueLoans.length}</p>
+        </article>
+        <article className="statCard">
+          <p className="statLabel">Started reservations</p>
+          <p className="statValue">{startedUnconvertedBookings.length}</p>
+        </article>
+      </section>
+
+      {activeTab === "users" ? (
+        <>
       <section className="panel">
         <h2>How admin access works</h2>
         <div className="vehicleMeta">
@@ -117,6 +161,40 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       </section>
 
+      <section className="sectionHeader">
+        <div>
+          <h2>Users</h2>
+          <p className="muted">Users appear here automatically after they sign up or after the schema backfill runs.</p>
+        </div>
+      </section>
+
+      <div className="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Admin</th>
+              <th>Joined</th>
+              <th>Last synced</th>
+            </tr>
+          </thead>
+          <tbody>
+            {userRoles.map((role) => (
+              <tr key={role.user_id}>
+                <td>{role.email}</td>
+                <td>{role.is_admin ? "Yes" : "No"}</td>
+                <td>{formatDateTime(role.created_at)}</td>
+                <td>{formatDateTime(role.updated_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+        </>
+      ) : null}
+
+      {activeTab === "fleet" ? (
+        <>
       <section className="panel">
         <h2>Add vehicle</h2>
         <form action={createVehicle}>
@@ -171,38 +249,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       <section className="sectionHeader">
         <div>
-          <h2>Users</h2>
-          <p className="muted">Users appear here automatically after they sign up or after the schema backfill runs.</p>
-        </div>
-      </section>
-
-      <div className="tableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Admin</th>
-              <th>Joined</th>
-              <th>Last synced</th>
-            </tr>
-          </thead>
-          <tbody>
-            {userRoles.map((role) => (
-              <tr key={role.user_id}>
-                <td>{role.email}</td>
-                <td>{role.is_admin ? "Yes" : "No"}</td>
-                <td>{formatDateTime(role.created_at)}</td>
-                <td>{formatDateTime(role.updated_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <section className="sectionHeader">
-        <div>
           <h2>Fleet manager</h2>
-          <p className="muted">Edit vehicle details here. Booking windows are now managed from each vehicle record page instead of the manual status dropdown.</p>
+          <p className="muted">Edit vehicle details here. Reservation windows are managed from each vehicle record page.</p>
         </div>
       </section>
 
@@ -309,15 +357,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {!activeLoan && nextBooking ? (
                 <div className="vehicleMeta borrowedSummary">
                   <span>
-                    <strong>Booked by</strong>
+                    <strong>Reserved by</strong>
                     {nextBooking.booked_by_email}
                   </span>
                   <span>
-                    <strong>Booked from</strong>
+                    <strong>Reserved from</strong>
                     {formatDateTime(nextBooking.starts_at)}
                   </span>
                   <span>
-                    <strong>Booked until</strong>
+                    <strong>Reserved until</strong>
                     {nextBooking.is_long_term ? "Long term" : formatDateTime(nextBooking.ends_at)}
                   </span>
                 </div>
@@ -392,6 +440,157 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           );
         })}
       </AdminFleetSearch>
+        </>
+      ) : null}
+
+      {activeTab === "bookings" ? (
+        <>
+          <section className="sectionHeader">
+            <div>
+              <h2>Reservations</h2>
+              <p className="muted">All active and upcoming reservations across the fleet.</p>
+            </div>
+          </section>
+
+          {startedUnconvertedBookings.length > 0 ? (
+            <section className="actionRequiredPanel">
+              <div>
+                <p className="actionRequiredLabel">Action needed</p>
+                <h2>Started reservations not converted</h2>
+                <p>These reservations have started but have not been converted with Start borrow.</p>
+              </div>
+              <div className="actionRequiredList">
+                {startedUnconvertedBookings.map((booking) => (
+                  <article className="actionRequiredItem" key={booking.id}>
+                    <div>
+                      <strong>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</strong>
+                      <span>{booking.booked_by_email}</span>
+                      <span>{formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
+                    </div>
+                    <Link className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
+                      Open vehicle
+                    </Link>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {activeOrUpcomingBookings.length === 0 ? (
+            <div className="emptyState">No active or upcoming reservations.</div>
+          ) : (
+            <div className="cardsGrid">
+              {activeOrUpcomingBookings.map((booking) => (
+                <article className="vehicleCard" key={booking.id}>
+                  <StatusPill status="booked" />
+                  <h3>{booking.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                  <p className="muted">{booking.vehicle?.model ?? "Vehicle"}</p>
+                  <div className="vehicleMeta">
+                    <span>Reserved for: {booking.booked_by_email}</span>
+                    <span>From: {formatDateTime(booking.starts_at)}</span>
+                    <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
+                    <span>Comments: {booking.comments || "-"}</span>
+                  </div>
+                  <Link className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
+                    Manage
+                  </Link>
+                </article>
+              ))}
+            </div>
+          )}
+        </>
+      ) : null}
+
+      {activeTab === "loans" ? (
+        <>
+          {overdueLoans.length > 0 ? (
+            <section className="actionRequiredPanel">
+              <div>
+                <p className="actionRequiredLabel">Overdue</p>
+                <h2>Vehicles past expected return</h2>
+                <p>These active loans need a return or an extension.</p>
+              </div>
+              <div className="actionRequiredList">
+                {overdueLoans.map((loan) => (
+                  <article className="actionRequiredItem" key={loan.id}>
+                    <div>
+                      <strong>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</strong>
+                      <span>{loan.borrower_email}</span>
+                      <span>Expected: {formatDateTime(loan.expected_return_at)}</span>
+                    </div>
+                    <Link className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
+                      Open vehicle
+                    </Link>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="sectionHeader">
+            <div>
+              <h2>Active loans</h2>
+              <p className="muted">Currently borrowed vehicles, including overdue and long-term loans.</p>
+            </div>
+          </section>
+
+          {activeLoans.length === 0 ? (
+            <div className="emptyState">No active loans right now.</div>
+          ) : (
+            <div className="cardsGrid">
+              {activeLoans.map((loan) => {
+                const isOverdue = !loan.is_long_term && loan.expected_return_at && new Date(loan.expected_return_at).getTime() < now;
+
+                return (
+                  <article className={isOverdue ? "vehicleCard activeBookingCard" : "vehicleCard"} key={loan.id}>
+                    <StatusPill status="borrowed" />
+                    <h3>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                    <p className="muted">{loan.vehicle?.model ?? "Vehicle"}</p>
+                    <div className="vehicleMeta">
+                      <span>Borrower: {loan.borrower_email}</span>
+                      <span>Driver: {loan.driver_name || "-"}</span>
+                      <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
+                      <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
+                      <span>Purpose: {loan.purpose}</span>
+                    </div>
+                    <Link className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
+                      Manage
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {longTermLoans.length > 0 ? (
+            <>
+              <section className="sectionHeader">
+                <div>
+                  <h2>Long-term loans</h2>
+                  <p className="muted">Active loans without a scheduled return time.</p>
+                </div>
+              </section>
+              <div className="cardsGrid">
+                {longTermLoans.map((loan) => (
+                  <article className="vehicleCard" key={loan.id}>
+                    <StatusPill status="borrowed" />
+                    <h3>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</h3>
+                    <p className="muted">{loan.borrower_email}</p>
+                    <div className="vehicleMeta">
+                      <span>Driver: {loan.driver_name || "-"}</span>
+                      <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
+                      <span>Purpose: {loan.purpose}</span>
+                    </div>
+                    <Link className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
+                      Manage
+                    </Link>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </>
+      ) : null}
     </AppShell>
   );
 }

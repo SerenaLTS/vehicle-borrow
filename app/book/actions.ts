@@ -141,11 +141,11 @@ export async function updateOwnBooking(formData: FormData) {
   }
 
   if (!booking) {
-    redirect("/book?error=You can only update your own future bookings.");
+    redirect("/book?error=You can only update your own future reservations.");
   }
 
   if (new Date(booking.starts_at).getTime() <= Date.now()) {
-    redirect("/book?error=This booking has already started and can no longer be changed here.");
+    redirect("/book?error=This reservation has already started and can no longer be changed here.");
   }
 
   const validationError = await validateVehicleBookingWindow(supabase, {
@@ -226,7 +226,7 @@ export async function updateOwnBooking(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
-  redirect("/book?message=Booking updated successfully.");
+  redirect("/book?message=Reservation updated successfully.");
 }
 
 export async function cancelOwnBooking(formData: FormData) {
@@ -258,11 +258,11 @@ export async function cancelOwnBooking(formData: FormData) {
   }
 
   if (!booking) {
-    redirect("/book?error=You can only cancel your own future bookings.");
+    redirect("/book?error=You can only cancel your own future reservations.");
   }
 
   if (new Date(booking.starts_at).getTime() <= Date.now()) {
-    redirect("/book?error=This booking has already started and can no longer be cancelled here.");
+    redirect("/book?error=This reservation has already started and can no longer be cancelled here.");
   }
 
   const { error: deleteError } = await supabase
@@ -301,7 +301,7 @@ export async function cancelOwnBooking(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
-  redirect("/book?message=Booking cancelled successfully.");
+  redirect("/book?message=Reservation cancelled successfully.");
 }
 
 export async function collectBookingKey(formData: FormData) {
@@ -338,5 +338,5 @@ export async function collectBookingKey(formData: FormData) {
   revalidatePath("/history");
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
-  redirect("/dashboard?message=Key collected. Booking converted to active borrow.");
+  redirect("/dashboard?message=Borrow started from reservation.");
 }

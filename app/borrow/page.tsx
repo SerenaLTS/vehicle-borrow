@@ -85,8 +85,8 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
   return (
     <AppShell
-      title="Borrow"
-      subtitle="Choose an available vehicle, record who is driving it, and confirm how long you need it."
+      title="Borrow now"
+      subtitle="Start an immediate vehicle borrow."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
@@ -154,7 +154,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       ) : null}
 
       <section className="panel">
-        <h2>Borrow a vehicle</h2>
+        <h2>Borrow now</h2>
         <p className="muted">Borrowing usually requires an expected return time. Long term borrows can be created without one and will notify admins.</p>
 
         {availableVehicles.length === 0 ? (

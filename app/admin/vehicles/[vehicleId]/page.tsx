@@ -214,15 +214,15 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <span>{currentLoan?.is_long_term ? "Long term" : formatDateTime(currentLoan?.expected_return_at ?? null)}</span>
           </div>
           <div>
-            <strong>Current booking</strong>
+            <strong>Current reservation</strong>
             <span>{currentBooking ? `${formatDateTime(currentBooking.starts_at)} to ${currentBooking.is_long_term ? "Long term" : formatDateTime(currentBooking.ends_at)}` : "-"}</span>
           </div>
           <div>
-            <strong>Booked by</strong>
+            <strong>Reserved by</strong>
             <span>{currentBooking?.booked_by_email ?? "-"}</span>
           </div>
           <div>
-            <strong>Next booking</strong>
+            <strong>Next reservation</strong>
             <span>{nextUpcomingBooking ? `${formatDateTime(nextUpcomingBooking.starts_at)} to ${nextUpcomingBooking.is_long_term ? "Long term" : formatDateTime(nextUpcomingBooking.ends_at)}` : "-"}</span>
           </div>
           <div>
@@ -233,9 +233,26 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       </section>
 
       <section className="panel">
-        <h2>Create booking</h2>
+        <h2>Create reservation</h2>
+        {userRoles.length === 0 ? (
+          <div className="emptyState">No users are available yet. Ask the reserver to sign in once, then create the reservation.</div>
+        ) : null}
         <form action={createAdminBooking}>
           <input name="vehicleId" type="hidden" value={record.id} />
+
+          <label className="fieldLabel">
+            Booked for
+            <select name="bookedForUserId" required defaultValue={defaultBorrowerUserId}>
+              <option disabled value="">
+                Select a user
+              </option>
+              {userRoles.map((role) => (
+                <option key={role.user_id} value={role.user_id}>
+                  {role.email}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="formGrid">
             <div className="timeFieldGroup">
@@ -260,14 +277,14 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <textarea name="comments" placeholder="Campaign, pickup, media event..." />
           </label>
 
-          <SubmitButton className="primaryButton" idleLabel="Create booking" pendingLabel="Saving..." />
+          <SubmitButton className="primaryButton" idleLabel="Create reservation" pendingLabel="Saving..." />
         </form>
       </section>
 
       <section className="sectionHeader">
         <div>
-          <h2>Bookings</h2>
-          <p className="muted">Admins can adjust booking windows here. Borrow attempts that overlap these windows will be blocked.</p>
+          <h2>Reservations</h2>
+          <p className="muted">Admins can adjust reservation windows here. Borrow attempts that overlap these windows will be blocked.</p>
         </div>
       </section>
 
@@ -287,7 +304,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <span>Created: {formatDateTime(booking.created_at)}</span>
               </div>
 
-              <ConfirmForm action={updateAdminBooking} confirmMessage="Confirm updating this booking?">
+              <ConfirmForm action={updateAdminBooking} confirmMessage="Confirm updating this reservation?">
                 <input name="bookingId" type="hidden" value={booking.id} />
                 <input name="vehicleId" type="hidden" value={record.id} />
 
@@ -301,7 +318,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                       <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
                       <span>Long term</span>
                     </label>
-                    <p className="fieldHint">Long term bookings will notify admins.</p>
+                    <p className="fieldHint">Long term reservations will notify admins.</p>
                   </div>
                   <label className="fieldLabel longTermHidden">
                     End time
@@ -315,11 +332,11 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 </label>
 
                 <div className="actionsRow">
-                  <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
+                  <SubmitButton className="primaryButton" idleLabel="Update reservation" pendingLabel="Saving..." />
                 </div>
               </ConfirmForm>
 
-              <ConfirmForm action={deleteAdminBooking} confirmMessage="Confirm deleting this booking? This cannot be undone.">
+              <ConfirmForm action={deleteAdminBooking} confirmMessage="Confirm deleting this reservation? This cannot be undone.">
                 <input name="bookingId" type="hidden" value={booking.id} />
                 <input name="vehicleId" type="hidden" value={record.id} />
                 <SubmitButton className="ghostButton" idleLabel="Delete booking" pendingLabel="Deleting..." />

@@ -40,8 +40,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
   return (
     <AppShell
-      title="Book"
-      subtitle="Reserve a vehicle for a specific time window before someone else borrows it."
+      title="Reserve"
+      subtitle="Reserve a vehicle for a future time window."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
@@ -51,15 +51,15 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       {message ? <p className="message">{message}</p> : null}
 
       <section className="panel">
-        <h2>Book a vehicle</h2>
-        <p className="muted">Bookings reserve a time slot. Vehicles that are currently borrowed can still be booked for later; if the previous borrower has not returned it by your booking time, both people will be notified to coordinate.</p>
+        <h2>Reserve a vehicle</h2>
+        <p className="muted">Reservations hold a time slot. Vehicles that are currently borrowed can still be reserved for later; if the previous borrower has not returned it by your reservation time, both people will be notified to coordinate.</p>
 
         {bookableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles can be booked right now.</div>
         ) : (
           <form action={createBooking}>
             <label className="fieldLabel">
-              Booked by
+              Reserved by
               <input defaultValue={user.email ?? ""} disabled />
             </label>
 
@@ -92,7 +92,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <input name="isLongTerm" type="checkbox" />
                   <span>Long term</span>
                 </label>
-                <p className="fieldHint">Long term bookings will notify admins.</p>
+                <p className="fieldHint">Long term reservations will notify admins.</p>
               </div>
 
               <label className="fieldLabel longTermHidden">
@@ -106,7 +106,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
               <textarea name="comments" placeholder="Campaign shoot, airport pickup, client use..." />
             </label>
 
-            <SubmitButton className="primaryButton" idleLabel="Create booking" pendingLabel="Saving..." />
+            <SubmitButton className="primaryButton" idleLabel="Create reservation" pendingLabel="Saving..." />
           </form>
         )}
 
@@ -115,13 +115,13 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
       <section className="sectionHeader">
         <div>
-          <h2>Your bookings</h2>
-          <p className="muted">Before the booking starts, you can adjust the time window, update comments, or cancel it.</p>
+          <h2>Your reservations</h2>
+          <p className="muted">Before the reservation starts, you can adjust the time window, update comments, or cancel it.</p>
         </div>
       </section>
 
       {yourBookings.length === 0 ? (
-        <div className="emptyState">You do not have any upcoming bookings right now.</div>
+        <div className="emptyState">You do not have any upcoming reservations right now.</div>
       ) : (
         <div className="cardsGrid">
           {yourBookings.map((booking) => {
@@ -139,17 +139,17 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <span>Created: {formatDateTime(booking.created_at)}</span>
                 </div>
 
-                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
+                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
                   <input name="bookingId" type="hidden" value={booking.id} />
                   <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                  <SubmitButton className="primaryButton" idleLabel="Key collected / Borrow vehicle" pendingLabel="Converting..." />
+                  <SubmitButton className="primaryButton" idleLabel="Start borrow" pendingLabel="Starting..." />
                 </ConfirmForm>
 
                 {hasStarted ? (
-                  <p className="muted">This booking has already started, so only key collection is available here.</p>
+                  <p className="muted">This reservation has already started, so only Start borrow is available here.</p>
                 ) : (
                   <>
-                    <ConfirmForm action={updateOwnBooking} confirmMessage="Confirm updating this booking?">
+                    <ConfirmForm action={updateOwnBooking} confirmMessage="Confirm updating this reservation?">
                       <input name="bookingId" type="hidden" value={booking.id} />
                       <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
 
@@ -168,7 +168,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                         <input defaultChecked={booking.is_long_term} name="isLongTerm" type="checkbox" />
                         <span>Long term</span>
                       </label>
-                      <p className="fieldHint">Long term bookings will notify admins.</p>
+                      <p className="fieldHint">Long term reservations will notify admins.</p>
 
                       <label className="fieldLabel">
                         Comments
@@ -176,14 +176,14 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                       </label>
 
                       <div className="actionsRow">
-                        <SubmitButton className="primaryButton" idleLabel="Update booking" pendingLabel="Saving..." />
+                        <SubmitButton className="primaryButton" idleLabel="Update reservation" pendingLabel="Saving..." />
                       </div>
                     </ConfirmForm>
 
-                    <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this booking?">
+                    <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this reservation?">
                       <input name="bookingId" type="hidden" value={booking.id} />
                       <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                      <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
+                      <SubmitButton className="ghostButton" idleLabel="Cancel reservation" pendingLabel="Cancelling..." />
                     </ConfirmForm>
                   </>
                 )}
@@ -195,8 +195,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
       <section className="sectionHeader">
         <div>
-          <h2>Fleet booking snapshot</h2>
-          <p className="muted">Shows the next active or upcoming booking for each vehicle.</p>
+          <h2>Fleet reservation snapshot</h2>
+          <p className="muted">Shows the next active or upcoming reservation for each vehicle.</p>
         </div>
       </section>
 
@@ -231,7 +231,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 </div>
               ) : (
                 <div className="vehicleMeta">
-                  <span>{vehicle.comments || "No upcoming booking recorded."}</span>
+                  <span>{vehicle.comments || "No upcoming reservation recorded."}</span>
                 </div>
               )}
               <VehicleScheduleTimeline basePath="/book" vehicleId={vehicle.id} />

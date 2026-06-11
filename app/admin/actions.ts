@@ -307,6 +307,7 @@ export async function adminReturnVehicle(formData: FormData) {
 
 export async function createAdminBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const bookedForUserId = String(formData.get("bookedForUserId") ?? "").trim();
   const startsAtValue = String(formData.get("startsAt") ?? "").trim();
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const isLongTerm = formData.get("isLongTerm") === "on";
@@ -324,6 +325,24 @@ export async function createAdminBooking(formData: FormData) {
     redirect("/");
   }
 
+  if (!bookedForUserId) {
+    redirect(`/admin/vehicles/${vehicleId}?error=Please choose who this reservation is for.`);
+  }
+
+  const { data: bookedForUser, error: bookedForUserError } = await supabase
+    .from("user_roles")
+    .select("user_id, email")
+    .eq("user_id", bookedForUserId)
+    .maybeSingle();
+
+  if (bookedForUserError) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(bookedForUserError.message)}`);
+  }
+
+  if (!bookedForUser?.email) {
+    redirect(`/admin/vehicles/${vehicleId}?error=Booked-for user not found. Ask the user to sign in once, then try again.`);
+  }
+
   const validationError = await validateVehicleBookingWindow(supabase, {
     vehicleId,
     startsAt,
@@ -339,8 +358,8 @@ export async function createAdminBooking(formData: FormData) {
     .from("vehicle_bookings")
     .insert({
       vehicle_id: vehicleId,
-      booked_by_user_id: user.id,
-      booked_by_email: user.email ?? "",
+      booked_by_user_id: bookedForUser.user_id,
+      booked_by_email: bookedForUser.email,
       starts_at: startsAt,
       ends_at: endsAt,
       is_long_term: isLongTerm,
@@ -398,7 +417,7 @@ export async function createAdminBooking(formData: FormData) {
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book");
   revalidatePath("/borrow");
-  redirect(`/admin/vehicles/${vehicleId}?message=Booking created successfully.`);
+  redirect(`/admin/vehicles/${vehicleId}?message=Reservation created successfully.`);
 }
 
 export async function updateAdminBooking(formData: FormData) {
@@ -516,7 +535,7 @@ export async function updateAdminBooking(formData: FormData) {
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book");
   revalidatePath("/borrow");
-  redirect(`/admin/vehicles/${vehicleId}?message=Booking updated successfully.`);
+  redirect(`/admin/vehicles/${vehicleId}?message=Reservation updated successfully.`);
 }
 
 export async function deleteAdminBooking(formData: FormData) {
@@ -582,7 +601,7 @@ export async function deleteAdminBooking(formData: FormData) {
   revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book");
   revalidatePath("/borrow");
-  redirect(`/admin/vehicles/${vehicleId}?message=Booking deleted successfully.`);
+  redirect(`/admin/vehicles/${vehicleId}?message=Reservation deleted successfully.`);
 }
 
 export async function createHistoricalLoan(formData: FormData) {

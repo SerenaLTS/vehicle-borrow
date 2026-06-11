@@ -68,6 +68,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
     return startsAt <= now && (booking.is_long_term || endsAt > now);
   });
+  const overdueLoans = loans.filter((loan) => !loan.is_long_term && loan.expected_return_at && new Date(loan.expected_return_at).getTime() < now);
 
   return (
     <AppShell
@@ -84,10 +85,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
         <div className="actionsRow">
           <Link className="secondaryButton" href="/book">
-            Book a vehicle
+            Reserve
           </Link>
           <Link className="secondaryButton" href="/borrow">
-            Borrow a vehicle
+            Borrow now
           </Link>
           <Link className="primaryButton" href="/return">
             Return a vehicle
@@ -106,13 +107,43 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {message ? <p className="message">{message}</p> : null}
       {error ? <p className="message error">{error}</p> : null}
 
+      {overdueLoans.length > 0 ? (
+        <section className="actionRequiredPanel">
+          <div>
+            <p className="actionRequiredLabel">Overdue</p>
+            <h2>Return or extend active borrow</h2>
+            <p>Your expected return time has passed. Return the vehicle or extend the borrow time so the schedule stays accurate.</p>
+          </div>
+
+          <div className="actionRequiredList">
+            {overdueLoans.map((loan) => (
+              <article className="actionRequiredItem" key={loan.id}>
+                <div>
+                  <strong>{loan.vehicle?.plate_number ?? "Unknown vehicle"}</strong>
+                  <span>{loan.vehicle?.model ?? "Vehicle"}</span>
+                  <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
+                </div>
+                <div className="actionsRow">
+                  <Link className="primaryButton urgentButton" href="/return">
+                    Return vehicle
+                  </Link>
+                  <Link className="secondaryButton" href="/borrow">
+                    Extend
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {activeUnconfirmedBookings.length > 0 ? (
         <section className="actionRequiredPanel">
           <div>
             <p className="actionRequiredLabel">Action required</p>
             <h2>Confirm your active booking</h2>
             <p>
-              You have a booking that has already started. If you have collected the key and are already using the car, <strong>make sure to click borrow the vehicle.</strong>
+              You have a reservation that has already started. If you have collected the key and are already using the car, <strong>start the borrow now.</strong>
             </p>
           </div>
 
@@ -126,10 +157,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     {formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}
                   </span>
                 </div>
-                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
+                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
                   <input name="bookingId" type="hidden" value={booking.id} />
                   <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                  <SubmitButton className="primaryButton urgentButton" idleLabel="Key collected / Borrow vehicle" pendingLabel="Converting..." />
+                  <SubmitButton className="primaryButton urgentButton" idleLabel="Start borrow" pendingLabel="Starting..." />
                 </ConfirmForm>
               </article>
             ))}
@@ -236,18 +267,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     {hasStarted ? "View booking" : "Edit booking"}
                   </Link>
                   {hasStarted ? (
-                    <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to convert this booking into an active borrow?">
+                    <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
                       <input name="bookingId" type="hidden" value={booking.id} />
                       <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                      <SubmitButton className="primaryButton" idleLabel="Key collected / Borrow vehicle" pendingLabel="Converting..." />
+                      <SubmitButton className="primaryButton" idleLabel="Start borrow" pendingLabel="Starting..." />
                     </ConfirmForm>
                   ) : null}
                 </div>
                 {!hasStarted ? (
-                  <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this booking?">
+                  <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this reservation?">
                     <input name="bookingId" type="hidden" value={booking.id} />
                     <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                    <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
+                    <SubmitButton className="ghostButton" idleLabel="Cancel reservation" pendingLabel="Cancelling..." />
                   </ConfirmForm>
                 ) : null}
               </article>

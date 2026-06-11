@@ -14,7 +14,36 @@ function formatReturnedStatus(returnedAt: string | null) {
   return returnedAt ? formatDateTime(returnedAt) : "Not returned yet";
 }
 
-export default async function HistoryPage() {
+type HistoryPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getParam(params: Record<string, string | string[] | undefined>, key: string) {
+  const value = params[key];
+
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getExportHref(params: Record<string, string>) {
+  const exportParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value) {
+      exportParams.set(key, value);
+    }
+  }
+
+  const query = exportParams.toString();
+
+  return query ? `/history/export?${query}` : "/history/export";
+}
+
+export default async function HistoryPage({ searchParams }: HistoryPageProps) {
+  const params = await searchParams;
+  const query = getParam(params, "q").toLowerCase();
+  const from = getParam(params, "from");
+  const to = getParam(params, "to");
+  const status = getParam(params, "status");
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,6 +76,58 @@ export default async function HistoryPage() {
   const history = Array.from(historyById.values())
     .sort((first, second) => new Date(second.borrowed_at).getTime() - new Date(first.borrowed_at).getTime())
     .map(normalizeLoan);
+  const fromTime = from ? new Date(`${from}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
+  const toTime = to ? new Date(`${to}T23:59:59`).getTime() : Number.POSITIVE_INFINITY;
+  const now = Date.now();
+  const filteredHistory = history.filter((loan) => {
+    const borrowedTime = new Date(loan.borrowed_at).getTime();
+    const isOverdue = !loan.returned_at && !loan.is_long_term && loan.expected_return_at && new Date(loan.expected_return_at).getTime() < now;
+    const isAdminReturned = Boolean(loan.return_notes?.toLowerCase().includes("admin return by"));
+    const searchable = [
+      loan.vehicle?.plate_number,
+      loan.vehicle?.model,
+      loan.borrower_email,
+      loan.driver_name,
+      loan.purpose,
+      loan.borrow_notes,
+      loan.return_notes,
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    if (query && !searchable.includes(query)) {
+      return false;
+    }
+
+    if (Number.isFinite(fromTime) && borrowedTime < fromTime) {
+      return false;
+    }
+
+    if (Number.isFinite(toTime) && borrowedTime > toTime) {
+      return false;
+    }
+
+    if (status === "active" && loan.returned_at) {
+      return false;
+    }
+
+    if (status === "returned" && !loan.returned_at) {
+      return false;
+    }
+
+    if (status === "long-term" && !loan.is_long_term) {
+      return false;
+    }
+
+    if (status === "overdue" && !isOverdue) {
+      return false;
+    }
+
+    if (status === "admin-returned" && !isAdminReturned) {
+      return false;
+    }
+
+    return true;
+  });
+  const exportHref = getExportHref({ q: query, from, to, status });
 
   return (
     <AppShell
@@ -60,20 +141,58 @@ export default async function HistoryPage() {
       <section className="sectionHeader">
         <div>
           <h2>Borrowing history</h2>
-          <p className="muted">Showing the most recent 200 records plus any active loans.</p>
+          <p className="muted">Search by plate, borrower, driver, or purpose. Export follows the current filters.</p>
         </div>
-        <Link className="primaryButton" href="/history/export">
+        <Link className="primaryButton" href={exportHref}>
           Export CSV
         </Link>
       </section>
 
+      <section className="panel">
+        <form action="/history" className="filterForm">
+          <label className="fieldLabel">
+            Search
+            <input defaultValue={query} name="q" placeholder="Plate, user, driver, purpose..." />
+          </label>
+          <div className="formGrid">
+            <label className="fieldLabel">
+              From
+              <input defaultValue={from} name="from" type="date" />
+            </label>
+            <label className="fieldLabel">
+              To
+              <input defaultValue={to} name="to" type="date" />
+            </label>
+          </div>
+          <label className="fieldLabel">
+            Status
+            <select defaultValue={status} name="status">
+              <option value="">All records</option>
+              <option value="active">Active</option>
+              <option value="returned">Returned</option>
+              <option value="long-term">Long term</option>
+              <option value="overdue">Overdue active</option>
+              <option value="admin-returned">Admin returned</option>
+            </select>
+          </label>
+          <div className="actionsRow">
+            <button className="primaryButton" type="submit">
+              Apply filters
+            </button>
+            <Link className="ghostButton" href="/history">
+              Clear
+            </Link>
+          </div>
+        </form>
+      </section>
+
       {loadError ? (
         <p className="message error">{loadError}</p>
-      ) : history.length === 0 ? (
-        <div className="emptyState">No borrowing history has been recorded yet.</div>
+      ) : filteredHistory.length === 0 ? (
+        <div className="emptyState">No borrowing history matches the current filters.</div>
       ) : (
         <>
-          <HistoryBorrowCalendar loans={history} />
+          <HistoryBorrowCalendar loans={filteredHistory} />
 
           <section className="historyTableSection">
             <div className="sectionHeader">
@@ -105,7 +224,7 @@ export default async function HistoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {history.map((loan) => (
+                    {filteredHistory.map((loan) => (
                       <tr key={loan.id}>
                         <td>
                           {loan.vehicle?.plate_number} <span className="muted">{loan.vehicle?.model}</span>

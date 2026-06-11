@@ -557,7 +557,7 @@ export async function sendKeyCollectionReminderEmail({
       `End time: ${formatDateTime(booking.endsAt)}`,
       `Comments: ${booking.comments || "-"}`,
       "",
-      `When you collect the key, open ${APP_NAME} and select Key collected on your booking. This will convert the booking into an active borrow.`,
+      `When you collect the key, open ${APP_NAME} and select Start borrow on your reservation. This will convert the reservation into an active borrow.`,
       "",
       "Booking alone is not enough once the key has been collected.",
     ].join("\n"),
@@ -611,7 +611,7 @@ export async function sendBookingBorrowReminderEmail({
       "",
       "if you collect the key and already using the car, make sure to click borrow the vehicle.",
       "",
-      `Open ${APP_NAME}, go to Book, and select Key collected / Borrow vehicle on your booking.`,
+      `Open ${APP_NAME}, go to Reserve, and select Start borrow on your reservation.`,
     ].join("\n"),
     html: [
       "<p>Your vehicle booking is currently active, but it has not been converted into an active borrow yet.</p>",
@@ -622,7 +622,7 @@ export async function sendBookingBorrowReminderEmail({
       `<li><strong>Comments:</strong> ${booking.comments || "-"}</li>`,
       "</ul>",
       '<p>if you collect the key and already using the car, <strong style="font-size: 18px;">make sure to click borrow the vehicle.</strong></p>',
-      `<p>Open ${APP_NAME}, go to Book, and select Key collected / Borrow vehicle on your booking.</p>`,
+      `<p>Open ${APP_NAME}, go to Reserve, and select Start borrow on your reservation.</p>`,
     ].join(""),
   });
 

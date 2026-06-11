@@ -6,7 +6,19 @@ function escapeCsv(value: string | number | null) {
   return `"${cell.replaceAll('"', '""')}"`;
 }
 
-export async function GET() {
+function getFilterParams(request: Request) {
+  const url = new URL(request.url);
+
+  return {
+    query: (url.searchParams.get("q") ?? "").trim().toLowerCase(),
+    from: (url.searchParams.get("from") ?? "").trim(),
+    to: (url.searchParams.get("to") ?? "").trim(),
+    status: (url.searchParams.get("status") ?? "").trim(),
+  };
+}
+
+export async function GET(request: Request) {
+  const { query, from, to, status } = getFilterParams(request);
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,9 +53,67 @@ export async function GET() {
     "return_notes",
   ];
 
+  const fromTime = from ? new Date(`${from}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
+  const toTime = to ? new Date(`${to}T23:59:59`).getTime() : Number.POSITIVE_INFINITY;
+  const now = Date.now();
+  const filteredRows = (data ?? []).filter((row) => {
+    const vehicle = row.vehicle as { plate_number?: string | null; model?: string | null } | null;
+    const borrowedAt = (row as { borrowed_at?: string | null }).borrowed_at ?? "";
+    const returnedAt = (row as { returned_at?: string | null }).returned_at ?? null;
+    const expectedReturnAt = (row as { expected_return_at?: string | null }).expected_return_at ?? null;
+    const isLongTerm = Boolean((row as { is_long_term?: boolean }).is_long_term);
+    const returnNotes = (row as { return_notes?: string | null }).return_notes ?? "";
+    const borrowedTime = new Date(borrowedAt).getTime();
+    const isOverdue = !returnedAt && !isLongTerm && expectedReturnAt && new Date(expectedReturnAt).getTime() < now;
+    const isAdminReturned = returnNotes.toLowerCase().includes("admin return by");
+    const searchable = [
+      vehicle?.plate_number,
+      vehicle?.model,
+      (row as { borrower_email?: string | null }).borrower_email,
+      (row as { driver_name?: string | null }).driver_name,
+      (row as { purpose?: string | null }).purpose,
+      (row as { borrow_notes?: string | null }).borrow_notes,
+      returnNotes,
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    if (query && !searchable.includes(query)) {
+      return false;
+    }
+
+    if (Number.isFinite(fromTime) && borrowedTime < fromTime) {
+      return false;
+    }
+
+    if (Number.isFinite(toTime) && borrowedTime > toTime) {
+      return false;
+    }
+
+    if (status === "active" && returnedAt) {
+      return false;
+    }
+
+    if (status === "returned" && !returnedAt) {
+      return false;
+    }
+
+    if (status === "long-term" && !isLongTerm) {
+      return false;
+    }
+
+    if (status === "overdue" && !isOverdue) {
+      return false;
+    }
+
+    if (status === "admin-returned" && !isAdminReturned) {
+      return false;
+    }
+
+    return true;
+  });
+
   const lines = [
     header.join(","),
-    ...(data ?? []).map((row) =>
+    ...filteredRows.map((row) =>
       [
         escapeCsv((row.vehicle as { plate_number?: string } | null)?.plate_number ?? ""),
         escapeCsv((row.vehicle as { model?: string } | null)?.model ?? ""),
