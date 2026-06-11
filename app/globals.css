@@ -1069,11 +1069,16 @@ textarea {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: var(--background);
+  overflow: auto;
+  background:
+    radial-gradient(circle at top left, rgba(219, 198, 153, 0.55), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(31, 107, 82, 0.18), transparent 30%),
+    var(--bg);
 }
 
 .navigationLoadingOverlay .loadingScreen {
   min-height: 100vh;
+  background: transparent;
 }
 
 .emptyState {
