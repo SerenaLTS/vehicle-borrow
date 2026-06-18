@@ -29,17 +29,19 @@ export function formatDateTime(value: string | null) {
 export function getVehicleDisplayStatus({
   storedStatus,
   hasActiveLoan,
+  hasCurrentHolder,
   hasActiveBooking,
 }: {
   storedStatus: "available" | "booked" | "borrowed" | "maintenance" | "retired";
   hasActiveLoan: boolean;
+  hasCurrentHolder?: boolean;
   hasActiveBooking: boolean;
 }) {
   if (storedStatus === "maintenance" || storedStatus === "retired") {
     return storedStatus;
   }
 
-  if (hasActiveLoan) {
+  if (storedStatus === "borrowed" || hasActiveLoan || hasCurrentHolder) {
     return "borrowed" as const;
   }
 

@@ -125,6 +125,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const displayStatus = getVehicleDisplayStatus({
     storedStatus: record.status,
     hasActiveLoan: Boolean(currentLoan),
+    hasCurrentHolder: Boolean(record.current_holder_user_id),
     hasActiveBooking: Boolean(currentBooking),
   });
   const message = typeof pageParams.message === "string" ? pageParams.message : null;

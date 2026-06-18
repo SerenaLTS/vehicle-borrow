@@ -265,6 +265,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           const displayStatus = getVehicleDisplayStatus({
             storedStatus: vehicle.status,
             hasActiveLoan: Boolean(activeLoan),
+            hasCurrentHolder: Boolean(vehicle.current_holder_user_id),
             hasActiveBooking: isBookingActive,
           });
 

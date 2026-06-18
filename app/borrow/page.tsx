@@ -61,6 +61,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     const displayStatus = getVehicleDisplayStatus({
       storedStatus: vehicle.status,
       hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
+      hasCurrentHolder: Boolean(vehicle.current_holder_user_id),
       hasActiveBooking: isBookingActive,
     });
 
@@ -75,6 +76,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
     const displayStatus = getVehicleDisplayStatus({
       storedStatus: vehicle.status,
       hasActiveLoan: activeLoanVehicleIds.has(vehicle.id),
+      hasCurrentHolder: Boolean(vehicle.current_holder_user_id),
       hasActiveBooking: isBookingActive,
     });
 
