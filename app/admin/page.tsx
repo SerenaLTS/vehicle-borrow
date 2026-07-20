@@ -18,6 +18,22 @@ type AdminPageProps = {
 
 type AdminTab = "fleet" | "bookings" | "loans" | "users";
 
+type BookingCancellation = {
+  id: string;
+  booking_id: string;
+  vehicle_plate_number: string | null;
+  vehicle_model: string | null;
+  booked_by_email: string;
+  starts_at: string;
+  ends_at: string | null;
+  is_long_term: boolean;
+  booking_comments: string | null;
+  cancelled_by_email: string;
+  cancelled_by_admin: boolean;
+  cancellation_note: string | null;
+  cancelled_at: string;
+};
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -42,6 +58,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: roles, error: rolesError },
     { data: vehicles, error: vehiclesError },
     { data: bookingData, error: bookingError },
+    { data: cancellationData, error: cancellationError },
   ] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
     supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
@@ -49,6 +66,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .order("starts_at", { ascending: true }),
+    supabase
+      .from("booking_cancellations")
+      .select("id, booking_id, vehicle_plate_number, vehicle_model, booked_by_email, starts_at, ends_at, is_long_term, booking_comments, cancelled_by_email, cancelled_by_admin, cancellation_note, cancelled_at")
+      .order("cancelled_at", { ascending: false })
+      .limit(100),
   ]);
 
   if (rolesError) {
@@ -61,6 +83,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   if (bookingError) {
     redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
+  }
+
+  if (cancellationError) {
+    redirect(`/admin?error=${encodeURIComponent(cancellationError.message)}`);
   }
 
   const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
@@ -86,6 +112,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
     .map(normalizeVehicleBooking)
     .filter((booking) => booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() >= Date.now() : false));
+  const bookingCancellations = (cancellationData ?? []) as BookingCancellation[];
   const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
 
   for (const booking of activeOrUpcomingBookings) {
@@ -511,6 +538,44 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </article>
                 );
               })}
+            </div>
+          )}
+
+          <section className="sectionHeader">
+            <div>
+              <h2>Cancellation audit</h2>
+              <p className="muted">The 100 most recent reservation cancellations. Audit records are retained after the original booking is deleted.</p>
+            </div>
+          </section>
+
+          {bookingCancellations.length === 0 ? (
+            <div className="emptyState">No reservation cancellations have been recorded yet.</div>
+          ) : (
+            <div className="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Vehicle</th>
+                    <th>Reserved for</th>
+                    <th>Reserved time</th>
+                    <th>Cancelled by</th>
+                    <th>Cancelled at</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookingCancellations.map((cancellation) => (
+                    <tr key={cancellation.id}>
+                      <td>{[cancellation.vehicle_plate_number, cancellation.vehicle_model].filter(Boolean).join(" • ") || "Deleted vehicle"}</td>
+                      <td>{cancellation.booked_by_email}</td>
+                      <td>{formatDateTime(cancellation.starts_at)} to {cancellation.is_long_term ? "Long term" : formatDateTime(cancellation.ends_at)}</td>
+                      <td>{cancellation.cancelled_by_email}{cancellation.cancelled_by_admin ? " (Admin)" : ""}</td>
+                      <td>{formatDateTime(cancellation.cancelled_at)}</td>
+                      <td>{cancellation.cancellation_note || cancellation.booking_comments || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </>

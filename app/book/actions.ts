@@ -258,16 +258,15 @@ export async function cancelOwnBooking(formData: FormData) {
   }
 
   if (!booking) {
-    redirect("/book?error=You can only cancel your own future reservations.");
+    redirect("/book?error=You can only cancel your own reservations.");
   }
 
   const vehicleId = booking.vehicle_id;
 
-  const { error: deleteError } = await supabase
-    .from("vehicle_bookings")
-    .delete()
-    .eq("id", bookingId)
-    .eq("booked_by_user_id", user.id);
+  const { error: deleteError } = await supabase.rpc("cancel_vehicle_booking", {
+    p_booking_id: bookingId,
+    p_cancellation_note: "Cancelled by booking owner.",
+  });
 
   if (deleteError) {
     redirect(`/book?error=${encodeURIComponent(deleteError.message)}`);

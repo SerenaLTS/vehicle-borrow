@@ -576,7 +576,10 @@ export async function deleteAdminBooking(formData: FormData) {
     .filter(Boolean)
     .join(" ");
 
-  const { error } = await supabase.from("vehicle_bookings").delete().eq("id", bookingId);
+  const { error } = await supabase.rpc("cancel_vehicle_booking", {
+    p_booking_id: bookingId,
+    p_cancellation_note: adminCancellationComment,
+  });
 
   if (error) {
     redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
