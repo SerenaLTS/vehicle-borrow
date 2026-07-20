@@ -7,11 +7,12 @@ import { APP_NAME } from "@/lib/app-config";
 export function NavigationLoadingOverlay() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const routeKey = `${pathname}?${searchParams.toString()}`;
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setIsLoading(false);
-  }, [pathname, searchParams]);
+  }, [routeKey]);
 
   useEffect(() => {
     function showLoading() {
@@ -23,10 +24,12 @@ export function NavigationLoadingOverlay() {
     }
 
     window.addEventListener("app:navigation-start", showLoading);
+    window.addEventListener("app:navigation-end", hideLoading);
     window.addEventListener("pageshow", hideLoading);
 
     return () => {
       window.removeEventListener("app:navigation-start", showLoading);
+      window.removeEventListener("app:navigation-end", hideLoading);
       window.removeEventListener("pageshow", hideLoading);
     };
   }, []);

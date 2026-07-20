@@ -559,6 +559,8 @@ export async function sendKeyCollectionReminderEmail({
       "",
       `When you collect the key, open ${APP_NAME} and select Start borrow on your reservation. This will convert the reservation into an active borrow.`,
       "",
+      `If you no longer need the vehicle, open ${APP_NAME} and cancel the reservation so it becomes available to others.`,
+      "",
       "Booking alone is not enough once the key has been collected.",
     ].join("\n"),
   });
@@ -609,9 +611,9 @@ export async function sendBookingBorrowReminderEmail({
       `End time: ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}`,
       `Comments: ${booking.comments || "-"}`,
       "",
-      "if you collect the key and already using the car, make sure to click borrow the vehicle.",
+      "Have you collected the key? If yes, select Start borrow to convert this booking into an active borrow.",
       "",
-      `Open ${APP_NAME}, go to Reserve, and select Start borrow on your reservation.`,
+      `If you no longer need the vehicle, open ${APP_NAME} and cancel this booking so the vehicle becomes available to others.`,
     ].join("\n"),
     html: [
       "<p>Your vehicle booking is currently active, but it has not been converted into an active borrow yet.</p>",
@@ -621,8 +623,8 @@ export async function sendBookingBorrowReminderEmail({
       `<li><strong>End time:</strong> ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}</li>`,
       `<li><strong>Comments:</strong> ${booking.comments || "-"}</li>`,
       "</ul>",
-      '<p>if you collect the key and already using the car, <strong style="font-size: 18px;">make sure to click borrow the vehicle.</strong></p>',
-      `<p>Open ${APP_NAME}, go to Reserve, and select Start borrow on your reservation.</p>`,
+      `<p>Have you collected the key? If yes, open ${APP_NAME} and <strong style="font-size: 18px;">select Start borrow</strong> to convert this booking into an active borrow.</p>`,
+      `<p>If you no longer need the vehicle, open ${APP_NAME} and <strong>cancel this booking</strong> so the vehicle becomes available to others.</p>`,
     ].join(""),
   });
 

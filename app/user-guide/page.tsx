@@ -136,7 +136,7 @@ export default function UserGuidePage() {
         <section className="guideSection" id="manage-your-bookings">
           <h2>Manage your reservations</h2>
           <p>Go to the dashboard -&gt; Your reservations.</p>
-          <p>You can edit details, change time, or cancel reservations.</p>
+          <p>You can edit details or change time before a reservation starts. You can cancel it at any time while it is still a reservation, including after its start time. Once you select Start borrow, manage it as an active borrow instead.</p>
         </section>
 
         <section className="guideSection" id="booking-rules">

@@ -569,6 +569,13 @@ export async function deleteAdminBooking(formData: FormData) {
     redirect(`/admin/vehicles/${vehicleId}?error=Booking not found.`);
   }
 
+  const adminCancellationComment = [
+    `Admin cancelled by ${user.email ?? "admin"}.`,
+    booking.comments ? `Original comments: ${booking.comments}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const { error } = await supabase.from("vehicle_bookings").delete().eq("id", bookingId);
 
   if (error) {
@@ -587,7 +594,7 @@ export async function deleteAdminBooking(formData: FormData) {
         startsAt: booking.starts_at,
         endsAt: booking.ends_at,
         isLongTerm: booking.is_long_term,
-        comments: booking.comments,
+        comments: adminCancellationComment,
       },
       notifyAdmins: true,
     });

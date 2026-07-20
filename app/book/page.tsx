@@ -146,7 +146,13 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                 </ConfirmForm>
 
                 {hasStarted ? (
-                  <p className="muted">This reservation has already started, so only Start borrow is available here.</p>
+                  <>
+                    <p className="muted">This reservation has started. Start the borrow if you collected the key, or cancel it if you no longer need the vehicle.</p>
+                    <ConfirmForm action={cancelOwnBooking} confirmMessage="This booking has already started. Confirm cancelling it because you no longer need the vehicle?">
+                      <input name="bookingId" type="hidden" value={booking.id} />
+                      <SubmitButton className="ghostButton" idleLabel="Cancel reservation" pendingLabel="Cancelling..." />
+                    </ConfirmForm>
+                  </>
                 ) : (
                   <>
                     <ConfirmForm action={updateOwnBooking} confirmMessage="Confirm updating this reservation?">

@@ -52,6 +52,10 @@ function isAuthorized(request: Request) {
   return request.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
+function hasRequiredReminderConfig() {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function getSydneyParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIME_ZONE,
@@ -124,6 +128,10 @@ async function getActiveLoanForBookingConflict(vehicleId: string) {
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!hasRequiredReminderConfig()) {
+    return NextResponse.json({ error: "Missing SUPABASE_SERVICE_ROLE_KEY environment variable." }, { status: 503 });
   }
 
   const supabase = createAdminClient();

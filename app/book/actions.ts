@@ -108,7 +108,6 @@ export async function createBooking(formData: FormData) {
 
 export async function updateOwnBooking(formData: FormData) {
   const bookingId = String(formData.get("bookingId") ?? "").trim();
-  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const startsAtValue = String(formData.get("startsAt") ?? "").trim();
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const isLongTerm = formData.get("isLongTerm") === "on";
@@ -116,7 +115,7 @@ export async function updateOwnBooking(formData: FormData) {
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
   const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
-  if (!bookingId || !vehicleId) {
+  if (!bookingId) {
     redirect("/book?error=Booking not found.");
   }
 
@@ -143,6 +142,8 @@ export async function updateOwnBooking(formData: FormData) {
   if (!booking) {
     redirect("/book?error=You can only update your own future reservations.");
   }
+
+  const vehicleId = booking.vehicle_id;
 
   if (new Date(booking.starts_at).getTime() <= Date.now()) {
     redirect("/book?error=This reservation has already started and can no longer be changed here.");
@@ -231,9 +232,8 @@ export async function updateOwnBooking(formData: FormData) {
 
 export async function cancelOwnBooking(formData: FormData) {
   const bookingId = String(formData.get("bookingId") ?? "").trim();
-  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
 
-  if (!bookingId || !vehicleId) {
+  if (!bookingId) {
     redirect("/book?error=Booking not found.");
   }
 
@@ -261,9 +261,7 @@ export async function cancelOwnBooking(formData: FormData) {
     redirect("/book?error=You can only cancel your own future reservations.");
   }
 
-  if (new Date(booking.starts_at).getTime() <= Date.now()) {
-    redirect("/book?error=This reservation has already started and can no longer be cancelled here.");
-  }
+  const vehicleId = booking.vehicle_id;
 
   const { error: deleteError } = await supabase
     .from("vehicle_bookings")

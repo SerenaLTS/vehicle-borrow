@@ -157,11 +157,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     {formatDateTime(booking.starts_at)} to {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}
                   </span>
                 </div>
-                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
-                  <input name="bookingId" type="hidden" value={booking.id} />
-                  <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
-                  <SubmitButton className="primaryButton urgentButton" idleLabel="Start borrow" pendingLabel="Starting..." />
-                </ConfirmForm>
+                <div className="actionsRow">
+                  <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
+                    <input name="bookingId" type="hidden" value={booking.id} />
+                    <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
+                    <SubmitButton className="primaryButton urgentButton" idleLabel="Start borrow" pendingLabel="Starting..." />
+                  </ConfirmForm>
+                  <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm you no longer need this vehicle and want to cancel the active booking?">
+                    <input name="bookingId" type="hidden" value={booking.id} />
+                    <SubmitButton className="ghostButton" idleLabel="Cancel booking" pendingLabel="Cancelling..." />
+                  </ConfirmForm>
+                </div>
               </article>
             ))}
           </div>
@@ -264,7 +270,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </div>
                 <div className="actionsRow">
                   <Link className="secondaryButton" href={`/book#booking-${booking.id}`}>
-                    {hasStarted ? "View booking" : "Edit booking"}
+                    Manage booking
                   </Link>
                   {hasStarted ? (
                     <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
@@ -274,13 +280,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </ConfirmForm>
                   ) : null}
                 </div>
-                {!hasStarted ? (
-                  <ConfirmForm action={cancelOwnBooking} confirmMessage="Confirm cancelling this reservation?">
+                <ConfirmForm
+                  action={cancelOwnBooking}
+                  confirmMessage={hasStarted
+                    ? "This booking has already started. Confirm cancelling it because you no longer need the vehicle?"
+                    : "Confirm cancelling this reservation?"}
+                >
                     <input name="bookingId" type="hidden" value={booking.id} />
-                    <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
                     <SubmitButton className="ghostButton" idleLabel="Cancel reservation" pendingLabel="Cancelling..." />
-                  </ConfirmForm>
-                ) : null}
+                </ConfirmForm>
               </article>
             );
           })}
