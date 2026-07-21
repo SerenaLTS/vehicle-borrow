@@ -43,7 +43,8 @@ revoke insert, update, delete on public.booking_cancellations from authenticated
 
 create or replace function public.cancel_vehicle_booking(
   p_booking_id uuid,
-  p_cancellation_note text default null
+  p_cancellation_note text default null,
+  p_cancelled_as_admin boolean default false
 )
 returns public.booking_cancellations
 language plpgsql
@@ -53,7 +54,7 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_email text := coalesce(auth.jwt() ->> 'email', '');
-  v_is_admin boolean := public.is_admin();
+  v_has_admin_role boolean := public.is_admin();
   v_booking public.vehicle_bookings;
   v_vehicle public.vehicles;
   v_audit public.booking_cancellations;
@@ -72,7 +73,11 @@ begin
     raise exception 'Booking not found.';
   end if;
 
-  if v_booking.booked_by_user_id <> v_user_id and not v_is_admin then
+  if p_cancelled_as_admin and not v_has_admin_role then
+    raise exception 'Admin access required.';
+  end if;
+
+  if not p_cancelled_as_admin and v_booking.booked_by_user_id <> v_user_id then
     raise exception 'You can only cancel your own booking.';
   end if;
 
@@ -110,7 +115,7 @@ begin
     v_booking.comments,
     v_user_id,
     v_email,
-    v_is_admin,
+    p_cancelled_as_admin,
     nullif(trim(p_cancellation_note), '')
   )
   returning * into v_audit;
@@ -122,5 +127,5 @@ begin
 end;
 $$;
 
-revoke all on function public.cancel_vehicle_booking(uuid, text) from public;
-grant execute on function public.cancel_vehicle_booking(uuid, text) to authenticated;
+revoke all on function public.cancel_vehicle_booking(uuid, text, boolean) from public;
+grant execute on function public.cancel_vehicle_booking(uuid, text, boolean) to authenticated;

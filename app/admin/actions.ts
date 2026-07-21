@@ -527,6 +527,7 @@ export async function deleteAdminBooking(formData: FormData) {
   const { error } = await supabase.rpc("cancel_vehicle_booking", {
     p_booking_id: bookingId,
     p_cancellation_note: adminCancellationComment,
+    p_cancelled_as_admin: true,
   });
 
   if (error) {

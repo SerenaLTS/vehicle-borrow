@@ -266,6 +266,7 @@ export async function cancelOwnBooking(formData: FormData) {
   const { error: deleteError } = await supabase.rpc("cancel_vehicle_booking", {
     p_booking_id: bookingId,
     p_cancellation_note: "Cancelled by booking owner.",
+    p_cancelled_as_admin: false,
   });
 
   if (deleteError) {
