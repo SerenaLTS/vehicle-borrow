@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import { APP_NAME } from "@/lib/app-config";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
-import { formatDateTime } from "@/lib/utils";
+import { escapeHtml, formatDateTime } from "@/lib/utils";
 
 type SupabaseNotificationClient = {
   from: (table: "vehicles" | "user_roles" | "vehicle_bookings" | "vehicle_loans") => {
@@ -583,6 +583,8 @@ export async function sendBookingBorrowReminderEmail({
 
   const vehicle = await getVehicleForNotification(supabase, booking.vehicleId);
   const vehicleLabel = buildVehicleLabel(vehicle);
+  const safeVehicleLabel = escapeHtml(vehicleLabel);
+  const safeComments = escapeHtml(booking.comments || "-");
   const recipient = booking.bookedByEmail.trim().toLowerCase();
 
   if (!recipient) {
@@ -618,10 +620,10 @@ export async function sendBookingBorrowReminderEmail({
     html: [
       "<p>Your vehicle booking is currently active, but it has not been converted into an active borrow yet.</p>",
       "<ul>",
-      `<li><strong>Vehicle:</strong> ${vehicleLabel}</li>`,
+      `<li><strong>Vehicle:</strong> ${safeVehicleLabel}</li>`,
       `<li><strong>Start time:</strong> ${formatDateTime(booking.startsAt)}</li>`,
       `<li><strong>End time:</strong> ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}</li>`,
-      `<li><strong>Comments:</strong> ${booking.comments || "-"}</li>`,
+      `<li><strong>Comments:</strong> ${safeComments}</li>`,
       "</ul>",
       `<p>Have you collected the key? If yes, open ${APP_NAME} and <strong style="font-size: 18px;">select Start borrow</strong> to convert this booking into an active borrow.</p>`,
       `<p>If you no longer need the vehicle, open ${APP_NAME} and <strong>cancel this booking</strong> so the vehicle becomes available to others.</p>`,
@@ -656,6 +658,10 @@ export async function sendBookingHandoverConflictReminderEmail({
 
   const vehicle = await getVehicleForNotification(supabase, booking.vehicleId);
   const vehicleLabel = buildVehicleLabel(vehicle);
+  const safeVehicleLabel = escapeHtml(vehicleLabel);
+  const safeBookingRecipient = escapeHtml(bookingRecipient || "-");
+  const safeBorrowerRecipient = escapeHtml(borrowerRecipient || "-");
+  const safeDriverName = escapeHtml(activeLoan.driverName || "-");
   const transporter = nodemailer.createTransport({
     host: mailConfig.host,
     port: mailConfig.port,
@@ -690,12 +696,12 @@ export async function sendBookingHandoverConflictReminderEmail({
     html: [
       "<p>A vehicle booking has started, but the vehicle is still recorded as borrowed.</p>",
       "<ul>",
-      `<li><strong>Vehicle:</strong> ${vehicleLabel}</li>`,
-      `<li><strong>Booked for:</strong> ${bookingRecipient || "-"}</li>`,
+      `<li><strong>Vehicle:</strong> ${safeVehicleLabel}</li>`,
+      `<li><strong>Booked for:</strong> ${safeBookingRecipient}</li>`,
       `<li><strong>Booking start:</strong> ${formatDateTime(booking.startsAt)}</li>`,
       `<li><strong>Booking end:</strong> ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}</li>`,
-      `<li><strong>Current borrower:</strong> ${borrowerRecipient || "-"}</li>`,
-      `<li><strong>Current driver:</strong> ${activeLoan.driverName || "-"}</li>`,
+      `<li><strong>Current borrower:</strong> ${safeBorrowerRecipient}</li>`,
+      `<li><strong>Current driver:</strong> ${safeDriverName}</li>`,
       `<li><strong>Expected return:</strong> ${activeLoan.isLongTerm ? "Long term" : formatDateTime(activeLoan.expectedReturnAt)}</li>`,
       "</ul>",
       "<p>Please coordinate the handover directly. The booking can be converted into an active borrow after the previous borrow is returned.</p>",

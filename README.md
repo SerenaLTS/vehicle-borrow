@@ -152,4 +152,15 @@ New auth users are synced into `user_roles` automatically.
 npm run dev
 npm run build
 npm run typecheck
+npm test
 ```
+
+## Production migrations
+
+For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
+
+```text
+supabase/2026-07-21_admin_action_audit_and_atomic_flows.sql
+```
+
+It adds atomic admin booking/return functions and the `admin_action_audits` table.

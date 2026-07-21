@@ -34,6 +34,16 @@ type BookingCancellation = {
   cancelled_at: string;
 };
 
+type AdminActionAudit = {
+  id: string;
+  action_type: "booking_started_as_borrow" | "vehicle_returned";
+  admin_email: string;
+  target_email: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+  vehicle: { plate_number: string; model: string } | Array<{ plate_number: string; model: string }> | null;
+};
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -59,6 +69,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: vehicles, error: vehiclesError },
     { data: bookingData, error: bookingError },
     { data: cancellationData, error: cancellationError },
+    { data: adminAuditData, error: adminAuditError },
   ] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
     supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
@@ -70,6 +81,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .from("booking_cancellations")
       .select("id, booking_id, vehicle_plate_number, vehicle_model, booked_by_email, starts_at, ends_at, is_long_term, booking_comments, cancelled_by_email, cancelled_by_admin, cancellation_note, cancelled_at")
       .order("cancelled_at", { ascending: false })
+      .limit(500),
+    supabase
+      .from("admin_action_audits")
+      .select("id, action_type, admin_email, target_email, details, created_at, vehicle:vehicles!admin_action_audits_vehicle_id_fkey(plate_number, model)")
+      .order("created_at", { ascending: false })
       .limit(100),
   ]);
 
@@ -87,6 +103,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   if (cancellationError) {
     redirect(`/admin?error=${encodeURIComponent(cancellationError.message)}`);
+  }
+
+  if (adminAuditError) {
+    redirect(`/admin?error=${encodeURIComponent(adminAuditError.message)}`);
   }
 
   const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
@@ -112,7 +132,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
     .map(normalizeVehicleBooking)
     .filter((booking) => booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() >= Date.now() : false));
-  const bookingCancellations = (cancellationData ?? []) as BookingCancellation[];
+  const cancellationQuery = typeof params.cancelQ === "string" ? params.cancelQ.trim().toLowerCase() : "";
+  const cancellationFrom = typeof params.cancelFrom === "string" ? params.cancelFrom : "";
+  const cancellationTo = typeof params.cancelTo === "string" ? params.cancelTo : "";
+  const cancellationFromTime = cancellationFrom ? new Date(`${cancellationFrom}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
+  const cancellationToTime = cancellationTo ? new Date(`${cancellationTo}T23:59:59`).getTime() : Number.POSITIVE_INFINITY;
+  const bookingCancellations = ((cancellationData ?? []) as BookingCancellation[]).filter((cancellation) => {
+    const searchable = [cancellation.vehicle_plate_number, cancellation.vehicle_model, cancellation.booked_by_email, cancellation.cancelled_by_email, cancellation.cancellation_note, cancellation.booking_comments]
+      .filter(Boolean).join(" ").toLowerCase();
+    const cancelledTime = new Date(cancellation.cancelled_at).getTime();
+    return (!cancellationQuery || searchable.includes(cancellationQuery)) && cancelledTime >= cancellationFromTime && cancelledTime <= cancellationToTime;
+  });
+  const adminActionAudits = (adminAuditData ?? []) as AdminActionAudit[];
+  const cancellationExportParams = new URLSearchParams();
+  if (cancellationQuery) cancellationExportParams.set("q", cancellationQuery);
+  if (cancellationFrom) cancellationExportParams.set("from", cancellationFrom);
+  if (cancellationTo) cancellationExportParams.set("to", cancellationTo);
+  const cancellationExportHref = `/admin/cancellations/export${cancellationExportParams.size ? `?${cancellationExportParams}` : ""}`;
   const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
 
   for (const booking of activeOrUpcomingBookings) {
@@ -544,9 +580,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <section className="sectionHeader">
             <div>
               <h2>Cancellation audit</h2>
-              <p className="muted">The 100 most recent reservation cancellations. Audit records are retained after the original booking is deleted.</p>
+              <p className="muted">Search recent reservation cancellations. Audit records are retained after the original booking is deleted.</p>
             </div>
           </section>
+
+          <form className="filterForm" method="get">
+            <input name="tab" type="hidden" value="bookings" />
+            <label className="fieldLabel">Search<input defaultValue={cancellationQuery} name="cancelQ" placeholder="Vehicle, user, admin or notes" /></label>
+            <label className="fieldLabel">Cancelled from<input defaultValue={cancellationFrom} name="cancelFrom" type="date" /></label>
+            <label className="fieldLabel">Cancelled to<input defaultValue={cancellationTo} name="cancelTo" type="date" /></label>
+            <div className="actionsRow">
+              <button className="secondaryButton" type="submit">Filter</button>
+              <LoadingLink className="ghostButton" href="/admin?tab=bookings">Clear</LoadingLink>
+              <a className="ghostButton" href={cancellationExportHref}>Export CSV</a>
+            </div>
+          </form>
 
           {bookingCancellations.length === 0 ? (
             <div className="emptyState">No reservation cancellations have been recorded yet.</div>
@@ -583,6 +631,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       {activeTab === "loans" ? (
         <>
+          <section className="sectionHeader">
+            <div><h2>Admin action audit</h2><p className="muted">Recent admin-started borrows and admin returns.</p></div>
+          </section>
+          {adminActionAudits.length === 0 ? <div className="emptyState">No admin loan actions recorded yet.</div> : (
+            <div className="tableWrap"><table><thead><tr><th>Action</th><th>Vehicle</th><th>Target user</th><th>Admin</th><th>Time</th></tr></thead><tbody>
+              {adminActionAudits.map((audit) => {
+                const vehicle = Array.isArray(audit.vehicle) ? audit.vehicle[0] : audit.vehicle;
+                return <tr key={audit.id}><td>{audit.action_type === "booking_started_as_borrow" ? "Started booking as borrow" : "Returned vehicle"}</td><td>{vehicle ? `${vehicle.plate_number} • ${vehicle.model}` : "Deleted vehicle"}</td><td>{audit.target_email || "-"}</td><td>{audit.admin_email}</td><td>{formatDateTime(audit.created_at)}</td></tr>;
+              })}
+            </tbody></table></div>
+          )}
           {overdueLoans.length > 0 ? (
             <section className="actionRequiredPanel">
               <div>

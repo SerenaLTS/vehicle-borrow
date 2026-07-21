@@ -14,6 +14,15 @@ export function isCompanyEmail(email: string, companyDomain: string) {
   return email.toLowerCase().endsWith(`@${companyDomain.toLowerCase()}`);
 }
 
+export function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 export function formatDateTime(value: string | null) {
   if (!value) {
     return "-";

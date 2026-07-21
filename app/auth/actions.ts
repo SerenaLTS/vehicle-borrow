@@ -73,3 +73,33 @@ export async function signOut() {
   revalidatePath("/", "layout");
   redirect("/");
 }
+
+export async function updatePassword(formData: FormData) {
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (password.length < 8) {
+    redirect("/account/password?error=Password must be at least 8 characters.");
+  }
+
+  if (password !== confirmPassword) {
+    redirect("/account/password?error=Passwords do not match.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    redirect(`/account/password?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect("/account/password?message=Password updated successfully.");
+}

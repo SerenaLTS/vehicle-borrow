@@ -230,67 +230,15 @@ export async function adminReturnVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const adminClient = createAdminClient();
+  const { error } = await supabase.rpc("admin_return_vehicle", {
+    p_loan_id: loanId,
+    p_vehicle_id: vehicleId,
+    p_end_odometer: endOdometer,
+    p_return_notes: returnNotes,
+  });
 
-  const { data: loanRecord, error: loanLoadError } = await adminClient
-    .from("vehicle_loans")
-    .select("id, vehicle_id, start_odometer, returned_at, return_notes")
-    .eq("id", loanId)
-    .eq("vehicle_id", vehicleId)
-    .maybeSingle();
-
-  if (loanLoadError) {
-    redirect(`/admin?error=${encodeURIComponent(loanLoadError.message)}`);
-  }
-
-  if (!loanRecord) {
-    redirect("/admin?error=Active loan record not found.");
-  }
-
-  if (loanRecord.returned_at) {
-    redirect("/admin?error=This vehicle has already been returned.");
-  }
-
-  if (endOdometer !== null && loanRecord.start_odometer !== null && endOdometer < Number(loanRecord.start_odometer)) {
-    redirect("/admin?error=Return odometer cannot be less than the borrow odometer.");
-  }
-
-  const adminReturnNote = `Admin return by ${user?.email ?? "admin"}: ${returnNotes}`;
-  const combinedReturnNotes = loanRecord.return_notes ? `${loanRecord.return_notes}\n${adminReturnNote}` : adminReturnNote;
-
-  const { data: returnedLoan, error: updateLoanError } = await adminClient
-    .from("vehicle_loans")
-    .update({
-      end_odometer: endOdometer,
-      return_notes: combinedReturnNotes,
-      returned_at: new Date().toISOString(),
-    })
-    .eq("id", loanId)
-    .is("returned_at", null)
-    .select("id")
-    .maybeSingle();
-
-  if (updateLoanError) {
-    redirect(`/admin?error=${encodeURIComponent(updateLoanError.message)}`);
-  }
-
-  if (!returnedLoan) {
-    redirect("/admin?error=This vehicle has already been returned.");
-  }
-
-  const { error: updateVehicleError } = await adminClient
-    .from("vehicles")
-    .update({
-      status: "available",
-      current_holder_user_id: null,
-    })
-    .eq("id", vehicleId);
-
-  if (updateVehicleError) {
-    redirect(`/admin?error=${encodeURIComponent(updateVehicleError.message)}`);
+  if (error) {
+    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
   }
 
   clearFleetSnapshotCache();
@@ -623,13 +571,7 @@ export async function adminStartReservationBorrow(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const adminClient = createAdminClient();
-  const now = new Date();
-
-  const { data: booking, error: bookingError } = await adminClient
+  const { data: booking, error: bookingError } = await supabase
     .from("vehicle_bookings")
     .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .eq("id", bookingId)
@@ -644,77 +586,13 @@ export async function adminStartReservationBorrow(formData: FormData) {
     redirect(`/admin/vehicles/${vehicleId}?error=Reservation not found.`);
   }
 
-  if (new Date(booking.starts_at).getTime() > now.getTime()) {
-    redirect(`/admin/vehicles/${vehicleId}?error=This reservation has not started yet.`);
-  }
+  const { error } = await supabase.rpc("admin_start_booking_borrow", {
+    p_booking_id: bookingId,
+    p_vehicle_id: vehicleId,
+  });
 
-  if (!booking.is_long_term && booking.ends_at && new Date(booking.ends_at).getTime() <= now.getTime()) {
-    redirect(`/admin/vehicles/${vehicleId}?error=This reservation has already ended.`);
-  }
-
-  const [{ data: vehicle, error: vehicleError }, { data: activeLoan, error: activeLoanError }] = await Promise.all([
-    adminClient.from("vehicles").select("id, status, current_holder_user_id").eq("id", vehicleId).maybeSingle(),
-    adminClient
-      .from("vehicle_loans")
-      .select("id, borrower_email")
-      .eq("vehicle_id", vehicleId)
-      .is("returned_at", null)
-      .maybeSingle(),
-  ]);
-
-  if (vehicleError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(vehicleError.message)}`);
-  }
-
-  if (!vehicle || vehicle.status === "retired" || vehicle.status === "maintenance") {
-    redirect(`/admin/vehicles/${vehicleId}?error=This vehicle cannot be borrowed in its current status.`);
-  }
-
-  if (activeLoanError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(activeLoanError.message)}`);
-  }
-
-  if (activeLoan) {
-    redirect(`/admin/vehicles/${vehicleId}?error=This vehicle is still borrowed by ${encodeURIComponent(String(activeLoan.borrower_email ?? "another user"))}. Return it first, then start the reservation borrow.`);
-  }
-
-  const adminNote = `Admin started borrow from reservation ${booking.id} by ${user?.email ?? "admin"}.`;
-  const { error: insertError } = await adminClient
-    .from("vehicle_loans")
-    .insert({
-      vehicle_id: booking.vehicle_id,
-      borrowed_by_user_id: booking.booked_by_user_id,
-      borrower_email: booking.booked_by_email,
-      driver_name: booking.booked_by_email,
-      purpose: booking.comments?.trim() || "Reservation converted by admin",
-      start_odometer: null,
-      borrow_notes: booking.comments ? `${adminNote}\n\nReservation comments: ${booking.comments}` : adminNote,
-      expected_return_at: booking.is_long_term ? null : booking.ends_at,
-      is_long_term: booking.is_long_term,
-    })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(insertError.message)}`);
-  }
-
-  const { error: deleteError } = await adminClient.from("vehicle_bookings").delete().eq("id", booking.id);
-
-  if (deleteError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(deleteError.message)}`);
-  }
-
-  const { error: vehicleUpdateError } = await adminClient
-    .from("vehicles")
-    .update({
-      status: "borrowed",
-      current_holder_user_id: booking.booked_by_user_id,
-    })
-    .eq("id", vehicleId);
-
-  if (vehicleUpdateError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(vehicleUpdateError.message)}`);
+  if (error) {
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
   }
 
   clearFleetSnapshotCache();
