@@ -104,6 +104,9 @@ type MailConfig = {
   user: string;
   pass: string;
   from: string;
+  connectionTimeout: number;
+  greetingTimeout: number;
+  socketTimeout: number;
 };
 
 const MAIL_FROM_NAME = "serena wang";
@@ -135,7 +138,34 @@ function getMailConfig(): MailConfig | null {
   const secureSetting = process.env.SMTP_SECURE?.trim().toLowerCase();
   const secure = secureSetting ? secureSetting === "true" : port === 465;
 
-  return { host, port, secure, user, pass, from: buildFromAddress(from) };
+  const parseTimeout = (value: string | undefined, fallback: number) => {
+    const parsed = Number(value?.trim());
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
+  return {
+    host,
+    port,
+    secure,
+    user,
+    pass,
+    from: buildFromAddress(from),
+    connectionTimeout: parseTimeout(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10_000),
+    greetingTimeout: parseTimeout(process.env.SMTP_GREETING_TIMEOUT_MS, 10_000),
+    socketTimeout: parseTimeout(process.env.SMTP_SOCKET_TIMEOUT_MS, 20_000),
+  };
+}
+
+function createMailTransporter(mailConfig: MailConfig) {
+  return nodemailer.createTransport({
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
+    auth: { user: mailConfig.user, pass: mailConfig.pass },
+    connectionTimeout: mailConfig.connectionTimeout,
+    greetingTimeout: mailConfig.greetingTimeout,
+    socketTimeout: mailConfig.socketTimeout,
+  });
 }
 
 function getSydneyDateTimeParts(date: Date) {
@@ -322,15 +352,7 @@ export async function sendLongTermBorrowAdminNotificationEmail({
   }
 
   const vehicleLabel = buildVehicleLabel(vehicle);
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,
@@ -376,15 +398,7 @@ export async function sendBorrowConfirmationEmail({
 
   const vehicle = await getVehicleForNotification(supabase, vehicleId);
   const vehicleLabel = buildVehicleLabel(vehicle);
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,
@@ -437,15 +451,7 @@ export async function sendBookingNotificationEmail({
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,
@@ -482,15 +488,7 @@ export async function sendBorrowOverdueReminderEmail({
 
   const vehicle = await getVehicleForNotification(supabase, loan.vehicleId);
   const vehicleLabel = buildVehicleLabel(vehicle);
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,
@@ -535,15 +533,7 @@ export async function sendKeyCollectionReminderEmail({
     return false;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,
@@ -591,15 +581,7 @@ export async function sendBookingBorrowReminderEmail({
     return false;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,
@@ -662,15 +644,7 @@ export async function sendBookingHandoverConflictReminderEmail({
   const safeBookingRecipient = escapeHtml(bookingRecipient || "-");
   const safeBorrowerRecipient = escapeHtml(borrowerRecipient || "-");
   const safeDriverName = escapeHtml(activeLoan.driverName || "-");
-  const transporter = nodemailer.createTransport({
-    host: mailConfig.host,
-    port: mailConfig.port,
-    secure: mailConfig.secure,
-    auth: {
-      user: mailConfig.user,
-      pass: mailConfig.pass,
-    },
-  });
+  const transporter = createMailTransporter(mailConfig);
 
   await transporter.sendMail({
     from: mailConfig.from,

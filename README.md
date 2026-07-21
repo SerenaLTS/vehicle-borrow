@@ -40,6 +40,10 @@ SMTP_SECURE=false
 SMTP_USER=your-email@yourcompany.com
 SMTP_PASS=your-app-password-or-smtp-password
 SMTP_FROM=vehicle-usage-management <your-email@yourcompany.com>
+# Optional; defaults shown below
+SMTP_CONNECTION_TIMEOUT_MS=10000
+SMTP_GREETING_TIMEOUT_MS=10000
+SMTP_SOCKET_TIMEOUT_MS=20000
 ```
 
 4. In Supabase SQL Editor, run [`supabase/schema.sql`](./supabase/schema.sql)

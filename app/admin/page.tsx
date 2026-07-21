@@ -17,6 +17,12 @@ type AdminPageProps = {
 };
 
 type AdminTab = "fleet" | "bookings" | "loans" | "users";
+const AUDIT_PAGE_SIZE = 25;
+
+function getPositivePage(value: string | string[] | undefined) {
+  const parsed = typeof value === "string" ? Number(value) : 1;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
 
 type BookingCancellation = {
   id: string;
@@ -144,11 +150,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     return (!cancellationQuery || searchable.includes(cancellationQuery)) && cancelledTime >= cancellationFromTime && cancelledTime <= cancellationToTime;
   });
   const adminActionAudits = (adminAuditData ?? []) as AdminActionAudit[];
+  const cancellationPageCount = Math.max(1, Math.ceil(bookingCancellations.length / AUDIT_PAGE_SIZE));
+  const cancellationPage = Math.min(getPositivePage(params.cancelPage), cancellationPageCount);
+  const paginatedBookingCancellations = bookingCancellations.slice((cancellationPage - 1) * AUDIT_PAGE_SIZE, cancellationPage * AUDIT_PAGE_SIZE);
+  const adminAuditPageCount = Math.max(1, Math.ceil(adminActionAudits.length / AUDIT_PAGE_SIZE));
+  const adminAuditPage = Math.min(getPositivePage(params.actionPage), adminAuditPageCount);
+  const paginatedAdminActionAudits = adminActionAudits.slice((adminAuditPage - 1) * AUDIT_PAGE_SIZE, adminAuditPage * AUDIT_PAGE_SIZE);
   const cancellationExportParams = new URLSearchParams();
   if (cancellationQuery) cancellationExportParams.set("q", cancellationQuery);
   if (cancellationFrom) cancellationExportParams.set("from", cancellationFrom);
   if (cancellationTo) cancellationExportParams.set("to", cancellationTo);
   const cancellationExportHref = `/admin/cancellations/export${cancellationExportParams.size ? `?${cancellationExportParams}` : ""}`;
+  const getCancellationPageHref = (page: number) => {
+    const pageParams = new URLSearchParams({ tab: "bookings" });
+    if (cancellationQuery) pageParams.set("cancelQ", cancellationQuery);
+    if (cancellationFrom) pageParams.set("cancelFrom", cancellationFrom);
+    if (cancellationTo) pageParams.set("cancelTo", cancellationTo);
+    pageParams.set("cancelPage", String(page));
+    return `/admin?${pageParams}`;
+  };
+  const getAdminAuditPageHref = (page: number) => `/admin?tab=loans&actionPage=${page}`;
   const nextBookingByVehicleId = new Map<string, (typeof activeOrUpcomingBookings)[number]>();
 
   for (const booking of activeOrUpcomingBookings) {
@@ -612,7 +633,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {bookingCancellations.map((cancellation) => (
+                  {paginatedBookingCancellations.map((cancellation) => (
                     <tr key={cancellation.id}>
                       <td>{[cancellation.vehicle_plate_number, cancellation.vehicle_model].filter(Boolean).join(" • ") || "Deleted vehicle"}</td>
                       <td>{cancellation.booked_by_email}</td>
@@ -626,17 +647,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </table>
             </div>
           )}
+          {bookingCancellations.length > AUDIT_PAGE_SIZE ? (
+            <div className="actionsRow">
+              {cancellationPage > 1 ? <LoadingLink className="ghostButton" href={getCancellationPageHref(cancellationPage - 1)}>Previous</LoadingLink> : null}
+              <span className="muted">Page {cancellationPage} of {cancellationPageCount} • {bookingCancellations.length} records</span>
+              {cancellationPage < cancellationPageCount ? <LoadingLink className="ghostButton" href={getCancellationPageHref(cancellationPage + 1)}>Next</LoadingLink> : null}
+            </div>
+          ) : null}
         </>
       ) : null}
 
       {activeTab === "loans" ? (
         <>
           <section className="sectionHeader">
-            <div><h2>Admin action audit</h2><p className="muted">Recent admin-started borrows and admin returns.</p></div>
+            <div><h2>Admin action audit</h2><p className="muted">Recent admin booking cancellations, admin-started borrows and admin returns.</p></div>
           </section>
           {adminActionAudits.length === 0 ? <div className="emptyState">No admin loan actions recorded yet.</div> : (
             <div className="tableWrap"><table><thead><tr><th>Action</th><th>Vehicle</th><th>Target user</th><th>Admin</th><th>Time</th></tr></thead><tbody>
-              {adminActionAudits.map((audit) => {
+              {paginatedAdminActionAudits.map((audit) => {
                 const vehicle = Array.isArray(audit.vehicle) ? audit.vehicle[0] : audit.vehicle;
                 const actionLabel = audit.action_type === "booking_started_as_borrow"
                   ? "Started booking as borrow"
@@ -647,6 +675,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               })}
             </tbody></table></div>
           )}
+          {adminActionAudits.length > AUDIT_PAGE_SIZE ? (
+            <div className="actionsRow">
+              {adminAuditPage > 1 ? <LoadingLink className="ghostButton" href={getAdminAuditPageHref(adminAuditPage - 1)}>Previous</LoadingLink> : null}
+              <span className="muted">Page {adminAuditPage} of {adminAuditPageCount} • {adminActionAudits.length} records</span>
+              {adminAuditPage < adminAuditPageCount ? <LoadingLink className="ghostButton" href={getAdminAuditPageHref(adminAuditPage + 1)}>Next</LoadingLink> : null}
+            </div>
+          ) : null}
           {overdueLoans.length > 0 ? (
             <section className="actionRequiredPanel">
               <div>
