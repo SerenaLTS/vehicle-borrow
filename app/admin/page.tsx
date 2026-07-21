@@ -36,7 +36,7 @@ type BookingCancellation = {
 
 type AdminActionAudit = {
   id: string;
-  action_type: "booking_started_as_borrow" | "vehicle_returned";
+  action_type: "booking_started_as_borrow" | "vehicle_returned" | "booking_cancelled";
   admin_email: string;
   target_email: string | null;
   details: Record<string, unknown>;
@@ -638,7 +638,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <div className="tableWrap"><table><thead><tr><th>Action</th><th>Vehicle</th><th>Target user</th><th>Admin</th><th>Time</th></tr></thead><tbody>
               {adminActionAudits.map((audit) => {
                 const vehicle = Array.isArray(audit.vehicle) ? audit.vehicle[0] : audit.vehicle;
-                return <tr key={audit.id}><td>{audit.action_type === "booking_started_as_borrow" ? "Started booking as borrow" : "Returned vehicle"}</td><td>{vehicle ? `${vehicle.plate_number} • ${vehicle.model}` : "Deleted vehicle"}</td><td>{audit.target_email || "-"}</td><td>{audit.admin_email}</td><td>{formatDateTime(audit.created_at)}</td></tr>;
+                const actionLabel = audit.action_type === "booking_started_as_borrow"
+                  ? "Started booking as borrow"
+                  : audit.action_type === "booking_cancelled"
+                    ? "Cancelled booking"
+                    : "Returned vehicle";
+                return <tr key={audit.id}><td>{actionLabel}</td><td>{vehicle ? `${vehicle.plate_number} • ${vehicle.model}` : "Deleted vehicle"}</td><td>{audit.target_email || "-"}</td><td>{audit.admin_email}</td><td>{formatDateTime(audit.created_at)}</td></tr>;
               })}
             </tbody></table></div>
           )}
