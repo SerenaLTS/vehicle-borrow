@@ -146,8 +146,6 @@ export async function extendVehicleLoan(formData: FormData) {
     redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
-  await supabase.from("vehicle_loans").update({ borrow_overdue_reminded_at: null }).eq("id", loanId);
-
   clearFleetSnapshotCache();
   clearVehicleCalendarCache(loanRecord?.vehicle_id ?? undefined);
   revalidatePath("/dashboard");

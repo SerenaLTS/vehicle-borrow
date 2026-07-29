@@ -164,7 +164,7 @@ npm test
 For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
 
 ```text
-supabase/2026-07-21_admin_action_audit_and_atomic_flows.sql
+supabase/2026-07-29_reset_overdue_reminder_on_extension.sql
 ```
 
-It adds atomic admin booking/return functions and the `admin_action_audits` table.
+It resets the overdue-reminder marker atomically when a borrower extends a loan.

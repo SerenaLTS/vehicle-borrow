@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
+import { escapeCsvCell } from "@/lib/csv";
 import { createClient } from "@/lib/supabase/server";
-
-function escapeCsv(value: string | number | null) {
-  const cell = value === null ? "" : String(value);
-  return `"${cell.replaceAll('"', '""')}"`;
-}
 
 function getFilterParams(request: Request) {
   const url = new URL(request.url);
@@ -115,19 +111,19 @@ export async function GET(request: Request) {
     header.join(","),
     ...filteredRows.map((row) =>
       [
-        escapeCsv((row.vehicle as { plate_number?: string } | null)?.plate_number ?? ""),
-        escapeCsv((row.vehicle as { model?: string } | null)?.model ?? ""),
-        escapeCsv((row as { borrower_email?: string | null }).borrower_email ?? ""),
-        escapeCsv((row as { driver_name?: string | null }).driver_name ?? ""),
-        escapeCsv((row as { purpose?: string | null }).purpose ?? ""),
-        escapeCsv((row as { returned_at?: string | null }).returned_at ? "returned" : "active"),
-        escapeCsv((row as { borrowed_at?: string | null }).borrowed_at ?? ""),
-        escapeCsv((row as { is_long_term?: boolean }).is_long_term ? "Long term" : ((row as { expected_return_at?: string | null }).expected_return_at ?? "")),
-        escapeCsv((row as { returned_at?: string | null }).returned_at ?? ""),
-        escapeCsv((row as { start_odometer?: number | null }).start_odometer ?? ""),
-        escapeCsv((row as { end_odometer?: number | null }).end_odometer ?? ""),
-        escapeCsv((row as { borrow_notes?: string | null }).borrow_notes ?? ""),
-        escapeCsv((row as { return_notes?: string | null }).return_notes ?? ""),
+        escapeCsvCell((row.vehicle as { plate_number?: string } | null)?.plate_number ?? ""),
+        escapeCsvCell((row.vehicle as { model?: string } | null)?.model ?? ""),
+        escapeCsvCell((row as { borrower_email?: string | null }).borrower_email ?? ""),
+        escapeCsvCell((row as { driver_name?: string | null }).driver_name ?? ""),
+        escapeCsvCell((row as { purpose?: string | null }).purpose ?? ""),
+        escapeCsvCell((row as { returned_at?: string | null }).returned_at ? "returned" : "active"),
+        escapeCsvCell((row as { borrowed_at?: string | null }).borrowed_at ?? ""),
+        escapeCsvCell((row as { is_long_term?: boolean }).is_long_term ? "Long term" : ((row as { expected_return_at?: string | null }).expected_return_at ?? "")),
+        escapeCsvCell((row as { returned_at?: string | null }).returned_at ?? ""),
+        escapeCsvCell((row as { start_odometer?: number | null }).start_odometer ?? ""),
+        escapeCsvCell((row as { end_odometer?: number | null }).end_odometer ?? ""),
+        escapeCsvCell((row as { borrow_notes?: string | null }).borrow_notes ?? ""),
+        escapeCsvCell((row as { return_notes?: string | null }).return_notes ?? ""),
       ].join(","),
     ),
   ];

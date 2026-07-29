@@ -612,6 +612,7 @@ begin
   update public.vehicle_loans
   set expected_return_at = p_expected_return_at,
       is_long_term = false,
+      borrow_overdue_reminded_at = null,
       borrow_notes = case
         when nullif(trim(coalesce(borrow_notes, '')), '') is null then v_extension_note
         else concat(borrow_notes, E'\n\n', v_extension_note)
@@ -641,6 +642,7 @@ begin
 end;
 $$;
 
+revoke all on function public.extend_vehicle_loan(uuid, timestamptz, text) from public;
 grant execute on function public.extend_vehicle_loan(uuid, timestamptz, text) to authenticated;
 
 select pg_notify('pgrst', 'reload schema');

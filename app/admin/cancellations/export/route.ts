@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
+import { escapeCsvCell } from "@/lib/csv";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
-
-function escapeCsv(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
-}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -34,7 +31,7 @@ export async function GET(request: Request) {
     return (!query || searchable.includes(query)) && time >= fromTime && time <= toTime;
   });
   const header = ["booking_id", "plate_number", "model", "booked_by", "starts_at", "ends_at", "long_term", "booking_comments", "cancelled_by", "cancelled_by_admin", "cancellation_note", "cancelled_at"];
-  const lines = [header.join(","), ...rows.map((row) => [row.booking_id, row.vehicle_plate_number, row.vehicle_model, row.booked_by_email, row.starts_at, row.ends_at, row.is_long_term, row.booking_comments, row.cancelled_by_email, row.cancelled_by_admin, row.cancellation_note, row.cancelled_at].map(escapeCsv).join(","))];
+  const lines = [header.join(","), ...rows.map((row) => [row.booking_id, row.vehicle_plate_number, row.vehicle_model, row.booked_by_email, row.starts_at, row.ends_at, row.is_long_term, row.booking_comments, row.cancelled_by_email, row.cancelled_by_admin, row.cancellation_note, row.cancelled_at].map(escapeCsvCell).join(","))];
 
   return new NextResponse(lines.join("\n"), {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="booking-cancellations.csv"' },

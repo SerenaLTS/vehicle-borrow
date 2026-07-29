@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_admin_action_audit_and_atomic_flows.sql"), "utf8");
 const cancellationAuditMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_admin_booking_cancellation_action_audit.sql"), "utf8");
 const cancellationContextMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_cancel_context_fix.sql"), "utf8");
+const reminderResetMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-29_reset_overdue_reminder_on_extension.sql"), "utf8");
 
 describe("admin database transaction contracts", () => {
   it("keeps booking conversion in one database function with an audit write", () => {
@@ -37,5 +38,10 @@ describe("admin database transaction contracts", () => {
     expect(cancellationContextMigration).toContain("p_cancelled_as_admin and not v_has_admin_role");
     expect(cancellationContextMigration).toContain("not p_cancelled_as_admin and v_booking.booked_by_user_id <> v_user_id");
     expect(cancellationContextMigration).toContain("v_email, p_cancelled_as_admin");
+  });
+
+  it("resets overdue reminder state inside the loan extension transaction", () => {
+    expect(reminderResetMigration).toContain("function public.extend_vehicle_loan");
+    expect(reminderResetMigration).toContain("borrow_overdue_reminded_at = null");
   });
 });
