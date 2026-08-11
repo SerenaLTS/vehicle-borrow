@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { escapeCsvCell } from "../lib/csv";
+import { getHistoryDateBounds } from "../lib/history-filters";
 
 describe("CSV cell escaping", () => {
   it("escapes quotes and preserves ordinary values", () => {
@@ -17,5 +18,18 @@ describe("CSV cell escaping", () => {
 
   it("does not alter formula characters that are not at the start", () => {
     expect(escapeCsvCell("Vehicle = available")).toBe('"Vehicle = available"');
+  });
+});
+
+describe("history export date bounds", () => {
+  it("uses the next Sydney midnight as an exclusive end bound", () => {
+    expect(getHistoryDateBounds("2026-08-01", "2026-08-11")).toEqual({
+      fromIso: "2026-07-31T14:00:00.000Z",
+      toExclusiveIso: "2026-08-11T14:00:00.000Z",
+    });
+  });
+
+  it("rolls the end date across month and year boundaries", () => {
+    expect(getHistoryDateBounds("", "2026-12-31").toExclusiveIso).toBe("2026-12-31T13:00:00.000Z");
   });
 });

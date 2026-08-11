@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { escapeCsvCell } from "@/lib/csv";
 import { createClient } from "@/lib/supabase/server";
-import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
+import { getHistoryDateBounds } from "@/lib/history-filters";
 
 function getFilterParams(request: Request) {
   const url = new URL(request.url);
@@ -30,11 +30,10 @@ export async function GET(request: Request) {
     .select("driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, borrower_email, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false });
 
-  const fromIso = from ? parseDateTimeLocalToUtcIso(`${from}T00:00`) : null;
-  const toIso = to ? parseDateTimeLocalToUtcIso(`${to}T23:59`) : null;
+  const { fromIso, toExclusiveIso } = getHistoryDateBounds(from, to);
 
   if (fromIso) loansQuery = loansQuery.gte("borrowed_at", fromIso);
-  if (toIso) loansQuery = loansQuery.lte("borrowed_at", toIso);
+  if (toExclusiveIso) loansQuery = loansQuery.lt("borrowed_at", toExclusiveIso);
   if (status === "active") loansQuery = loansQuery.is("returned_at", null);
   if (status === "returned") loansQuery = loansQuery.not("returned_at", "is", null);
   if (status === "long-term") loansQuery = loansQuery.eq("is_long_term", true);

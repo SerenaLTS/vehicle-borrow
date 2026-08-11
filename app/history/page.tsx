@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
+import { getHistoryDateBounds } from "@/lib/history-filters";
 
-const LOAN_SELECT =
-  "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)";
+const PAGE_SIZE = 50;
+
+type HistorySearchRow = RawLoanRow & { total_count: number };
 
 function formatReturnedStatus(returnedAt: string | null) {
   return returnedAt ? formatDateTime(returnedAt) : "Not returned yet";
@@ -38,12 +40,21 @@ function getExportHref(params: Record<string, string>) {
   return query ? `/history/export?${query}` : "/history/export";
 }
 
+function getPageHref(params: Record<string, string>, page: number) {
+  const pageParams = new URLSearchParams(params);
+  pageParams.set("page", String(page));
+  return `/history?${pageParams.toString()}`;
+}
+
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const params = await searchParams;
   const query = getParam(params, "q").toLowerCase();
   const from = getParam(params, "from");
   const to = getParam(params, "to");
   const status = getParam(params, "status");
+  const requestedPage = Number.parseInt(getParam(params, "page"), 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const { fromIso, toExclusiveIso } = getHistoryDateBounds(from, to);
   const supabase = await createClient();
   const {
     data: { user },
@@ -53,86 +64,29 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     redirect("/");
   }
 
-  const [{ data: recentLoans, error: recentLoansError }, { data: activeLoans, error: activeLoansError }, isAdmin] = await Promise.all([
-    supabase
-      .from("vehicle_loans")
-      .select(LOAN_SELECT)
-      .order("borrowed_at", { ascending: false })
-      .limit(200),
-    supabase.from("vehicle_loans").select(LOAN_SELECT).is("returned_at", null).order("borrowed_at", { ascending: false }),
+  const [{ data: historyRows, error: historyError }, isAdmin] = await Promise.all([
+    supabase.rpc("search_vehicle_loan_history", {
+      p_query: query,
+      p_from: fromIso,
+      p_to_exclusive: toExclusiveIso,
+      p_status: status,
+      p_limit: PAGE_SIZE,
+      p_offset: (page - 1) * PAGE_SIZE,
+    }),
     getIsAdmin(supabase, user.id),
   ]);
 
-  const loadError = recentLoansError?.message ?? activeLoansError?.message ?? null;
-
-  const historyById = new Map<string, RawLoanRow>();
-
-  if (!loadError) {
-    for (const loan of [...((recentLoans ?? []) as RawLoanRow[]), ...((activeLoans ?? []) as RawLoanRow[])]) {
-      historyById.set(loan.id, loan);
-    }
-  }
-
-  const history = Array.from(historyById.values())
-    .sort((first, second) => new Date(second.borrowed_at).getTime() - new Date(first.borrowed_at).getTime())
-    .map(normalizeLoan);
-  const fromTime = from ? new Date(`${from}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
-  const toTime = to ? new Date(`${to}T23:59:59`).getTime() : Number.POSITIVE_INFINITY;
-  const now = Date.now();
-  const filteredHistory = history.filter((loan) => {
-    const borrowedTime = new Date(loan.borrowed_at).getTime();
-    const isOverdue = !loan.returned_at && !loan.is_long_term && loan.expected_return_at && new Date(loan.expected_return_at).getTime() < now;
-    const isAdminReturned = Boolean(loan.return_notes?.toLowerCase().includes("admin return by"));
-    const searchable = [
-      loan.vehicle?.plate_number,
-      loan.vehicle?.model,
-      loan.borrower_email,
-      loan.driver_name,
-      loan.purpose,
-      loan.borrow_notes,
-      loan.return_notes,
-    ].filter(Boolean).join(" ").toLowerCase();
-
-    if (query && !searchable.includes(query)) {
-      return false;
-    }
-
-    if (Number.isFinite(fromTime) && borrowedTime < fromTime) {
-      return false;
-    }
-
-    if (Number.isFinite(toTime) && borrowedTime > toTime) {
-      return false;
-    }
-
-    if (status === "active" && loan.returned_at) {
-      return false;
-    }
-
-    if (status === "returned" && !loan.returned_at) {
-      return false;
-    }
-
-    if (status === "long-term" && !loan.is_long_term) {
-      return false;
-    }
-
-    if (status === "overdue" && !isOverdue) {
-      return false;
-    }
-
-    if (status === "admin-returned" && !isAdminReturned) {
-      return false;
-    }
-
-    return true;
-  });
+  const loadError = historyError?.message ?? null;
+  const rows = (historyRows ?? []) as HistorySearchRow[];
+  const filteredHistory = rows.map(normalizeLoan);
+  const totalCount = Number(rows[0]?.total_count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const exportHref = getExportHref({ q: query, from, to, status });
 
   return (
     <AppShell
       title="History"
-      subtitle="Review recent loan records and export a CSV copy."
+      subtitle="Review all loan records and export a CSV copy."
       userLabel={`${formatDisplayName(user.email ?? "")} • ${user.email}`}
       backHref="/dashboard"
       backLabel="Dashboard"
@@ -198,7 +152,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
             <div className="sectionHeader">
               <div>
                 <h2>Detailed log</h2>
-                <p className="muted">Swipe sideways to view all columns.</p>
+                <p className="muted">Page {page} of {totalPages} · {totalCount} matching records. Swipe sideways to view all columns.</p>
               </div>
             </div>
             <div className="tableScrollArea">
@@ -244,6 +198,12 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
                 </table>
               </div>
             </div>
+            {totalPages > 1 ? (
+              <nav aria-label="History pages" className="actionsRow">
+                {page > 1 ? <Link className="ghostButton" href={getPageHref({ q: query, from, to, status }, page - 1)}>Previous</Link> : null}
+                {page < totalPages ? <Link className="ghostButton" href={getPageHref({ q: query, from, to, status }, page + 1)}>Next</Link> : null}
+              </nav>
+            ) : null}
           </section>
         </>
       )}

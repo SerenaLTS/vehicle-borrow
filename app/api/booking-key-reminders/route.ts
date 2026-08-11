@@ -163,7 +163,21 @@ export async function GET(request: Request) {
   const failed: Array<{ bookingId: string; error: string }> = [];
 
   for (const booking of bookings) {
+    let claimedAt: string | null = null;
+
     try {
+      claimedAt = new Date().toISOString();
+      const { data: claim, error: claimError } = await supabase
+        .from("vehicle_bookings")
+        .update({ key_collection_reminded_at: claimedAt })
+        .eq("id", booking.id)
+        .is("key_collection_reminded_at", null)
+        .select("id")
+        .maybeSingle();
+
+      if (claimError) throw new Error(claimError.message);
+      if (!claim) continue;
+
       const sentReminder = await sendKeyCollectionReminderEmail({
         supabase,
         booking: {
@@ -178,21 +192,23 @@ export async function GET(request: Request) {
       });
 
       if (!sentReminder) {
+        await supabase
+          .from("vehicle_bookings")
+          .update({ key_collection_reminded_at: null })
+          .eq("id", booking.id)
+          .eq("key_collection_reminded_at", claimedAt);
         continue;
-      }
-
-      const { error: updateError } = await supabase
-        .from("vehicle_bookings")
-        .update({ key_collection_reminded_at: new Date().toISOString() })
-        .eq("id", booking.id)
-        .is("key_collection_reminded_at", null);
-
-      if (updateError) {
-        throw new Error(updateError.message);
       }
 
       sent.push(booking.id);
     } catch (reminderError) {
+      if (claimedAt) {
+        await supabase
+          .from("vehicle_bookings")
+          .update({ key_collection_reminded_at: null })
+          .eq("id", booking.id)
+          .eq("key_collection_reminded_at", claimedAt);
+      }
       failed.push({
         bookingId: booking.id,
         error: reminderError instanceof Error ? reminderError.message : "Unknown reminder error",
@@ -218,7 +234,21 @@ export async function GET(request: Request) {
   const activeBookingFailed: Array<{ bookingId: string; error: string }> = [];
 
   for (const booking of activeBookings) {
+    let claimed = false;
+
     try {
+      const { data: claim, error: claimError } = await supabase
+        .from("vehicle_bookings")
+        .update({ borrow_click_reminded_on: todaySydney })
+        .eq("id", booking.id)
+        .or(`borrow_click_reminded_on.is.null,borrow_click_reminded_on.neq.${todaySydney}`)
+        .select("id")
+        .maybeSingle();
+
+      if (claimError) throw new Error(claimError.message);
+      if (!claim) continue;
+      claimed = true;
+
       const reminderBooking = {
         bookingId: booking.id,
         vehicleId: booking.vehicle_id,
@@ -242,21 +272,23 @@ export async function GET(request: Request) {
             });
 
       if (!sentReminder) {
+        await supabase
+          .from("vehicle_bookings")
+          .update({ borrow_click_reminded_on: null })
+          .eq("id", booking.id)
+          .eq("borrow_click_reminded_on", todaySydney);
         continue;
-      }
-
-      const { error: updateError } = await supabase
-        .from("vehicle_bookings")
-        .update({ borrow_click_reminded_on: todaySydney })
-        .eq("id", booking.id)
-        .or(`borrow_click_reminded_on.is.null,borrow_click_reminded_on.neq.${todaySydney}`);
-
-      if (updateError) {
-        throw new Error(updateError.message);
       }
 
       activeBookingSent.push(booking.id);
     } catch (reminderError) {
+      if (claimed) {
+        await supabase
+          .from("vehicle_bookings")
+          .update({ borrow_click_reminded_on: null })
+          .eq("id", booking.id)
+          .eq("borrow_click_reminded_on", todaySydney);
+      }
       activeBookingFailed.push({
         bookingId: booking.id,
         error: reminderError instanceof Error ? reminderError.message : "Unknown active booking reminder error",
@@ -283,7 +315,21 @@ export async function GET(request: Request) {
   const overdueFailed: Array<{ loanId: string; error: string }> = [];
 
   for (const loan of overdueLoans) {
+    let claimedAt: string | null = null;
+
     try {
+      claimedAt = new Date().toISOString();
+      const { data: claim, error: claimError } = await supabase
+        .from("vehicle_loans")
+        .update({ borrow_overdue_reminded_at: claimedAt })
+        .eq("id", loan.id)
+        .is("borrow_overdue_reminded_at", null)
+        .select("id")
+        .maybeSingle();
+
+      if (claimError) throw new Error(claimError.message);
+      if (!claim) continue;
+
       const sentReminder = await sendBorrowOverdueReminderEmail({
         supabase,
         loan: {
@@ -298,21 +344,23 @@ export async function GET(request: Request) {
       });
 
       if (!sentReminder) {
+        await supabase
+          .from("vehicle_loans")
+          .update({ borrow_overdue_reminded_at: null })
+          .eq("id", loan.id)
+          .eq("borrow_overdue_reminded_at", claimedAt);
         continue;
-      }
-
-      const { error: updateError } = await supabase
-        .from("vehicle_loans")
-        .update({ borrow_overdue_reminded_at: new Date().toISOString() })
-        .eq("id", loan.id)
-        .is("borrow_overdue_reminded_at", null);
-
-      if (updateError) {
-        throw new Error(updateError.message);
       }
 
       overdueSent.push(loan.id);
     } catch (reminderError) {
+      if (claimedAt) {
+        await supabase
+          .from("vehicle_loans")
+          .update({ borrow_overdue_reminded_at: null })
+          .eq("id", loan.id)
+          .eq("borrow_overdue_reminded_at", claimedAt);
+      }
       overdueFailed.push({
         loanId: loan.id,
         error: reminderError instanceof Error ? reminderError.message : "Unknown borrow overdue reminder error",

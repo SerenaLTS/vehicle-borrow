@@ -6,6 +6,8 @@ const migration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_admin
 const cancellationAuditMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_admin_booking_cancellation_action_audit.sql"), "utf8");
 const cancellationContextMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_cancel_context_fix.sql"), "utf8");
 const reminderResetMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-29_reset_overdue_reminder_on_extension.sql"), "utf8");
+const historyAndBookingMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-11_history_pagination_and_booking_exclusion.sql"), "utf8");
+const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
   it("keeps booking conversion in one database function with an audit write", () => {
@@ -43,5 +45,26 @@ describe("admin database transaction contracts", () => {
   it("resets overdue reminder state inside the loan extension transaction", () => {
     expect(reminderResetMigration).toContain("function public.extend_vehicle_loan");
     expect(reminderResetMigration).toContain("borrow_overdue_reminded_at = null");
+  });
+
+  it("prevents concurrent overlapping bookings at the database level", () => {
+    expect(historyAndBookingMigration).toContain("constraint vehicle_bookings_no_overlap");
+    expect(historyAndBookingMigration).toContain("exclude using gist");
+    expect(historyAndBookingMigration).toContain("with &&");
+  });
+
+  it("provides a paginated database history search", () => {
+    expect(historyAndBookingMigration).toContain("function public.search_vehicle_loan_history");
+    expect(historyAndBookingMigration).toContain("count(*) over()");
+    expect(historyAndBookingMigration).toContain("p_offset");
+    expect(historyAndBookingMigration).toContain("security invoker");
+  });
+
+  it("claims reminder work before sending email", () => {
+    const claimPosition = reminderRoute.indexOf(".update({ key_collection_reminded_at: claimedAt })");
+    const sendPosition = reminderRoute.indexOf("sendKeyCollectionReminderEmail", claimPosition);
+    expect(claimPosition).toBeGreaterThan(-1);
+    expect(claimPosition).toBeLessThan(sendPosition);
+    expect(reminderRoute).toContain(".select(\"id\")");
   });
 });
