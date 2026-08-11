@@ -1,6 +1,6 @@
 # Regular Maintenance Checklist
 
-Last local check: 2026-05-14
+Last local check: 2026-07-29
 
 Use this checklist for both local/offline checks and production/online checks. A full maintenance cycle should cover the local code health, Vercel production health, Supabase configuration, Supabase data health, email/reminder behavior, and one manual smoke test.
 

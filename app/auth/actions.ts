@@ -17,6 +17,10 @@ function validateCompanyEmail(email: string) {
   }
 }
 
+function logAuthError(operation: string, error: { message: string }) {
+  console.error(`Supabase authentication error during ${operation}:`, error.message);
+}
+
 export async function signInWithPassword(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -34,7 +38,8 @@ export async function signInWithPassword(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/?error=${encodeURIComponent(error.message)}`);
+    logAuthError("sign in", error);
+    redirect("/?error=Unable to sign in. Check your email and password and try again.");
   }
 
   revalidatePath("/", "layout");
@@ -61,7 +66,8 @@ export async function signUpWithPassword(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/?error=${encodeURIComponent(error.message)}`);
+    logAuthError("account creation", error);
+    redirect("/?error=Unable to create the account. Check your details or contact an administrator.");
   }
 
   redirect("/?message=Account created. Please sign in with your password.");
@@ -98,7 +104,8 @@ export async function updatePassword(formData: FormData) {
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
-    redirect(`/account/password?error=${encodeURIComponent(error.message)}`);
+    logAuthError("password update", error);
+    redirect("/account/password?error=Unable to update the password. Please try again.");
   }
 
   redirect("/account/password?message=Password updated successfully.");

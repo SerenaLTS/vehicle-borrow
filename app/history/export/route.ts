@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { escapeCsvCell } from "@/lib/csv";
 import { createClient } from "@/lib/supabase/server";
+import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 
 function getFilterParams(request: Request) {
   const url = new URL(request.url);
@@ -24,10 +25,28 @@ export async function GET(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const { data, error } = await supabase
+  let loansQuery = supabase
     .from("vehicle_loans")
     .select("driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, borrower_email, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
     .order("borrowed_at", { ascending: false });
+
+  const fromIso = from ? parseDateTimeLocalToUtcIso(`${from}T00:00`) : null;
+  const toIso = to ? parseDateTimeLocalToUtcIso(`${to}T23:59`) : null;
+
+  if (fromIso) loansQuery = loansQuery.gte("borrowed_at", fromIso);
+  if (toIso) loansQuery = loansQuery.lte("borrowed_at", toIso);
+  if (status === "active") loansQuery = loansQuery.is("returned_at", null);
+  if (status === "returned") loansQuery = loansQuery.not("returned_at", "is", null);
+  if (status === "long-term") loansQuery = loansQuery.eq("is_long_term", true);
+  if (status === "overdue") {
+    loansQuery = loansQuery
+      .is("returned_at", null)
+      .eq("is_long_term", false)
+      .lt("expected_return_at", new Date().toISOString());
+  }
+  if (status === "admin-returned") loansQuery = loansQuery.ilike("return_notes", "%admin return by%");
+
+  const { data, error } = await loansQuery;
 
   if (error) {
     return new NextResponse(error.message, { status: 500 });
@@ -49,18 +68,9 @@ export async function GET(request: Request) {
     "return_notes",
   ];
 
-  const fromTime = from ? new Date(`${from}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
-  const toTime = to ? new Date(`${to}T23:59:59`).getTime() : Number.POSITIVE_INFINITY;
-  const now = Date.now();
   const filteredRows = (data ?? []).filter((row) => {
     const vehicle = row.vehicle as { plate_number?: string | null; model?: string | null } | null;
-    const borrowedAt = (row as { borrowed_at?: string | null }).borrowed_at ?? "";
-    const returnedAt = (row as { returned_at?: string | null }).returned_at ?? null;
-    const expectedReturnAt = (row as { expected_return_at?: string | null }).expected_return_at ?? null;
-    const isLongTerm = Boolean((row as { is_long_term?: boolean }).is_long_term);
     const returnNotes = (row as { return_notes?: string | null }).return_notes ?? "";
-    const borrowedTime = new Date(borrowedAt).getTime();
-    const isOverdue = !returnedAt && !isLongTerm && expectedReturnAt && new Date(expectedReturnAt).getTime() < now;
     const isAdminReturned = returnNotes.toLowerCase().includes("admin return by");
     const searchable = [
       vehicle?.plate_number,
@@ -73,30 +83,6 @@ export async function GET(request: Request) {
     ].filter(Boolean).join(" ").toLowerCase();
 
     if (query && !searchable.includes(query)) {
-      return false;
-    }
-
-    if (Number.isFinite(fromTime) && borrowedTime < fromTime) {
-      return false;
-    }
-
-    if (Number.isFinite(toTime) && borrowedTime > toTime) {
-      return false;
-    }
-
-    if (status === "active" && returnedAt) {
-      return false;
-    }
-
-    if (status === "returned" && !returnedAt) {
-      return false;
-    }
-
-    if (status === "long-term" && !isLongTerm) {
-      return false;
-    }
-
-    if (status === "overdue" && !isOverdue) {
       return false;
     }
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { signInWithPassword, signUpWithPassword } from "@/app/auth/actions";
 import { APP_NAME } from "@/lib/app-config";
 import { createClient } from "@/lib/supabase/server";
+import { SubmitButton } from "@/components/submit-button";
 
 type HomeProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -40,15 +41,13 @@ export default async function Home({ searchParams }: HomeProps) {
           <form action={signInWithPassword}>
             <label className="fieldLabel">
               Company email
-              <input name="email" type="email" placeholder="name@yourcompany.com" required />
+              <input autoComplete="email" name="email" type="email" placeholder="name@yourcompany.com" required />
             </label>
             <label className="fieldLabel">
               Password
-              <input name="password" type="password" placeholder="Your password" required />
+              <input autoComplete="current-password" name="password" type="password" placeholder="Your password" required />
             </label>
-            <button className="primaryButton authButton" type="submit">
-              Sign in
-            </button>
+            <SubmitButton className="primaryButton authButton" idleLabel="Sign in" pendingLabel="Signing in..." />
           </form>
 
           {message ? <p className="message">{message}</p> : null}
@@ -61,21 +60,20 @@ export default async function Home({ searchParams }: HomeProps) {
           <form action={signUpWithPassword}>
             <label className="fieldLabel">
               Company email
-              <input name="email" type="email" placeholder="name@yourcompany.com" required />
+              <input autoComplete="email" name="email" type="email" placeholder="name@yourcompany.com" required />
             </label>
             <label className="fieldLabel">
               Password
               <input
                 minLength={8}
+                autoComplete="new-password"
                 name="password"
                 type="password"
                 placeholder="Minimum 8 characters"
                 required
               />
             </label>
-            <button className="secondaryButton authButton" type="submit">
-              Create account
-            </button>
+            <SubmitButton className="secondaryButton authButton" idleLabel="Create account" pendingLabel="Creating..." />
           </form>
         </div>
       </section>
