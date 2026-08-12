@@ -5,6 +5,11 @@ import { redirect } from "next/navigation";
 import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
+
+function returnError(error: unknown, action: string) {
+  return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `return:${action}`);
+}
 
 export async function returnVehicle(formData: FormData) {
   const loanId = String(formData.get("loanId") ?? "");
@@ -32,7 +37,7 @@ export async function returnVehicle(formData: FormData) {
     .maybeSingle();
 
   if (loanLoadError) {
-    redirect(`/return?error=${encodeURIComponent(loanLoadError.message)}`);
+    redirect(`/return?error=${encodeURIComponent(returnError(loanLoadError, "load the borrow record"))}`);
   }
 
   const { error } = await supabase.rpc("return_vehicle", {
@@ -42,7 +47,7 @@ export async function returnVehicle(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/return?error=${encodeURIComponent(error.message)}`);
+    redirect(`/return?error=${encodeURIComponent(returnError(error, "return the vehicle"))}`);
   }
 
   clearFleetSnapshotCache();

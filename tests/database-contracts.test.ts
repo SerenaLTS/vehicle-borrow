@@ -7,6 +7,7 @@ const cancellationAuditMigration = readFileSync(resolve(process.cwd(), "supabase
 const cancellationContextMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-21_cancel_context_fix.sql"), "utf8");
 const reminderResetMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-29_reset_overdue_reminder_on_extension.sql"), "utf8");
 const historyAndBookingMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-11_history_pagination_and_booking_exclusion.sql"), "utf8");
+const historyPerformanceMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-12_history_pagination_performance.sql"), "utf8");
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -55,9 +56,14 @@ describe("admin database transaction contracts", () => {
 
   it("provides a paginated database history search", () => {
     expect(historyAndBookingMigration).toContain("function public.search_vehicle_loan_history");
-    expect(historyAndBookingMigration).toContain("count(*) over()");
     expect(historyAndBookingMigration).toContain("p_offset");
     expect(historyAndBookingMigration).toContain("security invoker");
+  });
+
+  it("avoids a full count scan while paging history", () => {
+    expect(historyPerformanceMigration).toContain("idx_vehicle_loans_borrowed_at_desc");
+    expect(historyPerformanceMigration).toContain("null::bigint as total_count");
+    expect(historyPerformanceMigration).not.toContain("count(*) over()");
   });
 
   it("claims reminder work before sending email", () => {

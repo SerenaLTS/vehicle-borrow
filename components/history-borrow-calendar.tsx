@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { APP_TIME_ZONE } from "@/lib/datetime";
 import { formatDateTime } from "@/lib/utils";
 import type { LoanRow } from "@/lib/types";
 
 type HistoryBorrowCalendarProps = {
-  loans: LoanRow[];
+  query: string;
+  from: string;
+  to: string;
+  status: string;
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -103,32 +106,6 @@ function isLoanActiveOnDay(loan: LoanRow, dayKey: string) {
   return startKey <= dayKey && endKey >= dayKey;
 }
 
-function getInitialMonth(loans: LoanRow[]) {
-  const todayMonth = getMonthKey(new Date());
-
-  if (loans.some((loan) => isLoanActiveOnDay(loan, getTodayKey()))) {
-    return todayMonth;
-  }
-
-  return loans[0] ? getMonthKey(loans[0].borrowed_at) : todayMonth;
-}
-
-function getInitialDay(loans: LoanRow[], monthKey: string) {
-  const todayKey = getTodayKey();
-
-  if (todayKey.startsWith(monthKey) && loans.some((loan) => isLoanActiveOnDay(loan, todayKey))) {
-    return todayKey;
-  }
-
-  const matchingLoan = loans.find((loan) => getMonthKey(loan.borrowed_at) === monthKey);
-
-  if (matchingLoan) {
-    return toDayKey(getZonedParts(matchingLoan.borrowed_at));
-  }
-
-  return `${monthKey}-01`;
-}
-
 function getVehicleLabel(loan: LoanRow) {
   return [loan.vehicle?.plate_number, loan.vehicle?.model].filter(Boolean).join(" - ") || "Unknown vehicle";
 }
@@ -166,10 +143,13 @@ function groupLoansByVehicle(loans: LoanRow[]) {
     .sort((first, second) => first.vehicleLabel.localeCompare(second.vehicleLabel));
 }
 
-export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
-  const initialMonth = useMemo(() => getInitialMonth(loans), [loans]);
-  const [currentMonth, setCurrentMonth] = useState(initialMonth);
-  const [selectedDay, setSelectedDay] = useState(() => getInitialDay(loans, initialMonth));
+export function HistoryBorrowCalendar({ query, from, to, status }: HistoryBorrowCalendarProps) {
+  const todayMonth = getMonthKey(new Date());
+  const [currentMonth, setCurrentMonth] = useState(todayMonth);
+  const [selectedDay, setSelectedDay] = useState(getTodayKey());
+  const [loans, setLoans] = useState<LoanRow[]>(EMPTY_LOANS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [yearText, monthText] = currentMonth.split("-");
   const year = Number(yearText);
   const month = Number(monthText);
@@ -193,8 +173,32 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
   const selectedLoans = loansByDay.get(selectedDay) ?? EMPTY_LOANS;
   const selectedVehicleGroups = useMemo(() => groupLoansByVehicle(selectedLoans), [selectedLoans]);
   const todayKey = getTodayKey();
-  const todayMonthKey = getMonthKey(new Date());
+  const todayMonthKey = todayMonth;
   const canMoveNext = currentMonth < todayMonthKey;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ month: currentMonth, q: query, from, to, status });
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    fetch(`/api/history-calendar?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load calendar records.");
+        return (await response.json()) as { loans: LoanRow[] };
+      })
+      .then((result) => setLoans(result.loans))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLoadError("Unable to load calendar records. Please try again.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [currentMonth, from, query, status, to]);
 
   function moveMonth(delta: number) {
     const targetMonth = addMonth(currentMonth, delta);
@@ -262,7 +266,11 @@ export function HistoryBorrowCalendar({ loans }: HistoryBorrowCalendarProps) {
 
       <div className="historyCalendarDetails">
         <h3>{selectedDay}</h3>
-        {selectedVehicleGroups.length === 0 ? (
+        {isLoading ? (
+          <div className="emptyState">Loading calendar records...</div>
+        ) : loadError ? (
+          <div className="message error">{loadError}</div>
+        ) : selectedVehicleGroups.length === 0 ? (
           <div className="emptyState">No vehicles were on loan for this day.</div>
         ) : (
           <div className="cardsGrid">

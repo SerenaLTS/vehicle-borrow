@@ -18,3 +18,22 @@ export function getHistoryDateBounds(from: string, to: string) {
     toExclusiveIso: nextDay ? parseDateTimeLocalToUtcIso(`${nextDay}T00:00`) : null,
   };
 }
+
+export function getHistoryMonthBounds(monthKey: string) {
+  const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (month < 1 || month > 12) return null;
+
+  const nextMonth = new Date(Date.UTC(year, month, 1));
+  const nextMonthKey = `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, "0")}`;
+
+  return {
+    monthStartIso: parseDateTimeLocalToUtcIso(`${monthKey}-01T00:00`),
+    monthEndExclusiveIso: parseDateTimeLocalToUtcIso(`${nextMonthKey}-01T00:00`),
+  };
+}

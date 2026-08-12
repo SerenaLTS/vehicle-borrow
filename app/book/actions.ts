@@ -8,6 +8,11 @@ import { sendBookingNotificationEmail, sendImmediateKeyCollectionReminderIfDue }
 import { createClient } from "@/lib/supabase/server";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
+
+function bookingError(error: unknown, action: string) {
+  return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `booking:${action}`);
+}
 
 export async function createBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
@@ -54,7 +59,7 @@ export async function createBooking(formData: FormData) {
     .single();
 
   if (error) {
-    redirect(`/book?error=${encodeURIComponent(error.message)}`);
+    redirect(`/book?error=${encodeURIComponent(bookingError(error, "create the reservation"))}`);
   }
 
   try {
@@ -136,7 +141,7 @@ export async function updateOwnBooking(formData: FormData) {
     .maybeSingle();
 
   if (error) {
-    redirect(`/book?error=${encodeURIComponent(error.message)}`);
+    redirect(`/book?error=${encodeURIComponent(bookingError(error, "load the reservation"))}`);
   }
 
   if (!booking) {
@@ -173,7 +178,7 @@ export async function updateOwnBooking(formData: FormData) {
     .eq("booked_by_user_id", user.id);
 
   if (updateError) {
-    redirect(`/book?error=${encodeURIComponent(updateError.message)}`);
+    redirect(`/book?error=${encodeURIComponent(bookingError(updateError, "update the reservation"))}`);
   }
 
   try {
@@ -254,7 +259,7 @@ export async function cancelOwnBooking(formData: FormData) {
     .maybeSingle();
 
   if (error) {
-    redirect(`/book?error=${encodeURIComponent(error.message)}`);
+    redirect(`/book?error=${encodeURIComponent(bookingError(error, "load the reservation"))}`);
   }
 
   if (!booking) {
@@ -270,7 +275,7 @@ export async function cancelOwnBooking(formData: FormData) {
   });
 
   if (deleteError) {
-    redirect(`/book?error=${encodeURIComponent(deleteError.message)}`);
+    redirect(`/book?error=${encodeURIComponent(bookingError(deleteError, "cancel the reservation"))}`);
   }
 
   try {
@@ -324,7 +329,7 @@ export async function collectBookingKey(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/book?error=${encodeURIComponent(error.message)}`);
+    redirect(`/book?error=${encodeURIComponent(bookingError(error, "start the borrow"))}`);
   }
 
   clearFleetSnapshotCache();

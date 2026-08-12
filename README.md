@@ -164,7 +164,7 @@ npm test
 For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
 
 ```text
-supabase/2026-08-11_history_pagination_and_booking_exclusion.sql
+supabase/2026-08-12_history_pagination_performance.sql
 ```
 
-It adds database-backed history pagination/search and prevents concurrent overlapping vehicle bookings.
+It removes the full-count scan from history pagination and adds an index for newest-first history pages.

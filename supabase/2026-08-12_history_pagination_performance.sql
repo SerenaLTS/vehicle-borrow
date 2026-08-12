@@ -1,22 +1,5 @@
-create extension if not exists btree_gist;
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'vehicle_bookings_no_overlap'
-      and conrelid = 'public.vehicle_bookings'::regclass
-  ) then
-    alter table public.vehicle_bookings
-      add constraint vehicle_bookings_no_overlap
-      exclude using gist (
-        vehicle_id with =,
-        (tstzrange(starts_at, coalesce(ends_at, 'infinity'::timestamptz), '[)')) with &&
-      );
-  end if;
-end;
-$$;
+create index if not exists idx_vehicle_loans_borrowed_at_desc
+on public.vehicle_loans (borrowed_at desc);
 
 create or replace function public.search_vehicle_loan_history(
   p_query text default '',
@@ -50,20 +33,9 @@ security invoker
 set search_path = public
 as $$
   select
-    l.id,
-    l.vehicle_id,
-    l.borrowed_by_user_id,
-    l.borrower_email,
-    l.driver_name,
-    l.purpose,
-    l.start_odometer,
-    l.end_odometer,
-    l.borrow_notes,
-    l.return_notes,
-    l.borrowed_at,
-    l.expected_return_at,
-    l.is_long_term,
-    l.returned_at,
+    l.id, l.vehicle_id, l.borrowed_by_user_id, l.borrower_email, l.driver_name, l.purpose,
+    l.start_odometer, l.end_odometer, l.borrow_notes, l.return_notes, l.borrowed_at,
+    l.expected_return_at, l.is_long_term, l.returned_at,
     jsonb_build_object('plate_number', v.plate_number, 'model', v.model) as vehicle,
     null::bigint as total_count
   from public.vehicle_loans l
@@ -88,8 +60,5 @@ as $$
   limit least(greatest(p_limit, 1), 100)
   offset greatest(p_offset, 0);
 $$;
-
-revoke all on function public.search_vehicle_loan_history(text, timestamptz, timestamptz, text, integer, integer) from public;
-grant execute on function public.search_vehicle_loan_history(text, timestamptz, timestamptz, text, integer, integer) to authenticated;
 
 select pg_notify('pgrst', 'reload schema');

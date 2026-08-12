@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -29,7 +30,7 @@ export async function validateVehicleBookingWindow(
   const { data: vehicle, error: vehicleError } = await supabase.from("vehicles").select("id, status, current_holder_user_id").eq("id", vehicleId).maybeSingle();
 
   if (vehicleError) {
-    return vehicleError.message;
+    return getSafeActionErrorMessage(vehicleError, "Unable to check this vehicle. Please try again.", "booking:validate vehicle");
   }
 
   if (!vehicle) {
@@ -54,7 +55,7 @@ export async function validateVehicleBookingWindow(
   const { count, error: conflictError } = await conflictQuery;
 
   if (conflictError) {
-    return conflictError.message;
+    return getSafeActionErrorMessage(conflictError, "Unable to check reservation availability. Please try again.", "booking:validate availability");
   }
 
   if ((count ?? 0) > 0) {

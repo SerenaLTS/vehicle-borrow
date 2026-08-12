@@ -7,6 +7,11 @@ import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { sendBorrowConfirmationEmail, sendLongTermBorrowAdminNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
+
+function borrowError(error: unknown, action: string) {
+  return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `borrow:${action}`);
+}
 
 function getExtendReturnPath(formData: FormData) {
   const returnTo = String(formData.get("returnTo") ?? "");
@@ -60,7 +65,7 @@ export async function borrowVehicle(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/borrow?error=${encodeURIComponent(error.message)}`);
+    redirect(`/borrow?error=${encodeURIComponent(borrowError(error, "borrow the vehicle"))}`);
   }
 
   try {
@@ -133,7 +138,7 @@ export async function extendVehicleLoan(formData: FormData) {
     .maybeSingle();
 
   if (loanLoadError) {
-    redirect(`${returnPath}?error=${encodeURIComponent(loanLoadError.message)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(borrowError(loanLoadError, "load the borrow record"))}`);
   }
 
   const { error } = await supabase.rpc("extend_vehicle_loan", {
@@ -143,7 +148,7 @@ export async function extendVehicleLoan(formData: FormData) {
   });
 
   if (error) {
-    redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(borrowError(error, "extend the borrow"))}`);
   }
 
   clearFleetSnapshotCache();

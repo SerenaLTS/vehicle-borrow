@@ -11,8 +11,13 @@ import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
 import { getIsAdmin } from "@/lib/user-roles";
 import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 import { getVehicleOptionalFieldPayload, getVehicleOptionalFieldSupport } from "@/lib/vehicle-schema";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
 type AdminVehicleStatus = "available" | "maintenance" | "retired";
+
+function adminActionError(error: unknown, action: string) {
+  return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `admin:${action}`);
+}
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -79,7 +84,7 @@ async function syncVehicleStateFromActiveLoan(adminClient: ReturnType<typeof cre
     .maybeSingle();
 
   if (activeLoanError) {
-    return activeLoanError.message;
+    return adminActionError(activeLoanError, "check active borrows");
   }
 
   if (activeLoan) {
@@ -91,7 +96,7 @@ async function syncVehicleStateFromActiveLoan(adminClient: ReturnType<typeof cre
       })
       .eq("id", vehicleId);
 
-    return error?.message ?? null;
+    return error ? adminActionError(error, "synchronize the vehicle status") : null;
   }
 
   const { data: vehicle, error: vehicleError } = await adminClient
@@ -101,7 +106,7 @@ async function syncVehicleStateFromActiveLoan(adminClient: ReturnType<typeof cre
     .maybeSingle();
 
   if (vehicleError) {
-    return vehicleError.message;
+    return adminActionError(vehicleError, "load the vehicle");
   }
 
   if (vehicle?.status !== "borrowed") {
@@ -116,7 +121,7 @@ async function syncVehicleStateFromActiveLoan(adminClient: ReturnType<typeof cre
     })
     .eq("id", vehicleId);
 
-  return error?.message ?? null;
+  return error ? adminActionError(error, "synchronize the vehicle status") : null;
 }
 
 export async function createVehicle(formData: FormData) {
@@ -144,7 +149,7 @@ export async function createVehicle(formData: FormData) {
   const { error } = await supabase.from("vehicles").insert(insertPayload);
 
   if (error) {
-    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "add the vehicle"))}`);
   }
 
   clearFleetSnapshotCache();
@@ -180,7 +185,7 @@ export async function updateVehicle(formData: FormData) {
   ]);
 
   if (loadError) {
-    redirect(`/admin?error=${encodeURIComponent(loadError.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(adminActionError(loadError, "load the vehicle"))}`);
   }
 
   if (!existingVehicle) {
@@ -207,7 +212,7 @@ export async function updateVehicle(formData: FormData) {
   const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
 
   if (error) {
-    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "update the vehicle"))}`);
   }
 
   clearFleetSnapshotCache();
@@ -238,7 +243,7 @@ export async function adminReturnVehicle(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "return the vehicle"))}`);
   }
 
   clearFleetSnapshotCache();
@@ -284,7 +289,7 @@ export async function createAdminBooking(formData: FormData) {
     .maybeSingle();
 
   if (bookedForUserError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(bookedForUserError.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(bookedForUserError, "load the selected user"))}`);
   }
 
   if (!bookedForUser?.email) {
@@ -317,7 +322,7 @@ export async function createAdminBooking(formData: FormData) {
     .single();
 
   if (error) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(error, "create the reservation"))}`);
   }
 
   try {
@@ -399,7 +404,7 @@ export async function updateAdminBooking(formData: FormData) {
     .maybeSingle();
 
   if (loadBookingError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(loadBookingError.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(loadBookingError, "load the reservation"))}`);
   }
 
   if (!existingBooking) {
@@ -429,7 +434,7 @@ export async function updateAdminBooking(formData: FormData) {
     .eq("id", bookingId);
 
   if (error) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(error, "update the reservation"))}`);
   }
 
   try {
@@ -510,7 +515,7 @@ export async function deleteAdminBooking(formData: FormData) {
     .maybeSingle();
 
   if (loadBookingError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(loadBookingError.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(loadBookingError, "load the reservation"))}`);
   }
 
   if (!booking) {
@@ -531,7 +536,7 @@ export async function deleteAdminBooking(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(error, "cancel the reservation"))}`);
   }
 
   try {
@@ -580,7 +585,7 @@ export async function adminStartReservationBorrow(formData: FormData) {
     .maybeSingle();
 
   if (bookingError) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(bookingError.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(bookingError, "load the reservation"))}`);
   }
 
   if (!booking) {
@@ -593,7 +598,7 @@ export async function adminStartReservationBorrow(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin/vehicles/${vehicleId}?error=${encodeURIComponent(adminActionError(error, "start the borrow"))}`);
   }
 
   clearFleetSnapshotCache();
@@ -656,7 +661,7 @@ export async function createHistoricalLoan(formData: FormData) {
   ]);
 
   if (vehicleError) {
-    redirectToVehicleRecordError(vehicleId, vehicleError.message);
+    redirectToVehicleRecordError(vehicleId, adminActionError(vehicleError, "load the vehicle"));
   }
 
   if (!vehicle) {
@@ -664,7 +669,7 @@ export async function createHistoricalLoan(formData: FormData) {
   }
 
   if (borrowerError) {
-    redirectToVehicleRecordError(vehicleId, borrowerError.message);
+    redirectToVehicleRecordError(vehicleId, adminActionError(borrowerError, "load the borrower"));
   }
 
   if (!borrower) {
@@ -681,7 +686,7 @@ export async function createHistoricalLoan(formData: FormData) {
       .maybeSingle();
 
     if (activeLoanError) {
-      redirectToVehicleRecordError(vehicleId, activeLoanError.message);
+      redirectToVehicleRecordError(vehicleId, adminActionError(activeLoanError, "check active borrows"));
     }
 
     if (activeLoan) {
@@ -706,13 +711,13 @@ export async function createHistoricalLoan(formData: FormData) {
   });
 
   if (error) {
-    redirectToVehicleRecordError(vehicleId, error.message);
+    redirectToVehicleRecordError(vehicleId, adminActionError(error, "add the borrow record"));
   }
 
   const syncError = await syncVehicleStateFromActiveLoan(adminClient, vehicleId);
 
   if (syncError) {
-    redirectToVehicleRecordError(vehicleId, syncError);
+    redirectToVehicleRecordError(vehicleId, adminActionError(syncError, "synchronize the vehicle status"));
   }
 
   revalidateVehicleLoanViews(vehicleId);
@@ -768,7 +773,7 @@ export async function updateHistoricalLoan(formData: FormData) {
   ]);
 
   if (loanLoadError) {
-    redirectToVehicleRecordError(vehicleId, loanLoadError.message);
+    redirectToVehicleRecordError(vehicleId, adminActionError(loanLoadError, "load the borrow record"));
   }
 
   if (!existingLoan) {
@@ -776,7 +781,7 @@ export async function updateHistoricalLoan(formData: FormData) {
   }
 
   if (borrowerError) {
-    redirectToVehicleRecordError(vehicleId, borrowerError.message);
+    redirectToVehicleRecordError(vehicleId, adminActionError(borrowerError, "load the borrower"));
   }
 
   if (!borrower) {
@@ -794,7 +799,7 @@ export async function updateHistoricalLoan(formData: FormData) {
       .maybeSingle();
 
     if (activeLoanError) {
-      redirectToVehicleRecordError(vehicleId, activeLoanError.message);
+      redirectToVehicleRecordError(vehicleId, adminActionError(activeLoanError, "check active borrows"));
     }
 
     if (activeLoan) {
@@ -822,13 +827,13 @@ export async function updateHistoricalLoan(formData: FormData) {
     .eq("vehicle_id", vehicleId);
 
   if (error) {
-    redirectToVehicleRecordError(vehicleId, error.message);
+    redirectToVehicleRecordError(vehicleId, adminActionError(error, "update the borrow record"));
   }
 
   const syncError = await syncVehicleStateFromActiveLoan(adminClient, vehicleId);
 
   if (syncError) {
-    redirectToVehicleRecordError(vehicleId, syncError);
+    redirectToVehicleRecordError(vehicleId, adminActionError(syncError, "synchronize the vehicle status"));
   }
 
   revalidateVehicleLoanViews(vehicleId);
@@ -853,7 +858,7 @@ export async function retireVehicle(formData: FormData) {
   ]);
 
   if (loadError) {
-    redirect(`/admin?error=${encodeURIComponent(loadError.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(adminActionError(loadError, "load the vehicle"))}`);
   }
 
   if (!existingVehicle) {
@@ -870,7 +875,7 @@ export async function retireVehicle(formData: FormData) {
     .eq("id", vehicleId);
 
   if (error) {
-    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "retire the vehicle"))}`);
   }
 
   clearFleetSnapshotCache();

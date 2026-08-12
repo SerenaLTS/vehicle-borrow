@@ -10,7 +10,7 @@ import { getHistoryDateBounds } from "@/lib/history-filters";
 
 const PAGE_SIZE = 50;
 
-type HistorySearchRow = RawLoanRow & { total_count: number };
+type HistorySearchRow = RawLoanRow & { total_count: number | null };
 
 function formatReturnedStatus(returnedAt: string | null) {
   return returnedAt ? formatDateTime(returnedAt) : "Not returned yet";
@@ -70,7 +70,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       p_from: fromIso,
       p_to_exclusive: toExclusiveIso,
       p_status: status,
-      p_limit: PAGE_SIZE,
+      p_limit: PAGE_SIZE + 1,
       p_offset: (page - 1) * PAGE_SIZE,
     }),
     getIsAdmin(supabase, user.id),
@@ -78,9 +78,8 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
   const loadError = historyError?.message ?? null;
   const rows = (historyRows ?? []) as HistorySearchRow[];
-  const filteredHistory = rows.map(normalizeLoan);
-  const totalCount = Number(rows[0]?.total_count ?? 0);
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const hasNextPage = rows.length > PAGE_SIZE;
+  const filteredHistory = rows.slice(0, PAGE_SIZE).map(normalizeLoan);
   const exportHref = getExportHref({ q: query, from, to, status });
 
   return (
@@ -142,17 +141,17 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
       {loadError ? (
         <p className="message error">{loadError}</p>
-      ) : filteredHistory.length === 0 ? (
-        <div className="emptyState">No borrowing history matches the current filters.</div>
       ) : (
         <>
-          <HistoryBorrowCalendar loans={filteredHistory} />
+          <HistoryBorrowCalendar query={query} from={from} to={to} status={status} />
 
-          <section className="historyTableSection">
+          {filteredHistory.length === 0 ? (
+            <div className="emptyState">No borrowing history matches the current filters on this page.</div>
+          ) : <section className="historyTableSection">
             <div className="sectionHeader">
               <div>
                 <h2>Detailed log</h2>
-                <p className="muted">Page {page} of {totalPages} · {totalCount} matching records. Swipe sideways to view all columns.</p>
+                <p className="muted">Page {page}. Swipe sideways to view all columns.</p>
               </div>
             </div>
             <div className="tableScrollArea">
@@ -198,13 +197,13 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
                 </table>
               </div>
             </div>
-            {totalPages > 1 ? (
+            {page > 1 || hasNextPage ? (
               <nav aria-label="History pages" className="actionsRow">
                 {page > 1 ? <Link className="ghostButton" href={getPageHref({ q: query, from, to, status }, page - 1)}>Previous</Link> : null}
-                {page < totalPages ? <Link className="ghostButton" href={getPageHref({ q: query, from, to, status }, page + 1)}>Next</Link> : null}
+                {hasNextPage ? <Link className="ghostButton" href={getPageHref({ q: query, from, to, status }, page + 1)}>Next</Link> : null}
               </nav>
             ) : null}
-          </section>
+          </section>}
         </>
       )}
     </AppShell>

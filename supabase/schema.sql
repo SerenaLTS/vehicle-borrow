@@ -183,6 +183,7 @@ for each row execute procedure public.validate_vehicle_booking();
 create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
 create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
 create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
+create index if not exists idx_vehicle_loans_borrowed_at_desc on public.vehicle_loans (borrowed_at desc);
 create index if not exists idx_vehicle_loans_overdue_reminders
 on public.vehicle_loans (expected_return_at)
 where returned_at is null
@@ -1129,7 +1130,7 @@ as $$
     l.start_odometer, l.end_odometer, l.borrow_notes, l.return_notes, l.borrowed_at,
     l.expected_return_at, l.is_long_term, l.returned_at,
     jsonb_build_object('plate_number', v.plate_number, 'model', v.model) as vehicle,
-    count(*) over() as total_count
+    null::bigint as total_count
   from public.vehicle_loans l
   join public.vehicles v on v.id = l.vehicle_id
   where

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { escapeCsvCell } from "../lib/csv";
-import { getHistoryDateBounds } from "../lib/history-filters";
+import { getHistoryDateBounds, getHistoryMonthBounds } from "../lib/history-filters";
 
 describe("CSV cell escaping", () => {
   it("escapes quotes and preserves ordinary values", () => {
@@ -31,5 +31,12 @@ describe("history export date bounds", () => {
 
   it("rolls the end date across month and year boundaries", () => {
     expect(getHistoryDateBounds("", "2026-12-31").toExclusiveIso).toBe("2026-12-31T13:00:00.000Z");
+  });
+
+  it("builds Sydney month bounds independently of table pagination", () => {
+    expect(getHistoryMonthBounds("2026-08")).toEqual({
+      monthStartIso: "2026-07-31T14:00:00.000Z",
+      monthEndExclusiveIso: "2026-08-31T14:00:00.000Z",
+    });
   });
 });
