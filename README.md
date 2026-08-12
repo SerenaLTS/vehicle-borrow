@@ -164,7 +164,7 @@ npm test
 For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
 
 ```text
-supabase/2026-08-12_history_pagination_performance.sql
+supabase/2026-08-13_history_count.sql
 ```
 
-It removes the full-count scan from history pagination and adds an index for newest-first history pages.
+It adds an asynchronous exact page-count query without blocking the main history pagination request.

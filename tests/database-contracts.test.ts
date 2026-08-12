@@ -8,6 +8,7 @@ const cancellationContextMigration = readFileSync(resolve(process.cwd(), "supaba
 const reminderResetMigration = readFileSync(resolve(process.cwd(), "supabase/2026-07-29_reset_overdue_reminder_on_extension.sql"), "utf8");
 const historyAndBookingMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-11_history_pagination_and_booking_exclusion.sql"), "utf8");
 const historyPerformanceMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-12_history_pagination_performance.sql"), "utf8");
+const historyCountMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-13_history_count.sql"), "utf8");
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -64,6 +65,12 @@ describe("admin database transaction contracts", () => {
     expect(historyPerformanceMigration).toContain("idx_vehicle_loans_borrowed_at_desc");
     expect(historyPerformanceMigration).toContain("null::bigint as total_count");
     expect(historyPerformanceMigration).not.toContain("count(*) over()");
+  });
+
+  it("counts history pages separately from the main pagination query", () => {
+    expect(historyCountMigration).toContain("function public.count_vehicle_loan_history");
+    expect(historyCountMigration).toContain("returns bigint");
+    expect(historyCountMigration).toContain("security invoker");
   });
 
   it("claims reminder work before sending email", () => {

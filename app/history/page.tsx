@@ -7,6 +7,7 @@ import { getIsAdmin } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 import { getHistoryDateBounds } from "@/lib/history-filters";
+import { HistoryPaginationSummary } from "@/components/history-pagination-summary";
 
 const PAGE_SIZE = 50;
 
@@ -151,7 +152,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
             <div className="sectionHeader">
               <div>
                 <h2>Detailed log</h2>
-                <p className="muted">Page {page}. Swipe sideways to view all columns.</p>
+                <HistoryPaginationSummary page={page} query={query} from={from} to={to} status={status} />
               </div>
             </div>
             <div className="tableScrollArea">
