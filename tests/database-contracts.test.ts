@@ -80,4 +80,10 @@ describe("admin database transaction contracts", () => {
     expect(claimPosition).toBeLessThan(sendPosition);
     expect(reminderRoute).toContain(".select(\"id\")");
   });
+
+  it("returns reminder counts without exposing record identifiers or error details", () => {
+    expect(reminderRoute).toContain("sent: sent.length");
+    expect(reminderRoute).toContain("failed: failed.length");
+    expect(reminderRoute).toContain("error: \"Unable to process reminders right now.\"");
+  });
 });

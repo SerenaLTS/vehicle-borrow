@@ -13,6 +13,11 @@ import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
+
+function vehicleRecordLoadError(error: unknown, area: string) {
+  return getSafeActionErrorMessage(error, "Unable to load the vehicle record. Please try again.", `admin:vehicle record ${area}`);
+}
 
 type VehicleRecordPageProps = {
   params: Promise<{
@@ -66,7 +71,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   ]);
 
   if (vehicleError) {
-    redirect(`/admin?error=${encodeURIComponent(vehicleError.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(vehicleRecordLoadError(vehicleError, "vehicle"))}`);
   }
 
   if (!vehicle) {
@@ -74,15 +79,15 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   }
 
   if (loansError) {
-    redirect(`/admin?error=${encodeURIComponent(loansError.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(vehicleRecordLoadError(loansError, "borrows"))}`);
   }
 
   if (bookingError) {
-    redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(vehicleRecordLoadError(bookingError, "reservations"))}`);
   }
 
   if (rolesError) {
-    redirect(`/admin?error=${encodeURIComponent(rolesError.message)}`);
+    redirect(`/admin?error=${encodeURIComponent(vehicleRecordLoadError(rolesError, "users"))}`);
   }
 
   const record = vehicle as unknown as Vehicle;

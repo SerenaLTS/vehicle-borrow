@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { escapeCsvCell } from "@/lib/csv";
 import { createClient } from "@/lib/supabase/server";
 import { getHistoryDateBounds } from "@/lib/history-filters";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
 function getFilterParams(request: Request) {
   const url = new URL(request.url);
@@ -48,7 +49,8 @@ export async function GET(request: Request) {
   const { data, error } = await loansQuery;
 
   if (error) {
-    return new NextResponse(error.message, { status: 500 });
+    const message = getSafeActionErrorMessage(error, "Unable to export borrowing history. Please try again.", "history:export");
+    return new NextResponse(message, { status: 500 });
   }
 
   const header = [

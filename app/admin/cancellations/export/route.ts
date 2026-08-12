@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { escapeCsvCell } from "@/lib/csv";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -23,7 +24,10 @@ export async function GET(request: Request) {
     .order("cancelled_at", { ascending: false })
     .limit(5000);
 
-  if (error) return new NextResponse(error.message, { status: 500 });
+  if (error) {
+    const message = getSafeActionErrorMessage(error, "Unable to export cancellation history. Please try again.", "admin:cancellation export");
+    return new NextResponse(message, { status: 500 });
+  }
 
   const rows = (data ?? []).filter((row) => {
     const searchable = [row.vehicle_plate_number, row.vehicle_model, row.booked_by_email, row.cancelled_by_email, row.cancellation_note, row.booking_comments].filter(Boolean).join(" ").toLowerCase();

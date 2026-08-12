@@ -11,6 +11,12 @@ import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/ve
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
 import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
+
+function redirectForAdminLoadError(error: unknown, area: string): never {
+  const message = getSafeActionErrorMessage(error, "Unable to load the administration area. Please try again.", `admin:load ${area}`);
+  redirect(`/dashboard?error=${encodeURIComponent(message)}`);
+}
 
 type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -96,23 +102,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ]);
 
   if (rolesError) {
-    redirect(`/admin?error=${encodeURIComponent(rolesError.message)}`);
+    redirectForAdminLoadError(rolesError, "users");
   }
 
   if (vehiclesError) {
-    redirect(`/admin?error=${encodeURIComponent(vehiclesError.message)}`);
+    redirectForAdminLoadError(vehiclesError, "vehicles");
   }
 
   if (bookingError) {
-    redirect(`/admin?error=${encodeURIComponent(bookingError.message)}`);
+    redirectForAdminLoadError(bookingError, "reservations");
   }
 
   if (cancellationError) {
-    redirect(`/admin?error=${encodeURIComponent(cancellationError.message)}`);
+    redirectForAdminLoadError(cancellationError, "cancellations");
   }
 
   if (adminAuditError) {
-    redirect(`/admin?error=${encodeURIComponent(adminAuditError.message)}`);
+    redirectForAdminLoadError(adminAuditError, "audit history");
   }
 
   const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
@@ -129,7 +135,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : { data: [], error: null };
 
   if (activeLoanError) {
-    redirect(`/admin?error=${encodeURIComponent(activeLoanError.message)}`);
+    redirectForAdminLoadError(activeLoanError, "active borrows");
   }
 
   const userRoles = (roles ?? []) as UserRole[];

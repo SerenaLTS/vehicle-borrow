@@ -56,6 +56,10 @@ function hasRequiredReminderConfig() {
   return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+function logReminderError(context: string, error: unknown) {
+  console.error(`[reminders:${context}]`, error instanceof Error ? error.message : error);
+}
+
 function getSydneyParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIME_ZONE,
@@ -131,7 +135,8 @@ export async function GET(request: Request) {
   }
 
   if (!hasRequiredReminderConfig()) {
-    return NextResponse.json({ error: "Missing SUPABASE_SERVICE_ROLE_KEY environment variable." }, { status: 503 });
+    console.error("[reminders:configuration] Reminder service configuration is incomplete.");
+    return NextResponse.json({ error: "Reminder service is temporarily unavailable." }, { status: 503 });
   }
 
   const supabase = createAdminClient();
@@ -141,7 +146,7 @@ export async function GET(request: Request) {
   const { isSydneyNineAmHour, windowStart, windowEnd } = getSydneyNineAmWindow(now);
 
   if (process.env.NODE_ENV === "production" && !isSydneyNineAmHour) {
-    return NextResponse.json({ skipped: true, reason: "Not Sydney 9am hour.", windowStart, windowEnd, checked: 0, sent: [], failed: [] });
+    return NextResponse.json({ skipped: true, reason: "Outside the scheduled reminder window." });
   }
 
   const { data, error } = await supabase
@@ -155,7 +160,8 @@ export async function GET(request: Request) {
     .limit(25);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logReminderError("load key collection reminders", error);
+    return NextResponse.json({ error: "Unable to process reminders right now." }, { status: 500 });
   }
 
   const bookings = (data ?? []) as ReminderBookingRow[];
@@ -202,6 +208,7 @@ export async function GET(request: Request) {
 
       sent.push(booking.id);
     } catch (reminderError) {
+      logReminderError("send key collection reminder", reminderError);
       if (claimedAt) {
         await supabase
           .from("vehicle_bookings")
@@ -226,7 +233,8 @@ export async function GET(request: Request) {
     .limit(25);
 
   if (activeBookingError) {
-    return NextResponse.json({ error: activeBookingError.message }, { status: 500 });
+    logReminderError("load active reservation reminders", activeBookingError);
+    return NextResponse.json({ error: "Unable to process reminders right now." }, { status: 500 });
   }
 
   const activeBookings = (activeBookingData ?? []) as ReminderBookingRow[];
@@ -282,6 +290,7 @@ export async function GET(request: Request) {
 
       activeBookingSent.push(booking.id);
     } catch (reminderError) {
+      logReminderError("send active reservation reminder", reminderError);
       if (claimed) {
         await supabase
           .from("vehicle_bookings")
@@ -307,7 +316,8 @@ export async function GET(request: Request) {
     .limit(25);
 
   if (overdueLoanError) {
-    return NextResponse.json({ error: overdueLoanError.message }, { status: 500 });
+    logReminderError("load overdue reminders", overdueLoanError);
+    return NextResponse.json({ error: "Unable to process reminders right now." }, { status: 500 });
   }
 
   const overdueLoans = (overdueLoanData ?? []) as OverdueLoanRow[];
@@ -354,6 +364,7 @@ export async function GET(request: Request) {
 
       overdueSent.push(loan.id);
     } catch (reminderError) {
+      logReminderError("send overdue reminder", reminderError);
       if (claimedAt) {
         await supabase
           .from("vehicle_loans")
@@ -369,10 +380,9 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    windowStart,
-    windowEnd,
-    bookingKeyReminders: { checked: bookings.length, sent, failed },
-    bookingBorrowReminders: { checked: activeBookings.length, sent: activeBookingSent, failed: activeBookingFailed },
-    borrowOverdueReminders: { checked: overdueLoans.length, sent: overdueSent, failed: overdueFailed },
+    success: true,
+    bookingKeyReminders: { checked: bookings.length, sent: sent.length, failed: failed.length },
+    bookingBorrowReminders: { checked: activeBookings.length, sent: activeBookingSent.length, failed: activeBookingFailed.length },
+    borrowOverdueReminders: { checked: overdueLoans.length, sent: overdueSent.length, failed: overdueFailed.length },
   });
 }

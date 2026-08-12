@@ -8,6 +8,7 @@ import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 import { getHistoryDateBounds } from "@/lib/history-filters";
 import { HistoryPaginationSummary } from "@/components/history-pagination-summary";
+import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
 const PAGE_SIZE = 50;
 
@@ -77,7 +78,9 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     getIsAdmin(supabase, user.id),
   ]);
 
-  const loadError = historyError?.message ?? null;
+  const loadError = historyError
+    ? getSafeActionErrorMessage(historyError, "Unable to load borrowing history. Please refresh and try again.", "history:load")
+    : null;
   const rows = (historyRows ?? []) as HistorySearchRow[];
   const hasNextPage = rows.length > PAGE_SIZE;
   const filteredHistory = rows.slice(0, PAGE_SIZE).map(normalizeLoan);
