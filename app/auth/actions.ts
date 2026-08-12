@@ -57,6 +57,17 @@ export async function signUpWithPassword(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const { data: isAllowed, error: allowlistError } = await supabase.rpc("is_signup_email_allowed", { p_email: email });
+
+  if (allowlistError) {
+    logAuthError("allowlist check", allowlistError);
+    redirect("/?error=Unable to check account access. Please try again.");
+  }
+
+  if (!isAllowed) {
+    redirect("/?error=Your email has not been approved for this internal application. Please contact an administrator.");
+  }
+
   const { error } = await supabase.auth.signUp({
     email,
     password,

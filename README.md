@@ -164,7 +164,7 @@ npm test
 For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
 
 ```text
-supabase/2026-08-13_history_count.sql
+supabase/2026-08-14_signup_email_allowlist.sql
 ```
 
-It adds an asynchronous exact page-count query without blocking the main history pagination request.
+It adds the approved-email list and the database hook used to block unapproved account creation.

@@ -885,3 +885,43 @@ export async function retireVehicle(formData: FormData) {
   revalidatePath("/dashboard");
   redirect("/admin?message=Vehicle retired successfully.");
 }
+
+export async function addAllowedUserEmail(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (!email || !email.includes("@")) {
+    redirect("/admin?tab=users&error=Please enter a valid email address.");
+  }
+
+  const supabase = await requireAdmin();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from("allowed_user_emails").insert({
+    email,
+    notes,
+    created_by_user_id: user?.id,
+  });
+
+  if (error) {
+    redirect(`/admin?tab=users&error=${encodeURIComponent(adminActionError(error, "add the approved email"))}`);
+  }
+
+  revalidatePath("/admin");
+  redirect("/admin?tab=users&message=Email added to the approved list.");
+}
+
+export async function removeAllowedUserEmail(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+
+  if (!email) redirect("/admin?tab=users&error=Approved email not found.");
+
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("allowed_user_emails").delete().eq("email", email);
+
+  if (error) {
+    redirect(`/admin?tab=users&error=${encodeURIComponent(adminActionError(error, "remove the approved email"))}`);
+  }
+
+  revalidatePath("/admin");
+  redirect("/admin?tab=users&message=Email removed from the approved list.");
+}

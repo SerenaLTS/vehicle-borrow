@@ -9,6 +9,7 @@ const reminderResetMigration = readFileSync(resolve(process.cwd(), "supabase/202
 const historyAndBookingMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-11_history_pagination_and_booking_exclusion.sql"), "utf8");
 const historyPerformanceMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-12_history_pagination_performance.sql"), "utf8");
 const historyCountMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-13_history_count.sql"), "utf8");
+const signupAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-14_signup_email_allowlist.sql"), "utf8");
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -71,6 +72,13 @@ describe("admin database transaction contracts", () => {
     expect(historyCountMigration).toContain("function public.count_vehicle_loan_history");
     expect(historyCountMigration).toContain("returns bigint");
     expect(historyCountMigration).toContain("security invoker");
+  });
+
+  it("enforces an exact-email signup allowlist through an auth hook", () => {
+    expect(signupAllowlistMigration).toContain("table if not exists public.allowed_user_emails");
+    expect(signupAllowlistMigration).toContain("function public.hook_require_allowed_user_email");
+    expect(signupAllowlistMigration).toContain("to supabase_auth_admin");
+    expect(signupAllowlistMigration).toContain("from authenticated, anon, public");
   });
 
   it("claims reminder work before sending email", () => {

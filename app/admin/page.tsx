@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { adminReturnVehicle, adminStartReservationBorrow, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { addAllowedUserEmail, adminReturnVehicle, adminStartReservationBorrow, createVehicle, removeAllowedUserEmail, retireVehicle, updateVehicle } from "@/app/admin/actions";
 import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
@@ -56,6 +56,12 @@ type AdminActionAudit = {
   vehicle: { plate_number: string; model: string } | Array<{ plate_number: string; model: string }> | null;
 };
 
+type AllowedUserEmail = {
+  email: string;
+  notes: string | null;
+  created_at: string;
+};
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -82,6 +88,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: bookingData, error: bookingError },
     { data: cancellationData, error: cancellationError },
     { data: adminAuditData, error: adminAuditError },
+    { data: allowedEmailData, error: allowedEmailError },
   ] = await Promise.all([
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
     supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
@@ -99,6 +106,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("id, action_type, admin_email, target_email, details, created_at, vehicle:vehicles!admin_action_audits_vehicle_id_fkey(plate_number, model)")
       .order("created_at", { ascending: false })
       .limit(100),
+    supabase.from("allowed_user_emails").select("email, notes, created_at").order("email"),
   ]);
 
   if (rolesError) {
@@ -121,6 +129,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirectForAdminLoadError(adminAuditError, "audit history");
   }
 
+  if (allowedEmailError) {
+    redirectForAdminLoadError(allowedEmailError, "approved emails");
+  }
+
   const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
   const vehicleIds = fleet.map((vehicle) => vehicle.id);
   const { data: activeLoanData, error: activeLoanError } =
@@ -139,6 +151,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const userRoles = (roles ?? []) as UserRole[];
+  const allowedEmails = (allowedEmailData ?? []) as AllowedUserEmail[];
   const activeLoans = ((activeLoanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
@@ -242,6 +255,45 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       {activeTab === "users" ? (
         <>
+      <section className="panel">
+        <h2>Approved signup emails</h2>
+        <p className="muted">Add an employee here before they create an account. Removing an email blocks future signup but does not disable an existing account.</p>
+        <form action={addAllowedUserEmail}>
+          <div className="formGrid">
+            <label className="fieldLabel">
+              Employee email
+              <input autoComplete="email" name="email" placeholder="name@yourcompany.com" required type="email" />
+            </label>
+            <label className="fieldLabel">
+              Notes
+              <input name="notes" placeholder="Team or reason (optional)" />
+            </label>
+          </div>
+          <SubmitButton idleLabel="Approve email" pendingLabel="Adding..." />
+        </form>
+      </section>
+
+      <div className="tableWrap">
+        <table>
+          <thead><tr><th>Approved email</th><th>Notes</th><th>Added</th><th>Action</th></tr></thead>
+          <tbody>
+            {allowedEmails.map((entry) => (
+              <tr key={entry.email}>
+                <td>{entry.email}</td>
+                <td>{entry.notes ?? "-"}</td>
+                <td>{formatDateTime(entry.created_at)}</td>
+                <td>
+                  <form action={removeAllowedUserEmail}>
+                    <input name="email" type="hidden" value={entry.email} />
+                    <SubmitButton className="ghostButton" idleLabel="Remove" pendingLabel="Removing..." />
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <section className="panel">
         <h2>How admin access works</h2>
         <div className="vehicleMeta">
