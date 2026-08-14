@@ -887,41 +887,53 @@ export async function retireVehicle(formData: FormData) {
 }
 
 export async function addAllowedUserEmail(formData: FormData) {
+  const startedAt = performance.now();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
-  if (!email || !email.includes("@")) {
-    redirect("/admin?tab=users&error=Please enter a valid email address.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false as const, message: "Please enter a valid email address." };
   }
 
-  const supabase = await requireAdmin();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("allowed_user_emails").insert({
-    email,
-    notes,
-    created_by_user_id: user?.id,
-  });
+  try {
+    const supabase = await requireAdmin();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from("allowed_user_emails").insert({
+      email,
+      notes,
+      created_by_user_id: user?.id,
+    }).select("email, notes, created_at").single();
 
-  if (error) {
-    redirect(`/admin?tab=users&error=${encodeURIComponent(adminActionError(error, "add the approved email"))}`);
+    if (error) {
+      if (error.code === "23505") {
+        return { ok: false as const, message: `${email} is already approved.` };
+      }
+
+      return { ok: false as const, message: adminActionError(error, "add the approved email") };
+    }
+
+    return { ok: true as const, entry: data, message: `${email} is now approved.` };
+  } finally {
+    console.info(JSON.stringify({ event: "admin_action_timing", action: "approve_email", duration_ms: Math.round(performance.now() - startedAt) }));
   }
-
-  revalidatePath("/admin");
-  redirect("/admin?tab=users&message=Email added to the approved list.");
 }
 
 export async function removeAllowedUserEmail(formData: FormData) {
+  const startedAt = performance.now();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
-  if (!email) redirect("/admin?tab=users&error=Approved email not found.");
+  if (!email) return { ok: false as const, message: "Approved email not found." };
 
-  const supabase = await requireAdmin();
-  const { error } = await supabase.from("allowed_user_emails").delete().eq("email", email);
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase.from("allowed_user_emails").delete().eq("email", email);
 
-  if (error) {
-    redirect(`/admin?tab=users&error=${encodeURIComponent(adminActionError(error, "remove the approved email"))}`);
+    if (error) {
+      return { ok: false as const, message: adminActionError(error, "remove the approved email") };
+    }
+
+    return { ok: true as const, message: `${email} was removed from the approved list.` };
+  } finally {
+    console.info(JSON.stringify({ event: "admin_action_timing", action: "remove_approved_email", duration_ms: Math.round(performance.now() - startedAt) }));
   }
-
-  revalidatePath("/admin");
-  redirect("/admin?tab=users&message=Email removed from the approved list.");
 }

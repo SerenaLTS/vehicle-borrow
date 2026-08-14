@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { addAllowedUserEmail, adminReturnVehicle, adminStartReservationBorrow, createVehicle, removeAllowedUserEmail, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { adminReturnVehicle, adminStartReservationBorrow, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { ApprovedEmailManager, type ApprovedEmailEntry } from "@/components/approved-email-manager";
 import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
@@ -16,6 +17,15 @@ import { getSafeActionErrorMessage } from "@/lib/action-errors";
 function redirectForAdminLoadError(error: unknown, area: string): never {
   const message = getSafeActionErrorMessage(error, "Unable to load the administration area. Please try again.", `admin:load ${area}`);
   redirect(`/dashboard?error=${encodeURIComponent(message)}`);
+}
+
+async function timedAdminQuery<T>(tab: AdminTab, name: string, query: PromiseLike<T>): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    return await query;
+  } finally {
+    console.info(JSON.stringify({ event: "admin_query_timing", tab, query: name, duration_ms: Math.round(performance.now() - startedAt) }));
+  }
 }
 
 type AdminPageProps = {
@@ -56,14 +66,9 @@ type AdminActionAudit = {
   vehicle: { plate_number: string; model: string } | Array<{ plate_number: string; model: string }> | null;
 };
 
-type AllowedUserEmail = {
-  email: string;
-  notes: string | null;
-  created_at: string;
-};
-
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
+  const activeTab: AdminTab = params.tab === "bookings" || params.tab === "loans" || params.tab === "users" ? params.tab : "fleet";
   const supabase = await createClient();
   const {
     data: { user },
@@ -73,14 +78,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect("/");
   }
 
-  const [isAdmin, optionalFieldSupport] = await Promise.all([
-    getIsAdmin(supabase, user.id),
-    getVehicleOptionalFieldSupport(supabase),
-  ]);
+  const isAdmin = await getIsAdmin(supabase, user.id);
 
   if (!isAdmin) {
     redirect("/dashboard?message=Admin access required.");
   }
+
+  const optionalFieldSupport = activeTab === "fleet"
+    ? await timedAdminQuery(activeTab, "vehicle_optional_fields", getVehicleOptionalFieldSupport(supabase))
+    : { enabled: false, columns: { vin: false, color: false, location: false } };
+
+  const emptyResult = Promise.resolve({ data: [], error: null });
 
   const [
     { data: roles, error: rolesError },
@@ -90,23 +98,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: adminAuditData, error: adminAuditError },
     { data: allowedEmailData, error: allowedEmailError },
   ] = await Promise.all([
-    supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
-    supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number"),
-    supabase
+    activeTab === "users" ? timedAdminQuery(activeTab, "user_roles", supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email")) : emptyResult,
+    activeTab === "fleet" ? timedAdminQuery(activeTab, "vehicles", supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number")) : emptyResult,
+    activeTab === "fleet" || activeTab === "bookings" ? timedAdminQuery(activeTab, "bookings", supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
-      .order("starts_at", { ascending: true }),
-    supabase
+      .order("starts_at", { ascending: true })) : emptyResult,
+    activeTab === "bookings" ? timedAdminQuery(activeTab, "booking_cancellations", supabase
       .from("booking_cancellations")
       .select("id, booking_id, vehicle_plate_number, vehicle_model, booked_by_email, starts_at, ends_at, is_long_term, booking_comments, cancelled_by_email, cancelled_by_admin, cancellation_note, cancelled_at")
       .order("cancelled_at", { ascending: false })
-      .limit(500),
-    supabase
+      .limit(500)) : emptyResult,
+    activeTab === "loans" ? timedAdminQuery(activeTab, "admin_action_audits", supabase
       .from("admin_action_audits")
       .select("id, action_type, admin_email, target_email, details, created_at, vehicle:vehicles!admin_action_audits_vehicle_id_fkey(plate_number, model)")
       .order("created_at", { ascending: false })
-      .limit(100),
-    supabase.from("allowed_user_emails").select("email, notes, created_at").order("email"),
+      .limit(100)) : emptyResult,
+    activeTab === "users" ? timedAdminQuery(activeTab, "approved_emails", supabase.from("allowed_user_emails").select("email, notes, created_at").order("email")) : emptyResult,
   ]);
 
   if (rolesError) {
@@ -134,16 +142,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const fleet = ((vehicles ?? []) as unknown[]) as Vehicle[];
-  const vehicleIds = fleet.map((vehicle) => vehicle.id);
   const { data: activeLoanData, error: activeLoanError } =
-    vehicleIds.length > 0
-      ? await supabase
+    activeTab === "fleet" || activeTab === "loans"
+      ? await timedAdminQuery(activeTab, "active_loans", supabase
           .from("vehicle_loans")
           .select(
             "id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)",
           )
-          .in("vehicle_id", vehicleIds)
-          .is("returned_at", null)
+          .is("returned_at", null))
       : { data: [], error: null };
 
   if (activeLoanError) {
@@ -151,7 +157,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const userRoles = (roles ?? []) as UserRole[];
-  const allowedEmails = (allowedEmailData ?? []) as AllowedUserEmail[];
+  const allowedEmails = (allowedEmailData ?? []) as ApprovedEmailEntry[];
   const activeLoans = ((activeLoanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const activeLoanByVehicleId = new Map(activeLoans.map((loan) => [loan.vehicle_id, loan]));
   const activeOrUpcomingBookings = ((bookingData ?? []) as RawVehicleBooking[])
@@ -200,7 +206,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const message = typeof params.message === "string" ? params.message : null;
   const error = typeof params.error === "string" ? params.error : null;
   const now = Date.now();
-  const activeTab = params.tab === "bookings" || params.tab === "loans" || params.tab === "users" ? params.tab : "fleet";
   const tabHref = (tab: AdminTab) => `/admin${tab === "fleet" ? "" : `?tab=${tab}`}`;
   const overdueLoans = activeLoans.filter((loan) => !loan.is_long_term && loan.expected_return_at && new Date(loan.expected_return_at).getTime() < now);
   const longTermLoans = activeLoans.filter((loan) => loan.is_long_term);
@@ -239,60 +244,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </nav>
 
       <section className="statsGrid adminStatsGrid">
-        <article className="statCard">
-          <p className="statLabel">Active loans</p>
-          <p className="statValue">{activeLoans.length}</p>
-        </article>
-        <article className="statCard">
-          <p className="statLabel">Overdue</p>
-          <p className="statValue">{overdueLoans.length}</p>
-        </article>
-        <article className="statCard">
-          <p className="statLabel">Started reservations</p>
-          <p className="statValue">{startedUnconvertedBookings.length}</p>
-        </article>
+        {activeTab === "users" ? (
+          <>
+            <article className="statCard"><p className="statLabel">Registered users</p><p className="statValue">{userRoles.length}</p></article>
+            <article className="statCard"><p className="statLabel">Approved emails</p><p className="statValue">{allowedEmails.length}</p></article>
+          </>
+        ) : null}
+        {activeTab === "fleet" || activeTab === "loans" ? (
+          <>
+            <article className="statCard"><p className="statLabel">Active loans</p><p className="statValue">{activeLoans.length}</p></article>
+            <article className="statCard"><p className="statLabel">Overdue</p><p className="statValue">{overdueLoans.length}</p></article>
+          </>
+        ) : null}
+        {activeTab === "fleet" || activeTab === "bookings" ? (
+          <article className="statCard"><p className="statLabel">Started reservations</p><p className="statValue">{startedUnconvertedBookings.length}</p></article>
+        ) : null}
       </section>
 
       {activeTab === "users" ? (
         <>
-      <section className="panel">
-        <h2>Approved signup emails</h2>
-        <p className="muted">Add an employee here before they create an account. Removing an email blocks future signup but does not disable an existing account.</p>
-        <form action={addAllowedUserEmail}>
-          <div className="formGrid">
-            <label className="fieldLabel">
-              Employee email
-              <input autoComplete="email" name="email" placeholder="name@yourcompany.com" required type="email" />
-            </label>
-            <label className="fieldLabel">
-              Notes
-              <input name="notes" placeholder="Team or reason (optional)" />
-            </label>
-          </div>
-          <SubmitButton idleLabel="Approve email" pendingLabel="Duck is approving..." showPendingDuck />
-        </form>
-      </section>
-
-      <div className="tableWrap">
-        <table>
-          <thead><tr><th>Approved email</th><th>Notes</th><th>Added</th><th>Action</th></tr></thead>
-          <tbody>
-            {allowedEmails.map((entry) => (
-              <tr key={entry.email}>
-                <td>{entry.email}</td>
-                <td>{entry.notes ?? "-"}</td>
-                <td>{formatDateTime(entry.created_at)}</td>
-                <td>
-                  <form action={removeAllowedUserEmail}>
-                    <input name="email" type="hidden" value={entry.email} />
-                    <SubmitButton className="ghostButton" idleLabel="Remove" pendingLabel="Removing..." />
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ApprovedEmailManager initialEntries={allowedEmails} />
 
       <section className="panel">
         <h2>How admin access works</h2>
