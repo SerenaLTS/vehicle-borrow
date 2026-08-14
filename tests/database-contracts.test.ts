@@ -11,6 +11,7 @@ const historyPerformanceMigration = readFileSync(resolve(process.cwd(), "supabas
 const historyCountMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-13_history_count.sql"), "utf8");
 const signupAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-14_signup_email_allowlist.sql"), "utf8");
 const signupAllowlistPermissionsMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-15_signup_allowlist_permissions.sql"), "utf8");
+const privateAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-16_auth_rate_limits_and_private_allowlist.sql"), "utf8");
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -86,6 +87,14 @@ describe("admin database transaction contracts", () => {
     expect(signupAllowlistPermissionsMigration).toContain("grant select, insert, delete");
     expect(signupAllowlistPermissionsMigration).toContain("to authenticated");
     expect(signupAllowlistPermissionsMigration).toContain("revoke all on table public.allowed_user_emails from anon");
+  });
+
+  it("keeps allowlist lookup private and rate limits auth through service role only", () => {
+    expect(privateAllowlistMigration).toContain("revoke all on function public.is_signup_email_allowed(text) from anon, authenticated, public");
+    expect(privateAllowlistMigration).toContain("table if not exists public.auth_rate_limits");
+    expect(privateAllowlistMigration).toContain("function public.consume_auth_rate_limit");
+    expect(privateAllowlistMigration).toContain("to service_role");
+    expect(privateAllowlistMigration).toContain("from anon, authenticated, public");
   });
 
   it("claims reminder work before sending email", () => {

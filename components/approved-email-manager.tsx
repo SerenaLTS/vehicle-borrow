@@ -45,17 +45,23 @@ export function ApprovedEmailManager({ initialEntries }: ApprovedEmailManagerPro
     setNotice(null);
 
     startTransition(async () => {
-      const result = await addAllowedUserEmail(formData);
-      setPendingEmail(null);
-      if (!result.ok) {
-        setEntries((current) => current.filter((entry) => entry.email !== email));
-        setNotice({ kind: "error", text: result.message });
-        return;
-      }
+      try {
+        const result = await addAllowedUserEmail(formData);
+        if (!result.ok) {
+          setEntries((current) => current.filter((entry) => entry.email !== email));
+          setNotice({ kind: "error", text: result.message });
+          return;
+        }
 
-      setEntries((current) => current.map((entry) => entry.email === email ? result.entry : entry));
-      setNotice({ kind: "success", text: result.message });
-      formRef.current?.reset();
+        setEntries((current) => current.map((entry) => entry.email === email ? result.entry : entry));
+        setNotice({ kind: "success", text: result.message });
+        formRef.current?.reset();
+      } catch {
+        setEntries((current) => current.filter((entry) => entry.email !== email));
+        setNotice({ kind: "error", text: "Unable to approve this email. Please try again." });
+      } finally {
+        setPendingEmail(null);
+      }
     });
   }
 
@@ -69,14 +75,20 @@ export function ApprovedEmailManager({ initialEntries }: ApprovedEmailManagerPro
     const formData = new FormData();
     formData.set("email", email);
     startTransition(async () => {
-      const result = await removeAllowedUserEmail(formData);
-      setPendingEmail(null);
-      if (!result.ok) {
+      try {
+        const result = await removeAllowedUserEmail(formData);
+        if (!result.ok) {
+          setEntries(previousEntries);
+          setNotice({ kind: "error", text: result.message });
+          return;
+        }
+        setNotice({ kind: "success", text: result.message });
+      } catch {
         setEntries(previousEntries);
-        setNotice({ kind: "error", text: result.message });
-        return;
+        setNotice({ kind: "error", text: "Unable to remove this email. Please try again." });
+      } finally {
+        setPendingEmail(null);
       }
-      setNotice({ kind: "success", text: result.message });
     });
   }
 

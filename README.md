@@ -164,7 +164,9 @@ npm test
 For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
 
 ```text
-supabase/2026-08-15_signup_allowlist_permissions.sql
+supabase/2026-08-16_auth_rate_limits_and_private_allowlist.sql
 ```
 
-It explicitly grants authenticated administrators access to manage the approved-email list while RLS continues to enforce admin-only access.
+It makes allowlist checks private and adds database-backed login and signup rate limiting. Run all earlier dated migrations first.
+
+In Supabase Dashboard, also enable the **Before User Created** Auth Hook and select `public.hook_require_allowed_user_email`. The server performs the same private check, while the hook remains the final database-level safeguard.

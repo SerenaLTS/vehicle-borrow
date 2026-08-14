@@ -86,7 +86,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const optionalFieldSupport = activeTab === "fleet"
     ? await timedAdminQuery(activeTab, "vehicle_optional_fields", getVehicleOptionalFieldSupport(supabase))
-    : { enabled: false, columns: { vin: false, color: false, location: false } };
+    : { enabled: false, vinColumn: null, colorColumn: null, locationColumn: null };
 
   const emptyResult = Promise.resolve({ data: [], error: null });
 

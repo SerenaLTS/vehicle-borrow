@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isCompanyEmail } from "@/lib/utils";
+import { consumeAuthRateLimit } from "@/lib/auth-rate-limit";
 
 function getAuthOrigin() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
@@ -31,6 +33,10 @@ export async function signInWithPassword(formData: FormData) {
     redirect("/?error=Please enter your password.");
   }
 
+  if (!await consumeAuthRateLimit("sign_in", email)) {
+    redirect("/?error=Unable to complete sign in. Please wait and try again.");
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -56,18 +62,23 @@ export async function signUpWithPassword(formData: FormData) {
     redirect("/?error=Password must be at least 8 characters.");
   }
 
+  if (!await consumeAuthRateLimit("sign_up", email)) {
+    redirect("/?message=If this email is eligible, the account request will be processed. Please wait before trying again.");
+  }
+
+  const admin = createAdminClient();
+  const { data: approvedEmail, error: approvalError } = await admin
+    .from("allowed_user_emails")
+    .select("email")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (approvalError) logAuthError("private allowlist check", approvalError);
+  if (!approvedEmail || approvalError) {
+    redirect("/?message=If this email is eligible, the account request has been processed. Check your inbox or try signing in.");
+  }
+
   const supabase = await createClient();
-  const { data: isAllowed, error: allowlistError } = await supabase.rpc("is_signup_email_allowed", { p_email: email });
-
-  if (allowlistError) {
-    logAuthError("allowlist check", allowlistError);
-    redirect("/?error=Unable to check account access. Please try again.");
-  }
-
-  if (!isAllowed) {
-    redirect("/?error=Your email has not been approved for this internal application. Please contact an administrator.");
-  }
-
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -78,10 +89,9 @@ export async function signUpWithPassword(formData: FormData) {
 
   if (error) {
     logAuthError("account creation", error);
-    redirect("/?error=Unable to create the account. Check your details or contact an administrator.");
   }
 
-  redirect("/?message=Account created. Please sign in with your password.");
+  redirect("/?message=If this email is eligible, the account request has been processed. Check your inbox or try signing in.");
 }
 
 export async function signOut() {
