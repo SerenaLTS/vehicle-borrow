@@ -269,7 +269,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <input name="notes" placeholder="Team or reason (optional)" />
             </label>
           </div>
-          <SubmitButton idleLabel="Approve email" pendingLabel="Adding..." />
+          <SubmitButton idleLabel="Approve email" pendingLabel="Duck is approving..." showPendingDuck />
         </form>
       </section>
 

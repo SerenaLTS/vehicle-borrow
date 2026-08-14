@@ -1207,6 +1207,8 @@ where nullif(trim(email), '') is not null
 on conflict (email) do nothing;
 
 alter table public.allowed_user_emails enable row level security;
+grant select, insert, delete on table public.allowed_user_emails to authenticated;
+revoke all on table public.allowed_user_emails from anon;
 
 drop policy if exists "Admins can read allowed emails" on public.allowed_user_emails;
 create policy "Admins can read allowed emails" on public.allowed_user_emails

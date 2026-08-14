@@ -10,6 +10,7 @@ const historyAndBookingMigration = readFileSync(resolve(process.cwd(), "supabase
 const historyPerformanceMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-12_history_pagination_performance.sql"), "utf8");
 const historyCountMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-13_history_count.sql"), "utf8");
 const signupAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-14_signup_email_allowlist.sql"), "utf8");
+const signupAllowlistPermissionsMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-15_signup_allowlist_permissions.sql"), "utf8");
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -79,6 +80,12 @@ describe("admin database transaction contracts", () => {
     expect(signupAllowlistMigration).toContain("function public.hook_require_allowed_user_email");
     expect(signupAllowlistMigration).toContain("to supabase_auth_admin");
     expect(signupAllowlistMigration).toContain("from authenticated, anon, public");
+  });
+
+  it("grants allowlist table access explicitly while retaining RLS", () => {
+    expect(signupAllowlistPermissionsMigration).toContain("grant select, insert, delete");
+    expect(signupAllowlistPermissionsMigration).toContain("to authenticated");
+    expect(signupAllowlistPermissionsMigration).toContain("revoke all on table public.allowed_user_emails from anon");
   });
 
   it("claims reminder work before sending email", () => {

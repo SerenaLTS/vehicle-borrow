@@ -164,7 +164,7 @@ npm test
 For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
 
 ```text
-supabase/2026-08-14_signup_email_allowlist.sql
+supabase/2026-08-15_signup_allowlist_permissions.sql
 ```
 
-It adds the approved-email list and the database hook used to block unapproved account creation.
+It explicitly grants authenticated administrators access to manage the approved-email list while RLS continues to enforce admin-only access.
