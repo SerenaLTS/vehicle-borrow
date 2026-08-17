@@ -1,4 +1,5 @@
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking } from "@/lib/types";
+import { getLoanCalendarEndAt } from "@/lib/loan-calendar";
 
 export type VehicleCalendarEvent = {
   id: string;
@@ -40,18 +41,6 @@ const cachedVehicleCalendarById = new Map<
 
 function sortEvents(events: VehicleCalendarEvent[]) {
   return [...events].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
-}
-
-function getLoanCalendarEndAt(loan: ReturnType<typeof normalizeLoan>, yearEndIso: string) {
-  if (loan.returned_at) {
-    return loan.returned_at;
-  }
-
-  if (loan.expected_return_at) {
-    return loan.expected_return_at;
-  }
-
-  return loan.is_long_term ? yearEndIso : new Date().toISOString();
 }
 
 export async function getVehicleCalendarSnapshot(supabase: unknown, vehicleId: string): Promise<VehicleCalendarSnapshot> {
@@ -130,7 +119,7 @@ export async function getVehicleCalendarSnapshotForYear(
     const loans = ((loanData ?? []) as RawLoanRow[])
       .map(normalizeLoan)
       .filter((loan) => {
-        const loanEnd = getLoanCalendarEndAt(loan, yearEndIso);
+        const loanEnd = getLoanCalendarEndAt(loan);
         return loanEnd >= yearStartIso;
       });
     const events = sortEvents([
@@ -147,7 +136,7 @@ export async function getVehicleCalendarSnapshotForYear(
         kind: "borrowed" as const,
         actor: loan.borrower_email,
         startAt: loan.borrowed_at,
-        endAt: getLoanCalendarEndAt(loan, yearEndIso),
+        endAt: getLoanCalendarEndAt(loan),
         notes: loan.purpose || loan.borrow_notes || null,
       })),
     ]);

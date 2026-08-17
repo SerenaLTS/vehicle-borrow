@@ -14,6 +14,7 @@ import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/li
 import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicleBooking, type Vehicle } from "@/lib/types";
 import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
+import { getLoanCalendarEndAt } from "@/lib/loan-calendar";
 
 function vehicleRecordLoadError(error: unknown, area: string) {
   return getSafeActionErrorMessage(error, "Unable to load the vehicle record. Please try again.", `admin:vehicle record ${area}`);
@@ -100,7 +101,6 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   const currentYear = new Date().getFullYear();
   const requestedMonth = typeof pageParams.month === "string" && /^\d{4}-\d{2}$/.test(pageParams.month) ? pageParams.month : undefined;
   const loadedYear = Number((requestedMonth ?? `${currentYear}-01`).slice(0, 4));
-  const loadedYearEndIso = new Date(Date.UTC(loadedYear + 1, 0, 1, 0, 0, 0, 0)).toISOString();
   const currentBooking =
     bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false))) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
@@ -118,7 +118,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       kind: "borrowed" as const,
       actor: loan.borrower_email,
       startAt: loan.borrowed_at,
-      endAt: loan.returned_at ?? loan.expected_return_at ?? (loan.is_long_term ? loadedYearEndIso : new Date().toISOString()),
+      endAt: getLoanCalendarEndAt(loan),
       notes: loan.purpose || loan.borrow_notes || null,
     })),
   ].filter((event) => {
@@ -217,7 +217,13 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           </div>
           <div>
             <strong>Expected return</strong>
-            <span>{currentLoan?.is_long_term ? "Long term" : formatDateTime(currentLoan?.expected_return_at ?? null)}</span>
+            <span>
+              {currentLoan?.is_long_term
+                ? "Long term · not returned"
+                : currentLoan?.expected_return_at && new Date(currentLoan.expected_return_at).getTime() < now
+                  ? `${formatDateTime(currentLoan.expected_return_at)} · overdue, not returned`
+                  : formatDateTime(currentLoan?.expected_return_at ?? null)}
+            </span>
           </div>
           <div>
             <strong>Current reservation</strong>

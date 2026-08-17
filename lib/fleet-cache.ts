@@ -1,5 +1,6 @@
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { normalizeLoan, normalizeVehicleBooking, type LoanRow, type RawLoanRow, type RawVehicleBooking, type Vehicle, type VehicleBooking } from "@/lib/types";
+import { getLoanCalendarEndAt } from "@/lib/loan-calendar";
 
 type SupabaseLike = {
   from: (table: string) => {
@@ -89,7 +90,7 @@ function createScheduleTimelineMap(bookings: VehicleBooking[], loans: LoanRow[])
       kind: "borrowed",
       actor: loan.borrower_email,
       startAt: loan.borrowed_at,
-      endAt: loan.returned_at ?? loan.expected_return_at ?? new Date().toISOString(),
+      endAt: getLoanCalendarEndAt(loan),
       notes: loan.purpose || loan.borrow_notes,
     });
     timelineByVehicleId.set(loan.vehicle_id, vehicleTimeline);
