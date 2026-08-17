@@ -459,6 +459,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         />
                       </label>
                       <label className="fieldLabel">
+                        Current vehicle location
+                        <input name="vehicleLocation" placeholder="e.g. P4-276" required />
+                        <span className="fieldHint">If parked at the office, use the P4-276 format.</span>
+                      </label>
+                      <label className="fieldLabel">
                         Admin return note
                         <textarea name="returnNotes" placeholder="Borrower forgot to return in system, confirmed key/vehicle returned..." required />
                       </label>

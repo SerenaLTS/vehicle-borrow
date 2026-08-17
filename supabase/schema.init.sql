@@ -675,7 +675,8 @@ select pg_notify('pgrst', 'reload schema');
 create or replace function public.return_vehicle(
   p_loan_id uuid,
   p_end_odometer integer,
-  p_return_notes text default null
+  p_return_notes text default null,
+  p_vehicle_location text default null
 )
 returns public.vehicle_loans
 language plpgsql
@@ -688,6 +689,10 @@ declare
 begin
   if v_user_id is null then
     raise exception 'You must be logged in to return a vehicle.';
+  end if;
+
+  if nullif(trim(p_vehicle_location), '') is null then
+    raise exception 'Please enter the current vehicle location.';
   end if;
 
   select *
@@ -722,14 +727,15 @@ begin
 
   update public.vehicles
   set status = 'available',
-      current_holder_user_id = null
+      current_holder_user_id = null,
+      location = trim(p_vehicle_location)
   where id = v_loan.vehicle_id;
 
   return v_loan;
 end;
 $$;
 
-grant execute on function public.return_vehicle(uuid, integer, text) to authenticated;
+grant execute on function public.return_vehicle(uuid, integer, text, text) to authenticated;
 
 
 -- Booking cancellation audit. Keep this in sync with
@@ -934,7 +940,8 @@ create or replace function public.admin_return_vehicle(
   p_loan_id uuid,
   p_vehicle_id uuid,
   p_end_odometer integer,
-  p_return_notes text
+  p_return_notes text,
+  p_vehicle_location text
 )
 returns public.vehicle_loans
 language plpgsql
@@ -953,6 +960,10 @@ begin
 
   if nullif(trim(p_return_notes), '') is null then
     raise exception 'Please enter an admin return note.';
+  end if;
+
+  if nullif(trim(p_vehicle_location), '') is null then
+    raise exception 'Please enter the current vehicle location.';
   end if;
 
   select * into v_loan
@@ -980,7 +991,8 @@ begin
   returning * into v_loan;
 
   update public.vehicles
-  set status = 'available', current_holder_user_id = null
+  set status = 'available', current_holder_user_id = null,
+      location = trim(p_vehicle_location)
   where id = p_vehicle_id;
 
   insert into public.admin_action_audits (
@@ -992,6 +1004,7 @@ begin
     jsonb_build_object(
       'end_odometer', p_end_odometer,
       'return_notes', trim(p_return_notes),
+      'vehicle_location', trim(p_vehicle_location),
       'borrowed_at', v_loan.borrowed_at
     )
   );
@@ -1000,8 +1013,8 @@ begin
 end;
 $$;
 
-revoke all on function public.admin_return_vehicle(uuid, uuid, integer, text) from public;
-grant execute on function public.admin_return_vehicle(uuid, uuid, integer, text) to authenticated;
+revoke all on function public.admin_return_vehicle(uuid, uuid, integer, text, text) from public;
+grant execute on function public.admin_return_vehicle(uuid, uuid, integer, text, text) to authenticated;
 
 -- Adds admin booking cancellations to the general admin action audit.
 -- Also backfills existing admin cancellations without duplicating records.

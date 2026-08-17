@@ -15,9 +15,10 @@ export async function returnVehicle(formData: FormData) {
   const loanId = String(formData.get("loanId") ?? "");
   const endOdometerValue = String(formData.get("endOdometer") ?? "").trim();
   const endOdometer = endOdometerValue ? Number(endOdometerValue) : null;
+  const vehicleLocation = String(formData.get("vehicleLocation") ?? "").trim();
   const returnNotes = String(formData.get("returnNotes") ?? "").trim() || null;
 
-  if (!loanId || (endOdometer !== null && (Number.isNaN(endOdometer) || endOdometer < 0))) {
+  if (!loanId || !vehicleLocation || (endOdometer !== null && (Number.isNaN(endOdometer) || endOdometer < 0))) {
     redirect("/return?error=Please complete the return details.");
   }
 
@@ -44,6 +45,7 @@ export async function returnVehicle(formData: FormData) {
     p_loan_id: loanId,
     p_end_odometer: endOdometer,
     p_return_notes: returnNotes,
+    p_vehicle_location: vehicleLocation,
   });
 
   if (error) {

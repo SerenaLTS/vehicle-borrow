@@ -227,11 +227,12 @@ export async function adminReturnVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const loanId = String(formData.get("loanId") ?? "").trim();
   const endOdometerValue = String(formData.get("endOdometer") ?? "").trim();
+  const vehicleLocation = String(formData.get("vehicleLocation") ?? "").trim();
   const returnNotes = String(formData.get("returnNotes") ?? "").trim();
   const endOdometer = endOdometerValue ? Number(endOdometerValue) : null;
 
-  if (!vehicleId || !loanId || !returnNotes || (endOdometer !== null && (Number.isNaN(endOdometer) || endOdometer < 0))) {
-    redirect("/admin?error=Please enter a valid admin return note and odometer.");
+  if (!vehicleId || !loanId || !vehicleLocation || !returnNotes || (endOdometer !== null && (Number.isNaN(endOdometer) || endOdometer < 0))) {
+    redirect("/admin?error=Please enter the vehicle location, a valid admin return note, and odometer.");
   }
 
   const supabase = await requireAdmin();
@@ -240,6 +241,7 @@ export async function adminReturnVehicle(formData: FormData) {
     p_vehicle_id: vehicleId,
     p_end_odometer: endOdometer,
     p_return_notes: returnNotes,
+    p_vehicle_location: vehicleLocation,
   });
 
   if (error) {

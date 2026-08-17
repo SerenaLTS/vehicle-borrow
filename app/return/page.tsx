@@ -72,6 +72,12 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
             </label>
 
             <label className="fieldLabel">
+              Current vehicle location
+              <input name="vehicleLocation" placeholder="e.g. P4-276" required />
+              <span className="fieldHint">If parked at the office, use the P4-276 format.</span>
+            </label>
+
+            <label className="fieldLabel">
               Notes
               <textarea name="returnNotes" placeholder="Optional return notes" />
             </label>
