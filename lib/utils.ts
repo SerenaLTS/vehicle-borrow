@@ -41,12 +41,12 @@ export function getVehicleDisplayStatus({
   hasCurrentHolder,
   hasActiveBooking,
 }: {
-  storedStatus: "available" | "booked" | "borrowed" | "maintenance" | "retired";
+  storedStatus: "available" | "booked" | "borrowed" | "in_transit" | "repair" | "maintenance" | "suspended" | "sold" | "retired";
   hasActiveLoan: boolean;
   hasCurrentHolder?: boolean;
   hasActiveBooking: boolean;
 }) {
-  if (storedStatus === "maintenance" || storedStatus === "retired") {
+  if (["in_transit", "repair", "maintenance", "suspended", "sold", "retired"].includes(storedStatus)) {
     return storedStatus;
   }
 

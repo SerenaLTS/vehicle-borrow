@@ -13,7 +13,7 @@ import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 import { getVehicleOptionalFieldPayload, getVehicleOptionalFieldSupport } from "@/lib/vehicle-schema";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
-type AdminVehicleStatus = "available" | "maintenance" | "retired";
+type AdminVehicleStatus = "available" | "in_transit" | "repair" | "maintenance" | "suspended" | "sold" | "retired";
 
 function adminActionError(error: unknown, action: string) {
   return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `admin:${action}`);
@@ -70,7 +70,33 @@ function revalidateVehicleLoanViews(vehicleId: string) {
 }
 
 function isEditableStatus(value: string): value is AdminVehicleStatus {
-  return value === "available" || value === "maintenance" || value === "retired";
+  return ["available", "in_transit", "repair", "maintenance", "suspended", "sold", "retired"].includes(value);
+}
+
+function getFleetDetails(formData: FormData) {
+  const optional = (name: string) => String(formData.get(name) ?? "").trim() || null;
+  const yearText = optional("modelYear");
+  const reminderText = optional("reminderDays");
+  const modelYear = yearText ? Number(yearText) : null;
+  const reminderDays = reminderText ? Number(reminderText) : 30;
+
+  if ((modelYear !== null && (!Number.isInteger(modelYear) || modelYear < 1900 || modelYear > 2100)) ||
+      !Number.isInteger(reminderDays) || reminderDays < 0 || reminderDays > 365) {
+    return { ok: false, error: "Model year or reminder days is invalid." } as const;
+  }
+
+  return { ok: true, values: {
+    make: optional("make"), model_year: modelYear, vehicle_type: optional("vehicleType"),
+    department: optional("department"), fuel_type: optional("fuelType"),
+    default_parking_location: optional("defaultParkingLocation"), spare_key_location: optional("spareKeyLocation"),
+    current_location_name: optional("currentLocationName"), current_location_address: optional("currentLocationAddress"),
+    location_source: optional("locationSource"), location_comments: optional("locationComments"),
+    current_custodian_name: optional("currentCustodianName"), current_key_holder_name: optional("currentKeyHolderName"),
+    expected_return_or_arrival_at: optional("expectedReturnOrArrivalAt"), registration_state: optional("registrationState"),
+    registration_expires_on: optional("registrationExpiresOn"), insurer: optional("insurer"),
+    insurance_policy_number: optional("insurancePolicyNumber"), insurance_expires_on: optional("insuranceExpiresOn"),
+    inspection_expires_on: optional("inspectionExpiresOn"), usage_restrictions: optional("usageRestrictions"), reminder_days: reminderDays,
+  }} as const;
 }
 
 async function syncVehicleStateFromActiveLoan(adminClient: ReturnType<typeof createAdminClient>, vehicleId: string) {
@@ -129,13 +155,15 @@ export async function createVehicle(formData: FormData) {
   const model = String(formData.get("model") ?? "").trim();
   const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
   const color = String(formData.get("color") ?? "").trim() || null;
-  const location = String(formData.get("location") ?? "").trim() || null;
+  const location = String(formData.get("currentLocationName") ?? formData.get("location") ?? "").trim() || null;
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
+  const fleetDetails = getFleetDetails(formData);
 
   if (!plateNumber || !model || !isEditableStatus(status)) {
     redirect("/admin?error=Please complete all vehicle fields.");
   }
+  if (!fleetDetails.ok) redirect(`/admin?error=${encodeURIComponent(fleetDetails.error)}`);
 
   const supabase = await requireAdmin();
   const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
@@ -144,6 +172,7 @@ export async function createVehicle(formData: FormData) {
     model,
     status,
     comments,
+    ...fleetDetails.values,
     ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }),
   };
   const { error } = await supabase.from("vehicles").insert(insertPayload);
@@ -165,13 +194,15 @@ export async function updateVehicle(formData: FormData) {
   const model = String(formData.get("model") ?? "").trim();
   const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
   const color = String(formData.get("color") ?? "").trim() || null;
-  const location = String(formData.get("location") ?? "").trim() || null;
+  const location = String(formData.get("currentLocationName") ?? formData.get("location") ?? "").trim() || null;
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
+  const fleetDetails = getFleetDetails(formData);
 
   if (!vehicleId || !model) {
     redirect("/admin?error=Please complete all vehicle fields before saving.");
   }
+  if (!fleetDetails.ok) redirect(`/admin?error=${encodeURIComponent(fleetDetails.error)}`);
 
   const supabase = await requireAdmin();
   const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
@@ -200,11 +231,12 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     isActivelyBorrowed
-      ? { model, comments, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }) }
+      ? { model, comments, ...fleetDetails.values, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }) }
       : {
           model,
           status,
           comments,
+          ...fleetDetails.values,
           current_holder_user_id: null,
           ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }),
         };

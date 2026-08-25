@@ -32,7 +32,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
 
-  const bookableVehicles = fleet.filter((vehicle) => vehicle.status !== "retired" && vehicle.status !== "maintenance");
+  const bookableVehicles = fleet.filter((vehicle) => !["retired", "sold", "maintenance", "repair", "suspended", "in_transit"].includes(vehicle.status));
   const error = typeof params.error === "string" ? params.error : null;
   const message = typeof params.message === "string" ? params.message : null;
   const yourBookings = upcomingBookings.filter((booking) => booking.booked_by_user_id === user.id);

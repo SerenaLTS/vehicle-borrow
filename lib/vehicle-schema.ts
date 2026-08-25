@@ -1,4 +1,4 @@
-const VEHICLE_BASE_SELECT = "id, plate_number, model, status, comments, current_holder_user_id";
+const VEHICLE_BASE_SELECT = "id, plate_number, model, make, model_year, vehicle_type, department, fuel_type, default_parking_location, spare_key_location, current_location_name, current_location_address, location_source, location_comments, location_updated_at, current_custodian_name, current_custodian_user_id, current_key_holder_name, current_key_holder_user_id, expected_return_or_arrival_at, registration_state, registration_expires_on, insurer, insurance_policy_number, insurance_expires_on, inspection_expires_on, usage_restrictions, reminder_days, status, comments, current_holder_user_id";
 
 type QueryResult<T> = {
   data: T | null;

@@ -13,6 +13,7 @@ const signupAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/2
 const signupAllowlistPermissionsMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-15_signup_allowlist_permissions.sql"), "utf8");
 const privateAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-16_auth_rate_limits_and_private_allowlist.sql"), "utf8");
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
+const fleetFieldsMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-25_fleet_fields_rls_and_constraints.sql"), "utf8");
 
 describe("admin database transaction contracts", () => {
   it("keeps booking conversion in one database function with an audit write", () => {
@@ -109,5 +110,20 @@ describe("admin database transaction contracts", () => {
     expect(reminderRoute).toContain("sent: sent.length");
     expect(reminderRoute).toContain("failed: failed.length");
     expect(reminderRoute).toContain("error: \"Unable to process reminders right now.\"");
+  });
+
+  it("protects sensitive fleet fields and supplies policies for every new table", () => {
+    expect(fleetFieldsMigration).toContain("revoke select on public.vehicles from authenticated");
+    expect(fleetFieldsMigration).toContain("view public.admin_vehicle_details");
+    expect(fleetFieldsMigration).toContain("Drivers can read own record and admins can read all");
+    expect(fleetFieldsMigration).toContain("Admins can manage compliance records");
+    expect(fleetFieldsMigration).toContain("Booking participants can read photos");
+  });
+
+  it("enforces new status and measurement rules in the database", () => {
+    expect(fleetFieldsMigration).toContain("vehicles_status_check");
+    expect(fleetFieldsMigration).toContain("vehicle_bookings_external_approval_check");
+    expect(fleetFieldsMigration).toContain("pickup_energy_percent between 0 and 100");
+    expect(fleetFieldsMigration).toContain("fleet_require_operational_vehicle");
   });
 });

@@ -52,7 +52,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     { data: roleData, error: rolesError },
   ] = await Promise.all([
     supabase
-      .from("vehicles")
+      .from("admin_vehicle_details")
       .select(getVehicleSelectClause(optionalFieldSupport))
       .eq("id", vehicleId)
       .maybeSingle(),
@@ -199,10 +199,21 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
               </div>
               <div>
                 <strong>Location</strong>
-                <span>{record.location || "-"}</span>
+                <span>{record.current_location_name || record.location || "-"}</span>
               </div>
             </>
           ) : null}
+          <div><strong>Make / year</strong><span>{[record.make, record.model_year].filter(Boolean).join(" · ") || "-"}</span></div>
+          <div><strong>Vehicle / fuel type</strong><span>{[record.vehicle_type, record.fuel_type].filter(Boolean).join(" · ") || "-"}</span></div>
+          <div><strong>Department</strong><span>{record.department || "-"}</span></div>
+          <div><strong>Default parking</strong><span>{record.default_parking_location || "-"}</span></div>
+          <div><strong>Spare key</strong><span>{record.spare_key_location || "-"}</span></div>
+          <div><strong>Location address</strong><span>{record.current_location_address || "-"}</span></div>
+          <div><strong>Location last updated</strong><span>{formatDateTime(record.location_updated_at)}</span></div>
+          <div><strong>Custodian / key holder</strong><span>{[record.current_custodian_name, record.current_key_holder_name].filter(Boolean).join(" · ") || "-"}</span></div>
+          <div><strong>Registration</strong><span>{[record.registration_state, record.registration_expires_on].filter(Boolean).join(" · expires ") || "-"}</span></div>
+          <div><strong>Insurance</strong><span>{[record.insurer, record.insurance_policy_number, record.insurance_expires_on].filter(Boolean).join(" · ") || "-"}</span></div>
+          <div><strong>Inspection expiry</strong><span>{record.inspection_expires_on || "-"}</span></div>
           <div>
             <strong>Current borrower</strong>
             <span>{currentLoan?.borrower_email ?? "-"}</span>

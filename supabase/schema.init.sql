@@ -2,6 +2,15 @@
 -- Keep this aligned with schema.sql and the latest migration files.
 
 create extension if not exists "pgcrypto";
+create extension if not exists btree_gist;
+
+do $$ begin create type public.fleet_vehicle_type as enum ('sedan', 'suv', 'ute', 'truck', 'display', 'other'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.fleet_fuel_type as enum ('petrol', 'diesel', 'hybrid', 'electric'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.fleet_location_source as enum ('manual', 'booking', 'gps', 'admin_confirmed'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.fleet_borrower_type as enum ('internal', 'external'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.fleet_approval_status as enum ('not_required', 'pending', 'approved', 'rejected', 'cancelled'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.fleet_booking_status as enum ('draft', 'pending_approval', 'approved', 'active', 'completed', 'cancelled', 'rejected'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.fleet_record_status as enum ('open', 'in_progress', 'resolved', 'closed'); exception when duplicate_object then null; end $$;
 
 create table if not exists public.vehicles (
   id uuid primary key default gen_random_uuid(),
@@ -20,10 +29,26 @@ alter table public.vehicles add column if not exists comments text;
 alter table public.vehicles add column if not exists vin text;
 alter table public.vehicles add column if not exists color text;
 alter table public.vehicles add column if not exists location text;
+alter table public.vehicles
+  add column if not exists make text, add column if not exists model_year smallint,
+  add column if not exists vehicle_type public.fleet_vehicle_type, add column if not exists department text,
+  add column if not exists fuel_type public.fleet_fuel_type, add column if not exists default_parking_location text,
+  add column if not exists spare_key_location text, add column if not exists current_location_name text,
+  add column if not exists current_location_address text, add column if not exists location_source public.fleet_location_source,
+  add column if not exists location_comments text, add column if not exists location_updated_at timestamptz,
+  add column if not exists location_updated_by uuid references auth.users(id) on delete set null,
+  add column if not exists current_custodian_name text, add column if not exists current_custodian_user_id uuid references auth.users(id) on delete set null,
+  add column if not exists current_key_holder_name text, add column if not exists current_key_holder_user_id uuid references auth.users(id) on delete set null,
+  add column if not exists expected_return_or_arrival_at timestamptz, add column if not exists registration_state text,
+  add column if not exists registration_expires_on date, add column if not exists insurer text,
+  add column if not exists insurance_policy_number text, add column if not exists insurance_expires_on date,
+  add column if not exists inspection_expires_on date, add column if not exists usage_restrictions text,
+  add column if not exists reminder_days integer not null default 30,
+  add column if not exists updated_at timestamptz not null default now(), add column if not exists updated_by uuid references auth.users(id) on delete set null;
 alter table public.vehicles drop constraint if exists vehicles_status_check;
 alter table public.vehicles
 add constraint vehicles_status_check
-check (status in ('available', 'booked', 'borrowed', 'maintenance', 'retired'));
+check (status in ('available', 'booked', 'borrowed', 'in_transit', 'repair', 'maintenance', 'suspended', 'sold', 'retired'));
 
 create unique index if not exists idx_vehicles_vin_unique
 on public.vehicles (vin)
@@ -96,6 +121,61 @@ alter table public.vehicle_bookings add column if not exists key_collection_remi
 alter table public.vehicle_bookings add column if not exists borrow_click_reminded_on date;
 alter table public.vehicle_bookings add column if not exists is_long_term boolean not null default false;
 alter table public.vehicle_bookings alter column ends_at drop not null;
+alter table public.vehicle_bookings
+  add column if not exists borrower_type public.fleet_borrower_type not null default 'internal',
+  add column if not exists applicant_name text, add column if not exists purpose text,
+  add column if not exists origin text, add column if not exists destination text,
+  add column if not exists actual_pickup_at timestamptz, add column if not exists actual_return_at timestamptz,
+  add column if not exists booking_status public.fleet_booking_status not null default 'draft',
+  add column if not exists approval_status public.fleet_approval_status not null default 'not_required',
+  add column if not exists approved_by uuid references auth.users(id) on delete set null,
+  add column if not exists approver_name text, add column if not exists approval_notes text,
+  add column if not exists approved_at timestamptz, add column if not exists pickup_odometer_km numeric(12,1),
+  add column if not exists pickup_energy_percent numeric(5,2), add column if not exists pickup_condition text,
+  add column if not exists return_odometer_km numeric(12,1), add column if not exists return_energy_percent numeric(5,2),
+  add column if not exists return_condition text, add column if not exists exception_notes text,
+  add column if not exists updated_at timestamptz not null default now(),
+  add column if not exists updated_by uuid references auth.users(id) on delete set null;
+alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_pickup_energy_check;
+alter table public.vehicle_bookings add constraint vehicle_bookings_pickup_energy_check check (pickup_energy_percent is null or pickup_energy_percent between 0 and 100);
+alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_return_energy_check;
+alter table public.vehicle_bookings add constraint vehicle_bookings_return_energy_check check (return_energy_percent is null or return_energy_percent between 0 and 100);
+alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_external_approval_check;
+alter table public.vehicle_bookings add constraint vehicle_bookings_external_approval_check check (borrower_type = 'internal' or approval_status <> 'not_required');
+
+create table if not exists public.drivers (
+  id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete set null,
+  legal_name text not null, licence_number text not null unique, licence_class text not null,
+  licence_expires_on date not null, licence_photo_drive_url text,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+alter table public.vehicle_bookings add column if not exists driver_id uuid references public.drivers(id) on delete restrict;
+create table if not exists public.vehicle_files (
+  id uuid primary key default gen_random_uuid(), vehicle_id uuid not null references public.vehicles(id) on delete cascade,
+  category text not null check (category in ('vehicle_photo','registration','insurance','inspection','compliance','other')),
+  file_name text, file_url text not null, notes text, created_at timestamptz not null default now(), created_by uuid references auth.users(id) on delete set null
+);
+create table if not exists public.booking_photos (
+  id uuid primary key default gen_random_uuid(), booking_id uuid not null references public.vehicle_bookings(id) on delete cascade,
+  stage text not null check (stage in ('pickup','return','incident','other')), file_url text not null,
+  caption text, created_at timestamptz not null default now(), created_by uuid references auth.users(id) on delete set null
+);
+create table if not exists public.vehicle_location_history (
+  id uuid primary key default gen_random_uuid(), vehicle_id uuid not null references public.vehicles(id) on delete cascade,
+  location_name text not null, address text, source public.fleet_location_source not null, comments text,
+  latitude numeric(9,6), longitude numeric(9,6), recorded_at timestamptz not null default now(), recorded_by uuid references auth.users(id) on delete set null
+);
+create table if not exists public.vehicle_compliance_records (
+  id uuid primary key default gen_random_uuid(), vehicle_id uuid not null references public.vehicles(id) on delete cascade,
+  record_type text not null check (record_type in ('accident','infringement','fine','toll','restriction','other')),
+  occurred_on date, description text not null, amount numeric(12,2), responsible_user_id uuid references auth.users(id) on delete set null,
+  responsible_person_name text, status public.fleet_record_status not null default 'open', resolution_notes text,
+  resolved_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create table if not exists public.compliance_files (
+  id uuid primary key default gen_random_uuid(), compliance_record_id uuid not null references public.vehicle_compliance_records(id) on delete cascade,
+  file_name text, file_url text not null, created_at timestamptz not null default now(), created_by uuid references auth.users(id) on delete set null
+);
 
 alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_time_check;
 alter table public.vehicle_bookings
@@ -187,6 +267,21 @@ create trigger vehicle_booking_validation_trigger
 before insert or update on public.vehicle_bookings
 for each row execute procedure public.validate_vehicle_booking();
 
+create or replace function public.fleet_require_operational_vehicle()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_status text; begin
+  select status into v_status from public.vehicles where id = new.vehicle_id;
+  if v_status is null then raise exception 'Vehicle not found.'; end if;
+  if v_status in ('in_transit','repair','maintenance','suspended','sold','retired') then
+    raise exception 'This vehicle is not available for booking or borrowing in its current status.';
+  end if;
+  return new;
+end; $$;
+drop trigger if exists fleet_booking_operational_vehicle on public.vehicle_bookings;
+create trigger fleet_booking_operational_vehicle before insert or update of vehicle_id on public.vehicle_bookings for each row execute function public.fleet_require_operational_vehicle();
+drop trigger if exists fleet_loan_operational_vehicle on public.vehicle_loans;
+create trigger fleet_loan_operational_vehicle before insert on public.vehicle_loans for each row execute function public.fleet_require_operational_vehicle();
+
 create index if not exists idx_vehicle_loans_vehicle_id on public.vehicle_loans (vehicle_id);
 create index if not exists idx_vehicle_loans_borrowed_by_user_id on public.vehicle_loans (borrowed_by_user_id);
 create index if not exists idx_vehicle_loans_active on public.vehicle_loans (vehicle_id, returned_at);
@@ -207,6 +302,12 @@ alter table public.vehicles enable row level security;
 alter table public.vehicle_loans enable row level security;
 alter table public.user_roles enable row level security;
 alter table public.vehicle_bookings enable row level security;
+alter table public.drivers enable row level security;
+alter table public.vehicle_files enable row level security;
+alter table public.booking_photos enable row level security;
+alter table public.vehicle_location_history enable row level security;
+alter table public.vehicle_compliance_records enable row level security;
+alter table public.compliance_files enable row level security;
 
 create or replace function public.handle_user_role_sync()
 returns trigger
@@ -252,6 +353,35 @@ as $$
 $$;
 
 grant execute on function public.is_admin(uuid) to authenticated;
+
+revoke select on public.vehicles from authenticated;
+grant select (id, plate_number, model, vin, color, location, make, model_year, vehicle_type,
+  department, fuel_type, default_parking_location, current_location_name, current_location_address,
+  location_source, location_comments, location_updated_at, location_updated_by, current_custodian_name,
+  current_custodian_user_id, current_key_holder_name, current_key_holder_user_id,
+  expected_return_or_arrival_at, registration_state, registration_expires_on, insurer,
+  insurance_expires_on, inspection_expires_on, usage_restrictions, reminder_days, status,
+  comments, current_holder_user_id, created_at, updated_at, updated_by) on public.vehicles to authenticated;
+create or replace view public.admin_vehicle_details with (security_barrier = true)
+as select * from public.vehicles where public.is_admin();
+revoke all on public.admin_vehicle_details from anon, public;
+grant select on public.admin_vehicle_details to authenticated;
+
+grant select, insert, update, delete on public.drivers, public.vehicle_files, public.booking_photos,
+  public.vehicle_location_history, public.vehicle_compliance_records, public.compliance_files to authenticated;
+revoke all on public.drivers, public.vehicle_files, public.booking_photos,
+  public.vehicle_location_history, public.vehicle_compliance_records, public.compliance_files from anon;
+create policy "Drivers can read own record and admins can read all" on public.drivers for select to authenticated using (user_id = auth.uid() or public.is_admin());
+create policy "Admins can manage drivers" on public.drivers for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Authenticated users can read vehicle files" on public.vehicle_files for select to authenticated using (true);
+create policy "Admins can manage vehicle files" on public.vehicle_files for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Booking participants can read photos" on public.booking_photos for select to authenticated using (public.is_admin() or exists (select 1 from public.vehicle_bookings b where b.id = booking_id and b.booked_by_user_id = auth.uid()));
+create policy "Booking participants can add photos" on public.booking_photos for insert to authenticated with check (created_by = auth.uid() and (public.is_admin() or exists (select 1 from public.vehicle_bookings b where b.id = booking_id and b.booked_by_user_id = auth.uid())));
+create policy "Admins can manage booking photos" on public.booking_photos for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Authenticated users can read location history" on public.vehicle_location_history for select to authenticated using (true);
+create policy "Admins can manage location history" on public.vehicle_location_history for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Admins can manage compliance records" on public.vehicle_compliance_records for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Admins can manage compliance files" on public.compliance_files for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "Authenticated users can read vehicles" on public.vehicles;
 create policy "Authenticated users can read vehicles"

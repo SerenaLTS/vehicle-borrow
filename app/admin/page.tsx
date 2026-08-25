@@ -7,6 +7,7 @@ import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
+import { VehicleDetailsFields } from "@/components/vehicle-details-fields";
 import { createClient } from "@/lib/supabase/server";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
@@ -99,7 +100,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: allowedEmailData, error: allowedEmailError },
   ] = await Promise.all([
     activeTab === "users" ? timedAdminQuery(activeTab, "user_roles", supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email")) : emptyResult,
-    activeTab === "fleet" ? timedAdminQuery(activeTab, "vehicles", supabase.from("vehicles").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number")) : emptyResult,
+    activeTab === "fleet" ? timedAdminQuery(activeTab, "vehicles", supabase.from("admin_vehicle_details").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number")) : emptyResult,
     activeTab === "fleet" || activeTab === "bookings" ? timedAdminQuery(activeTab, "bookings", supabase
       .from("vehicle_bookings")
       .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
@@ -330,10 +331,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Color
                   <input name="color" placeholder="White" />
                 </label>
-                <label className="fieldLabel">
-                  Location
-                  <input name="location" placeholder="Sydney office, warehouse..." />
-                </label>
               </>
             ) : null}
           </div>
@@ -342,11 +339,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <p className="muted">VIN, color, and location fields will appear after those columns are added to the vehicles table.</p>
           ) : null}
 
+          <VehicleDetailsFields />
+
           <label className="fieldLabel">
             Status
             <select defaultValue="available" name="status" required>
               <option value="available">available</option>
+              <option value="in_transit">in transit</option>
+              <option value="repair">repair</option>
               <option value="maintenance">maintenance</option>
+              <option value="suspended">suspended</option>
+              <option value="sold">sold</option>
               <option value="retired">retired</option>
             </select>
           </label>
@@ -400,6 +403,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 vehicle.vin,
                 vehicle.color,
                 vehicle.location,
+                vehicle.make,
+                vehicle.model_year,
+                vehicle.vehicle_type,
+                vehicle.department,
+                vehicle.fuel_type,
+                vehicle.registration_state,
                 vehicle.comments,
                 activeLoan?.borrower_email,
                 activeLoan?.driver_name,
@@ -509,12 +518,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <input defaultValue={vehicle.color ?? ""} name="color" placeholder="White" />
                     </label>
 
-                    <label className="fieldLabel">
-                      Location
-                      <input defaultValue={vehicle.location ?? ""} name="location" placeholder="Sydney office, warehouse..." />
-                    </label>
                   </div>
                 ) : null}
+
+                <VehicleDetailsFields vehicle={vehicle} />
 
                 <label className="fieldLabel">
                   Status
@@ -522,12 +529,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <p className="muted">borrowed</p>
                   ) : (
                     <select
-                      defaultValue={vehicle.status === "maintenance" || vehicle.status === "retired" ? vehicle.status : "available"}
+                      defaultValue={vehicle.status === "booked" || vehicle.status === "borrowed" ? "available" : vehicle.status}
                       name="status"
                       required
                     >
                       <option value="available">available</option>
+                      <option value="in_transit">in transit</option>
+                      <option value="repair">repair</option>
                       <option value="maintenance">maintenance</option>
+                      <option value="suspended">suspended</option>
+                      <option value="sold">sold</option>
                       <option value="retired">retired</option>
                     </select>
                   )}
