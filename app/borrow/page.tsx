@@ -82,6 +82,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
     return displayStatus === "booked";
   });
+  const requestedVehicleId = typeof params.vehicleId === "string" && availableVehicles.some((vehicle) => vehicle.id === params.vehicleId) ? params.vehicleId : "";
   const error = typeof params.error === "string" ? params.error : null;
   const message = typeof params.message === "string" ? params.message : null;
 
@@ -171,7 +172,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
 
             <label className="fieldLabel">
               Vehicle
-              <select name="vehicleId" required defaultValue="">
+              <select name="vehicleId" required defaultValue={requestedVehicleId}>
                 <option disabled value="">
                   Select a vehicle
                 </option>

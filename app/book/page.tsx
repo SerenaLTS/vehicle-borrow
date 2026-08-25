@@ -33,6 +33,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   const nextBookingByVehicleId = snapshot.nextBookingByVehicleId;
 
   const bookableVehicles = fleet.filter((vehicle) => !["retired", "sold", "maintenance", "repair", "suspended", "in_transit"].includes(vehicle.status));
+  const requestedVehicleId = typeof params.vehicleId === "string" && bookableVehicles.some((vehicle) => vehicle.id === params.vehicleId) ? params.vehicleId : "";
   const error = typeof params.error === "string" ? params.error : null;
   const message = typeof params.message === "string" ? params.message : null;
   const yourBookings = upcomingBookings.filter((booking) => booking.booked_by_user_id === user.id);
@@ -72,7 +73,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
             <label className="fieldLabel">
               Vehicle
-              <select name="vehicleId" required defaultValue="">
+              <select name="vehicleId" required defaultValue={requestedVehicleId}>
                 <option disabled value="">
                   Select a vehicle
                 </option>

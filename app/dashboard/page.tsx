@@ -96,6 +96,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <Link className="ghostButton" href="/history">
             View history
           </Link>
+          <Link className="ghostButton" href="/fleet">
+            Fleet
+          </Link>
           {isAdmin ? (
             <Link className="ghostButton" href="/admin">
               Admin
