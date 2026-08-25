@@ -135,6 +135,15 @@ describe("admin database transaction contracts", () => {
     expect(externalApprovalMigration).toContain("must be approved before key collection");
   });
 
+  it("repairs the shared audit trigger before backfilling bookings", () => {
+    const repairPosition = externalApprovalMigration.indexOf("create or replace function public.fleet_set_updated_audit_fields");
+    const backfillPosition = externalApprovalMigration.indexOf("update public.vehicle_bookings");
+    expect(repairPosition).toBeGreaterThan(-1);
+    expect(repairPosition).toBeLessThan(backfillPosition);
+    expect(externalApprovalMigration).toContain("if tg_table_name = 'vehicles' then");
+    expect(externalApprovalMigration).not.toContain("if tg_table_name = 'vehicles' and (");
+  });
+
   it("sends rego reminders once per day until an admin acknowledges them", () => {
     expect(externalApprovalMigration).toContain("registration_reminder_acknowledged_at");
     expect(externalApprovalMigration).toContain("registration_reminder_last_sent_on");

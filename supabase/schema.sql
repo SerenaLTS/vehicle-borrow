@@ -187,6 +187,31 @@ create table if not exists public.compliance_files (
   file_name text, file_url text not null, created_at timestamptz not null default now(), created_by uuid references auth.users(id) on delete set null
 );
 
+create or replace function public.fleet_set_updated_audit_fields()
+returns trigger language plpgsql security invoker set search_path = '' as $$
+begin
+  new.updated_at = now();
+  if auth.uid() is not null then new.updated_by = auth.uid(); end if;
+  if tg_table_name = 'vehicles' then
+    if tg_op = 'INSERT' then
+      new.location = new.current_location_name;
+      new.location_updated_at = coalesce(new.location_updated_at, now());
+      if auth.uid() is not null then new.location_updated_by = auth.uid(); end if;
+    elsif new.current_location_name is distinct from old.current_location_name
+       or new.current_location_address is distinct from old.current_location_address
+       or new.location_source is distinct from old.location_source
+       or new.location_comments is distinct from old.location_comments then
+      new.location = new.current_location_name; new.location_updated_at = now();
+      if auth.uid() is not null then new.location_updated_by = auth.uid(); end if;
+    end if;
+  end if;
+  return new;
+end; $$;
+drop trigger if exists fleet_vehicles_set_updated_audit_fields on public.vehicles;
+create trigger fleet_vehicles_set_updated_audit_fields before insert or update on public.vehicles for each row execute function public.fleet_set_updated_audit_fields();
+drop trigger if exists fleet_bookings_set_updated_audit_fields on public.vehicle_bookings;
+create trigger fleet_bookings_set_updated_audit_fields before insert or update on public.vehicle_bookings for each row execute function public.fleet_set_updated_audit_fields();
+
 alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_time_check;
 alter table public.vehicle_bookings
 add constraint vehicle_bookings_time_check

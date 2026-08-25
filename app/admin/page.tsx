@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { acknowledgeRegistrationReminder, adminReturnVehicle, adminStartReservationBorrow, createVehicle, decideExternalBooking, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { adminReturnVehicle, adminStartReservationBorrow, createVehicle, decideExternalBooking, retireVehicle, updateVehicleSummary } from "@/app/admin/actions";
 import { ApprovedEmailManager, type ApprovedEmailEntry } from "@/components/approved-email-manager";
 import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
@@ -420,8 +420,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <LoadingLink className="vehicleCardLink" href={`/admin/vehicles/${vehicle.id}`}>
                   <StatusPill status={displayStatus} />
                   <h3>{vehicle.plate_number}</h3>
-                  <p className="muted">{vehicle.model}</p>
-                  {vehicle.location ? <p className="muted">Location: {vehicle.location}</p> : null}
+                  <p className="muted">VIN: {vehicle.vin || "-"}</p>
+                  <p className="muted">Colour: {vehicle.color || "-"}</p>
                 </LoadingLink>
                 <LoadingLink className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
                   View records
@@ -498,14 +498,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </span>
                 </div>
               ) : null}
-              <form action={updateVehicle}>
+              <form action={updateVehicleSummary}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
-
-                <label className="fieldLabel">
-                  Model
-                  <input defaultValue={vehicle.model} name="model" required />
-                </label>
-
                 {optionalFieldSupport.enabled ? (
                   <div className="formGrid">
                     <label className="fieldLabel">
@@ -520,52 +514,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
                   </div>
                 ) : null}
-
-                <VehicleDetailsFields vehicle={vehicle} />
-
-                <label className="fieldLabel">
-                  Status
-                  {isActivelyBorrowed ? (
-                    <p className="muted">borrowed</p>
-                  ) : (
-                    <select
-                      defaultValue={vehicle.status === "booked" || vehicle.status === "borrowed" ? "available" : vehicle.status}
-                      name="status"
-                      required
-                    >
-                      <option value="available">available</option>
-                      <option value="in_transit">in transit</option>
-                      <option value="repair">repair</option>
-                      <option value="maintenance">maintenance</option>
-                      <option value="suspended">suspended</option>
-                      <option value="sold">sold</option>
-                      <option value="retired">retired</option>
-                    </select>
-                  )}
-                </label>
-
-                <label className="fieldLabel">
-                  Comments
-                  <textarea
-                    defaultValue={vehicle.comments ?? ""}
-                    name="comments"
-                    placeholder="Booking details, issues, handover notes..."
-                  />
-                </label>
-
                 <div className="actionsRow">
-                  <SubmitButton className="primaryButton" idleLabel="Save changes" pendingLabel="Saving..." />
+                  <SubmitButton className="primaryButton" idleLabel="Save VIN / colour" pendingLabel="Saving..." />
                 </div>
               </form>
-
-              {vehicle.registration_expires_on && !vehicle.registration_reminder_acknowledged_at &&
-              new Date(`${vehicle.registration_expires_on}T00:00:00`).getTime() - Date.now() <= vehicle.reminder_days * 86_400_000 ? (
-                <ConfirmForm action={acknowledgeRegistrationReminder} confirmMessage="Confirm this registration expiry has been handled? Daily reminders will stop.">
-                  <input name="vehicleId" type="hidden" value={vehicle.id} />
-                  <p className="message">Registration expires {vehicle.registration_expires_on}. Daily reminders are active.</p>
-                  <SubmitButton className="secondaryButton" idleLabel="Confirm rego handled" pendingLabel="Confirming..." />
-                </ConfirmForm>
-              ) : null}
 
               {!isActivelyBorrowed ? (
                 <form action={retireVehicle}>

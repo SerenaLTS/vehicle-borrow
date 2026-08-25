@@ -252,7 +252,30 @@ export async function updateVehicle(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/borrow");
   revalidatePath("/dashboard");
-  redirect("/admin?message=Vehicle updated successfully.");
+  redirect(formData.get("returnTo") === "detail"
+    ? `/admin/vehicles/${vehicleId}?message=Vehicle updated successfully.`
+    : "/admin?message=Vehicle updated successfully.");
+}
+
+export async function updateVehicleSummary(formData: FormData) {
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
+  const color = String(formData.get("color") ?? "").trim() || null;
+  if (!vehicleId) redirect("/admin?error=Vehicle not found.");
+
+  const supabase = await requireAdmin();
+  const support = await getVehicleOptionalFieldSupport(supabase);
+  const payload = {
+    ...(support.vinColumn ? { [support.vinColumn]: vin } : {}),
+    ...(support.colorColumn ? { [support.colorColumn]: color } : {}),
+  };
+  const { error } = await supabase.from("vehicles").update(payload).eq("id", vehicleId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "update VIN and colour"))}`);
+
+  clearFleetSnapshotCache(); clearVehicleCalendarCache(vehicleId);
+  revalidatePath("/admin"); revalidatePath(`/admin/vehicles/${vehicleId}`);
+  revalidatePath("/book"); revalidatePath("/borrow"); revalidatePath("/dashboard");
+  redirect("/admin?message=VIN and colour updated successfully.");
 }
 
 export async function adminReturnVehicle(formData: FormData) {

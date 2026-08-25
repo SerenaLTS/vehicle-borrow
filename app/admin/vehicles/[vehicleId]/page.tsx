@@ -5,7 +5,8 @@ import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
 import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
-import { adminStartReservationBorrow, createAdminBooking, createHistoricalLoan, deleteAdminBooking, updateAdminBooking, updateHistoricalLoan } from "@/app/admin/actions";
+import { VehicleDetailsFields } from "@/components/vehicle-details-fields";
+import { acknowledgeRegistrationReminder, adminStartReservationBorrow, createAdminBooking, createHistoricalLoan, deleteAdminBooking, updateAdminBooking, updateHistoricalLoan, updateVehicle } from "@/app/admin/actions";
 import { createClient } from "@/lib/supabase/server";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
@@ -253,6 +254,43 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <span>{record.comments || "-"}</span>
           </div>
         </div>
+
+        <details className="extensionDisclosure">
+          <summary>Edit full vehicle details</summary>
+          <form action={updateVehicle} className="extensionForm">
+            <input name="vehicleId" type="hidden" value={record.id} />
+            <input name="returnTo" type="hidden" value="detail" />
+            <label className="fieldLabel">Model<input defaultValue={record.model} name="model" required /></label>
+            {optionalFieldSupport.enabled ? (
+              <div className="formGrid">
+                <label className="fieldLabel">VIN<input defaultValue={record.vin ?? ""} name="vin" /></label>
+                <label className="fieldLabel">Colour<input defaultValue={record.color ?? ""} name="color" /></label>
+              </div>
+            ) : null}
+            <VehicleDetailsFields vehicle={record} />
+            <label className="fieldLabel">
+              Status
+              {currentLoan ? <p className="muted">borrowed</p> : (
+                <select defaultValue={record.status === "booked" || record.status === "borrowed" ? "available" : record.status} name="status" required>
+                  <option value="available">available</option><option value="in_transit">in transit</option>
+                  <option value="repair">repair</option><option value="maintenance">maintenance</option>
+                  <option value="suspended">suspended</option><option value="sold">sold</option><option value="retired">retired</option>
+                </select>
+              )}
+            </label>
+            <label className="fieldLabel">Comments<textarea defaultValue={record.comments ?? ""} name="comments" /></label>
+            <SubmitButton className="primaryButton" idleLabel="Save full details" pendingLabel="Saving..." />
+          </form>
+        </details>
+
+        {record.registration_expires_on && !record.registration_reminder_acknowledged_at &&
+        new Date(`${record.registration_expires_on}T00:00:00`).getTime() - Date.now() <= record.reminder_days * 86_400_000 ? (
+          <ConfirmForm action={acknowledgeRegistrationReminder} confirmMessage="Confirm this registration expiry has been handled? Daily reminders will stop.">
+            <input name="vehicleId" type="hidden" value={record.id} />
+            <p className="message">Registration expires {record.registration_expires_on}. Daily reminders are active.</p>
+            <SubmitButton className="secondaryButton" idleLabel="Confirm rego handled" pendingLabel="Confirming..." />
+          </ConfirmForm>
+        ) : null}
       </section>
 
       <section className="panel">
