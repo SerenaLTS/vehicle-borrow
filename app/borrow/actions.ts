@@ -21,7 +21,6 @@ function getExtendReturnPath(formData: FormData) {
 
 export async function borrowVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "");
-  const customDriverName = String(formData.get("driverName") ?? "").trim();
   const purpose = String(formData.get("purpose") ?? "").trim();
   const startOdometerValue = String(formData.get("startOdometer") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
@@ -48,7 +47,8 @@ export async function borrowVehicle(formData: FormData) {
     redirect("/");
   }
 
-  const driverName = customDriverName || user.email || "";
+  const profileName = typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "";
+  const driverName = profileName || user.email || "";
 
   if (!driverName) {
     redirect("/borrow?error=Unable to detect the signed-in email address.");

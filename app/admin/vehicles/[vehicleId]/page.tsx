@@ -53,7 +53,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
   ] = await Promise.all([
     supabase
       .from("admin_vehicle_details")
-      .select(getVehicleSelectClause(optionalFieldSupport))
+      .select(getVehicleSelectClause(optionalFieldSupport, true))
       .eq("id", vehicleId)
       .maybeSingle(),
     supabase

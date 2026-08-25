@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { adminReturnVehicle, adminStartReservationBorrow, createVehicle, retireVehicle, updateVehicle } from "@/app/admin/actions";
+import { acknowledgeRegistrationReminder, adminReturnVehicle, adminStartReservationBorrow, createVehicle, decideExternalBooking, retireVehicle, updateVehicle } from "@/app/admin/actions";
 import { ApprovedEmailManager, type ApprovedEmailEntry } from "@/components/approved-email-manager";
 import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
@@ -100,10 +100,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: allowedEmailData, error: allowedEmailError },
   ] = await Promise.all([
     activeTab === "users" ? timedAdminQuery(activeTab, "user_roles", supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email")) : emptyResult,
-    activeTab === "fleet" ? timedAdminQuery(activeTab, "vehicles", supabase.from("admin_vehicle_details").select(getVehicleSelectClause(optionalFieldSupport)).order("plate_number")) : emptyResult,
+    activeTab === "fleet" ? timedAdminQuery(activeTab, "vehicles", supabase.from("admin_vehicle_details").select(getVehicleSelectClause(optionalFieldSupport, true)).order("plate_number")) : emptyResult,
     activeTab === "fleet" || activeTab === "bookings" ? timedAdminQuery(activeTab, "bookings", supabase
       .from("vehicle_bookings")
-      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+      .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, borrower_type, driver_name, booking_status, approval_status, approval_notes, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
       .order("starts_at", { ascending: true })) : emptyResult,
     activeTab === "bookings" ? timedAdminQuery(activeTab, "booking_cancellations", supabase
       .from("booking_cancellations")
@@ -558,6 +558,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               </form>
 
+              {vehicle.registration_expires_on && !vehicle.registration_reminder_acknowledged_at &&
+              new Date(`${vehicle.registration_expires_on}T00:00:00`).getTime() - Date.now() <= vehicle.reminder_days * 86_400_000 ? (
+                <ConfirmForm action={acknowledgeRegistrationReminder} confirmMessage="Confirm this registration expiry has been handled? Daily reminders will stop.">
+                  <input name="vehicleId" type="hidden" value={vehicle.id} />
+                  <p className="message">Registration expires {vehicle.registration_expires_on}. Daily reminders are active.</p>
+                  <SubmitButton className="secondaryButton" idleLabel="Confirm rego handled" pendingLabel="Confirming..." />
+                </ConfirmForm>
+              ) : null}
+
               {!isActivelyBorrowed ? (
                 <form action={retireVehicle}>
                   <input name="vehicleId" type="hidden" value={vehicle.id} />
@@ -624,12 +633,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>From: {formatDateTime(booking.starts_at)}</span>
                       <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
                       <span>Comments: {booking.comments || "-"}</span>
+                      {booking.driver_name ? <span>External driver: {booking.driver_name}</span> : <span>Driver: account holder</span>}
+                      <span>Approval: {booking.approval_status ?? "not required"}</span>
                     </div>
                     <div className="actionsRow">
                       <LoadingLink className="secondaryButton" href={`/admin/vehicles/${booking.vehicle_id}`}>
                         Manage
                       </LoadingLink>
-                      {isActiveReservation ? (
+                      {isActiveReservation && (booking.borrower_type !== "external" || booking.approval_status === "approved") ? (
                         <ConfirmForm action={adminStartReservationBorrow} confirmMessage="Start this reservation as an active borrow for the reserved user?">
                           <input name="bookingId" type="hidden" value={booking.id} />
                           <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
@@ -637,6 +648,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         </ConfirmForm>
                       ) : null}
                     </div>
+                    {booking.borrower_type === "external" && booking.approval_status === "pending" ? (
+                      <form action={decideExternalBooking}>
+                        <input name="bookingId" type="hidden" value={booking.id} />
+                        <label className="fieldLabel">Approval note<textarea name="approvalNotes" placeholder="Optional approval or rejection reason" /></label>
+                        <div className="actionsRow">
+                          <button className="primaryButton" name="decision" type="submit" value="approved">Approve external driver</button>
+                          <button className="ghostButton" name="decision" type="submit" value="rejected">Reject</button>
+                        </div>
+                      </form>
+                    ) : null}
                   </article>
                 );
               })}

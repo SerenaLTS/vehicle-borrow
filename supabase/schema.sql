@@ -42,6 +42,18 @@ alter table public.vehicles
   add column if not exists inspection_expires_on date, add column if not exists usage_restrictions text,
   add column if not exists reminder_days integer not null default 30,
   add column if not exists updated_at timestamptz not null default now(), add column if not exists updated_by uuid references auth.users(id) on delete set null;
+alter table public.vehicles add column if not exists registration_reminder_acknowledged_at timestamptz;
+alter table public.vehicles add column if not exists registration_reminder_acknowledged_by uuid references auth.users(id) on delete set null;
+alter table public.vehicles add column if not exists registration_reminder_last_sent_on date;
+create or replace function public.fleet_reset_registration_reminder()
+returns trigger language plpgsql security invoker set search_path = '' as $$ begin
+  if new.registration_expires_on is distinct from old.registration_expires_on then
+    new.registration_reminder_acknowledged_at = null; new.registration_reminder_acknowledged_by = null;
+    new.registration_reminder_last_sent_on = null;
+  end if; return new;
+end; $$;
+drop trigger if exists fleet_reset_registration_reminder on public.vehicles;
+create trigger fleet_reset_registration_reminder before update of registration_expires_on on public.vehicles for each row execute function public.fleet_reset_registration_reminder();
 alter table public.vehicles drop constraint if exists vehicles_status_check;
 alter table public.vehicles
 add constraint vehicles_status_check
@@ -133,6 +145,7 @@ alter table public.vehicle_bookings
   add column if not exists return_condition text, add column if not exists exception_notes text,
   add column if not exists updated_at timestamptz not null default now(),
   add column if not exists updated_by uuid references auth.users(id) on delete set null;
+alter table public.vehicle_bookings add column if not exists driver_name text;
 alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_pickup_energy_check;
 alter table public.vehicle_bookings add constraint vehicle_bookings_pickup_energy_check check (pickup_energy_percent is null or pickup_energy_percent between 0 and 100);
 alter table public.vehicle_bookings drop constraint if exists vehicle_bookings_return_energy_check;
@@ -595,6 +608,10 @@ begin
     raise exception 'You can only collect keys for your own bookings.';
   end if;
 
+  if v_booking.borrower_type = 'external' and v_booking.approval_status <> 'approved' then
+    raise exception 'This external driver reservation must be approved before key collection.';
+  end if;
+
   if (not v_booking.is_long_term) and v_booking.ends_at <= v_now then
     raise exception 'This booking has already ended.';
   end if;
@@ -646,7 +663,7 @@ begin
   values (
     v_booking.vehicle_id,
     v_user_id,
-    coalesce(v_email, v_booking.booked_by_email, ''),
+    coalesce(nullif(trim(v_booking.driver_name), ''), coalesce(v_email, v_booking.booked_by_email, '')),
     coalesce(v_email, v_booking.booked_by_email, ''),
     coalesce(nullif(trim(v_booking.comments), ''), 'Booking converted after key collection'),
     null,

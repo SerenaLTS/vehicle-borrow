@@ -88,6 +88,15 @@ export type BorrowOverdueReminderSnapshot = {
   expectedReturnAt: string;
 };
 
+export type RegistrationExpiryReminderSnapshot = {
+  vehicleId: string;
+  plateNumber: string;
+  model: string;
+  registrationState: string | null;
+  expiresOn: string;
+  daysRemaining: number;
+};
+
 type BookingNotificationParams = {
   supabase: unknown;
   action: BookingNotificationAction;
@@ -684,6 +693,33 @@ export async function sendBookingHandoverConflictReminderEmail({
   });
 
   return true;
+}
+
+export async function sendRegistrationExpiryReminderEmail({
+  supabase,
+  reminder,
+}: {
+  supabase: unknown;
+  reminder: RegistrationExpiryReminderSnapshot;
+}) {
+  const mailConfig = getMailConfig();
+  if (!mailConfig) throw new Error("Email configuration is incomplete.");
+  const adminEmails = await getAdminEmails(supabase);
+  if (adminEmails.length === 0) throw new Error("No administrator email recipients are configured.");
+  const transporter = createMailTransporter(mailConfig);
+  const vehicleLabel = `${reminder.plateNumber} • ${reminder.model}`;
+  const urgency = reminder.daysRemaining < 0 ? `${Math.abs(reminder.daysRemaining)} day(s) overdue` : `${reminder.daysRemaining} day(s) remaining`;
+  await transporter.sendMail({
+    from: mailConfig.from,
+    to: adminEmails,
+    subject: `Rego action required: ${vehicleLabel}`,
+    text: [
+      "A vehicle registration expiry needs attention.", "", `Vehicle: ${vehicleLabel}`,
+      `State: ${reminder.registrationState ?? "-"}`, `Expiry date: ${reminder.expiresOn}`,
+      `Status: ${urgency}`, "", "This reminder is sent daily until an admin opens Fleet manager and selects Confirm rego handled.",
+    ].join("\n"),
+    html: `<p>A vehicle registration expiry needs attention.</p><ul><li><strong>Vehicle:</strong> ${escapeHtml(vehicleLabel)}</li><li><strong>State:</strong> ${escapeHtml(reminder.registrationState ?? "-")}</li><li><strong>Expiry date:</strong> ${escapeHtml(reminder.expiresOn)}</li><li><strong>Status:</strong> ${escapeHtml(urgency)}</li></ul><p>This reminder is sent daily until an admin opens Fleet manager and selects <strong>Confirm rego handled</strong>.</p>`,
+  });
 }
 
 export async function sendImmediateKeyCollectionReminderIfDue({

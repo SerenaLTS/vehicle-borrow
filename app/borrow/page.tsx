@@ -166,6 +166,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
             <label className="fieldLabel">
               Borrowing as
               <input defaultValue={user.email ?? ""} disabled />
+              <span className="fieldHint">Immediate borrowing is only for the signed-in employee. To let an external person drive, create a reservation and wait for Serena or JD approval.</span>
             </label>
 
             <label className="fieldLabel">
@@ -186,10 +187,6 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
             </label>
 
             <div className="formGrid">
-              <label className="fieldLabel">
-                Driver (if applicable)
-                <input name="driverName" placeholder="Influencer or other driver name" />
-              </label>
               <label className="fieldLabel">
                 Purpose
                 <input name="purpose" placeholder="Client visit, airport pickup..." required />

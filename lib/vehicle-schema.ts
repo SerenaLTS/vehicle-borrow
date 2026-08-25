@@ -1,4 +1,5 @@
-const VEHICLE_BASE_SELECT = "id, plate_number, model, make, model_year, vehicle_type, department, fuel_type, default_parking_location, spare_key_location, current_location_name, current_location_address, location_source, location_comments, location_updated_at, current_custodian_name, current_custodian_user_id, current_key_holder_name, current_key_holder_user_id, expected_return_or_arrival_at, registration_state, registration_expires_on, insurer, insurance_policy_number, insurance_expires_on, inspection_expires_on, usage_restrictions, reminder_days, status, comments, current_holder_user_id";
+const VEHICLE_BASE_SELECT = "id, plate_number, model, make, model_year, vehicle_type, department, fuel_type, default_parking_location, current_location_name, current_location_address, location_source, location_comments, location_updated_at, current_custodian_name, current_custodian_user_id, current_key_holder_name, current_key_holder_user_id, expected_return_or_arrival_at, registration_state, registration_expires_on, insurer, insurance_expires_on, inspection_expires_on, usage_restrictions, reminder_days, status, comments, current_holder_user_id";
+const VEHICLE_ADMIN_SELECT = "spare_key_location, insurance_policy_number, registration_reminder_acknowledged_at";
 
 type QueryResult<T> = {
   data: T | null;
@@ -65,14 +66,14 @@ export async function getVehicleOptionalFieldSupport(supabase: unknown): Promise
   return cachedVehicleOptionalFieldSupport;
 }
 
-export function getVehicleSelectClause(optionalFieldSupport: VehicleOptionalFieldSupport) {
+export function getVehicleSelectClause(optionalFieldSupport: VehicleOptionalFieldSupport, includeAdminFields = false) {
   const optionalColumns = [
     optionalFieldSupport.vinColumn ? `vin:${optionalFieldSupport.vinColumn}` : null,
     optionalFieldSupport.colorColumn ? `color:${optionalFieldSupport.colorColumn}` : null,
     optionalFieldSupport.locationColumn ? `location:${optionalFieldSupport.locationColumn}` : null,
   ].filter(Boolean);
 
-  return optionalColumns.length > 0 ? `${VEHICLE_BASE_SELECT}, ${optionalColumns.join(", ")}` : VEHICLE_BASE_SELECT;
+  return [VEHICLE_BASE_SELECT, includeAdminFields ? VEHICLE_ADMIN_SELECT : null, ...optionalColumns].filter(Boolean).join(", ");
 }
 
 export function getVehicleOptionalFieldPayload(

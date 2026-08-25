@@ -24,6 +24,7 @@ export type Vehicle = {
   expected_return_or_arrival_at: string | null;
   registration_state: string | null;
   registration_expires_on: string | null;
+  registration_reminder_acknowledged_at: string | null;
   insurer: string | null;
   insurance_policy_number: string | null;
   insurance_expires_on: string | null;
@@ -97,6 +98,11 @@ export type VehicleBooking = {
   ends_at: string | null;
   is_long_term: boolean;
   comments: string | null;
+  borrower_type?: "internal" | "external";
+  driver_name?: string | null;
+  booking_status?: "draft" | "pending_approval" | "approved" | "active" | "completed" | "cancelled" | "rejected";
+  approval_status?: "not_required" | "pending" | "approved" | "rejected" | "cancelled";
+  approval_notes?: string | null;
   created_at: string;
   vehicle: {
     plate_number: string;

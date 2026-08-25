@@ -61,6 +61,13 @@ export default async function BookPage({ searchParams }: BookPageProps) {
             <label className="fieldLabel">
               Reserved by
               <input defaultValue={user.email ?? ""} disabled />
+              <span className="fieldHint">Company employees must reserve and borrow using their own account.</span>
+            </label>
+
+            <label className="fieldLabel">
+              External driver name (leave blank if you are driving)
+              <input name="externalDriverName" placeholder="External person's legal name" />
+              <span className="fieldHint">Booking for an external person requires Serena or JD approval.</span>
             </label>
 
             <label className="fieldLabel">
@@ -136,14 +143,16 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   <span>From: {formatDateTime(booking.starts_at)}</span>
                   <span>Until: {booking.is_long_term ? "Long term" : formatDateTime(booking.ends_at)}</span>
                   <span>Comments: {booking.comments || "-"}</span>
+                  {booking.driver_name ? <span>External driver: {booking.driver_name}</span> : <span>Driver: booking account holder</span>}
+                  <span>Approval: {booking.approval_status === "pending" ? "Pending Serena / JD approval" : booking.approval_status ?? "Not required"}</span>
                   <span>Created: {formatDateTime(booking.created_at)}</span>
                 </div>
 
-                <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
+                {booking.borrower_type !== "external" || booking.approval_status === "approved" ? <ConfirmForm action={collectBookingKey} confirmMessage="Confirm you have collected the key and want to start this borrow?">
                   <input name="bookingId" type="hidden" value={booking.id} />
                   <input name="vehicleId" type="hidden" value={booking.vehicle_id} />
                   <SubmitButton className="primaryButton" idleLabel="Start borrow" pendingLabel="Starting..." />
-                </ConfirmForm>
+                </ConfirmForm> : <p className="message">Waiting for external driver approval. The key cannot be collected yet.</p>}
 
                 {hasStarted ? (
                   <>
@@ -179,6 +188,11 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                       <label className="fieldLabel">
                         Comments
                         <textarea defaultValue={booking.comments ?? ""} name="comments" />
+                      </label>
+                      <label className="fieldLabel">
+                        External driver name (leave blank if you are driving)
+                        <input defaultValue={booking.driver_name ?? ""} name="externalDriverName" />
+                        <span className="fieldHint">Company employees must book for themselves. An external driver requires Serena or JD approval.</span>
                       </label>
 
                       <div className="actionsRow">

@@ -292,6 +292,50 @@ export async function adminReturnVehicle(formData: FormData) {
   redirect("/admin?message=Vehicle returned by admin successfully.");
 }
 
+export async function decideExternalBooking(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim();
+  const approvalNotes = String(formData.get("approvalNotes") ?? "").trim() || null;
+  if (!bookingId || (decision !== "approved" && decision !== "rejected")) redirect("/admin?tab=bookings&error=Invalid approval request.");
+
+  const supabase = await requireAdmin();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/");
+  const { data: booking, error: loadError } = await supabase.from("vehicle_bookings").select("id, vehicle_id, borrower_type").eq("id", bookingId).maybeSingle();
+  if (loadError || !booking || booking.borrower_type !== "external") redirect("/admin?tab=bookings&error=External reservation not found.");
+
+  const { error } = decision === "rejected"
+    ? await supabase.rpc("cancel_vehicle_booking", {
+        p_booking_id: bookingId,
+        p_cancellation_note: approvalNotes ? `External driver rejected: ${approvalNotes}` : "External driver request rejected by admin.",
+        p_cancelled_as_admin: true,
+      })
+    : await supabase.from("vehicle_bookings").update({
+        approval_status: "approved", booking_status: "approved", approved_by: user.id,
+        approver_name: user.email ?? "Admin", approval_notes: approvalNotes, approved_at: new Date().toISOString(),
+      }).eq("id", bookingId);
+  if (error) redirect(`/admin?tab=bookings&error=${encodeURIComponent(adminActionError(error, "record the approval decision"))}`);
+  clearFleetSnapshotCache();
+  clearVehicleCalendarCache(booking.vehicle_id);
+  revalidatePath("/admin"); revalidatePath("/book"); revalidatePath("/dashboard");
+  redirect(`/admin?tab=bookings&message=External reservation ${decision}.`);
+}
+
+export async function acknowledgeRegistrationReminder(formData: FormData) {
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  if (!vehicleId) redirect("/admin?error=Vehicle not found.");
+  const supabase = await requireAdmin();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/");
+  const { error } = await supabase.from("vehicles").update({
+    registration_reminder_acknowledged_at: new Date().toISOString(),
+    registration_reminder_acknowledged_by: user.id,
+  }).eq("id", vehicleId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "confirm the registration reminder"))}`);
+  clearFleetSnapshotCache(); revalidatePath("/admin");
+  redirect("/admin?message=Registration reminder marked as handled.");
+}
+
 export async function createAdminBooking(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
   const bookedForUserId = String(formData.get("bookedForUserId") ?? "").trim();
@@ -613,7 +657,7 @@ export async function adminStartReservationBorrow(formData: FormData) {
   const supabase = await requireAdmin();
   const { data: booking, error: bookingError } = await supabase
     .from("vehicle_bookings")
-    .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
+    .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, borrower_type, approval_status")
     .eq("id", bookingId)
     .eq("vehicle_id", vehicleId)
     .maybeSingle();
@@ -624,6 +668,10 @@ export async function adminStartReservationBorrow(formData: FormData) {
 
   if (!booking) {
     redirect(`/admin/vehicles/${vehicleId}?error=Reservation not found.`);
+  }
+
+  if (booking.borrower_type === "external" && booking.approval_status !== "approved") {
+    redirect(`/admin/vehicles/${vehicleId}?error=Approve the external driver before starting this borrow.`);
   }
 
   const { error } = await supabase.rpc("admin_start_booking_borrow", {

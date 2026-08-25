@@ -130,7 +130,7 @@ export async function getFleetSnapshot(supabase: unknown): Promise<FleetSnapshot
         Promise.resolve({ data: [] }),
       client
         .from("vehicle_bookings")
-        .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
+        .select("id, vehicle_id, booked_by_user_id, booked_by_email, starts_at, ends_at, is_long_term, comments, borrower_type, driver_name, booking_status, approval_status, approval_notes, created_at, vehicle:vehicles!vehicle_bookings_vehicle_id_fkey(plate_number, model)")
         .order?.("starts_at", { ascending: true }) ?? Promise.resolve({ data: [] }),
       client.from("vehicle_loans").select("vehicle_id").is?.("returned_at", null) ?? Promise.resolve({ data: [] }),
       client

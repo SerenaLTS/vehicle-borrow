@@ -20,6 +20,8 @@ export async function createBooking(formData: FormData) {
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const isLongTerm = formData.get("isLongTerm") === "on";
   const comments = String(formData.get("comments") ?? "").trim() || null;
+  const externalDriverName = String(formData.get("externalDriverName") ?? "").trim() || null;
+  const isExternal = Boolean(externalDriverName);
 
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
   const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
@@ -54,6 +56,11 @@ export async function createBooking(formData: FormData) {
       ends_at: endsAt,
       is_long_term: isLongTerm,
       comments,
+      applicant_name: user.email ?? "",
+      driver_name: externalDriverName,
+      borrower_type: isExternal ? "external" : "internal",
+      approval_status: isExternal ? "pending" : "not_required",
+      booking_status: isExternal ? "pending_approval" : "approved",
     })
     .select("id, vehicle_id, booked_by_email, starts_at, ends_at, is_long_term, comments")
     .single();
@@ -76,7 +83,7 @@ export async function createBooking(formData: FormData) {
         isLongTerm: createdBooking.is_long_term,
         comments: createdBooking.comments,
       },
-      notifyAdmins: createdBooking.is_long_term,
+      notifyAdmins: createdBooking.is_long_term || isExternal,
     });
   } catch (notificationError) {
     console.error("Failed to send booking confirmation email.", notificationError);
@@ -108,7 +115,9 @@ export async function createBooking(formData: FormData) {
   revalidatePath("/borrow");
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
-  redirect("/dashboard?message=Vehicle booked successfully.");
+  redirect(isExternal
+    ? "/dashboard?message=External driver reservation submitted for approval."
+    : "/dashboard?message=Vehicle booked successfully.");
 }
 
 export async function updateOwnBooking(formData: FormData) {
@@ -117,6 +126,8 @@ export async function updateOwnBooking(formData: FormData) {
   const endsAtValue = String(formData.get("endsAt") ?? "").trim();
   const isLongTerm = formData.get("isLongTerm") === "on";
   const comments = String(formData.get("comments") ?? "").trim() || null;
+  const externalDriverName = String(formData.get("externalDriverName") ?? "").trim() || null;
+  const isExternal = Boolean(externalDriverName);
   const startsAt = startsAtValue ? parseDateTimeLocalToUtcIso(startsAtValue) ?? "" : "";
   const endsAt = !isLongTerm && endsAtValue ? parseDateTimeLocalToUtcIso(endsAtValue) ?? "" : null;
 
@@ -173,6 +184,10 @@ export async function updateOwnBooking(formData: FormData) {
       ends_at: endsAt,
       is_long_term: isLongTerm,
       comments,
+      driver_name: externalDriverName,
+      borrower_type: isExternal ? "external" : "internal",
+      approval_status: isExternal ? "pending" : "not_required",
+      booking_status: isExternal ? "pending_approval" : "approved",
     })
     .eq("id", bookingId)
     .eq("booked_by_user_id", user.id);
@@ -322,6 +337,17 @@ export async function collectBookingKey(formData: FormData) {
 
   if (!user) {
     redirect("/");
+  }
+
+  const { data: approvalBooking } = await supabase
+    .from("vehicle_bookings")
+    .select("borrower_type, approval_status")
+    .eq("id", bookingId)
+    .eq("booked_by_user_id", user.id)
+    .maybeSingle();
+
+  if (approvalBooking?.borrower_type === "external" && approvalBooking.approval_status !== "approved") {
+    redirect("/book?error=This external driver reservation must be approved before the key can be collected.");
   }
 
   const { error } = await supabase.rpc("collect_booking_key", {
