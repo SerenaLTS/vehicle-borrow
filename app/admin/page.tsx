@@ -349,6 +349,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <option value="repair">repair</option>
               <option value="maintenance">maintenance</option>
               <option value="suspended">suspended</option>
+              <option value="employee_car">employee car</option>
               <option value="sold">sold</option>
               <option value="retired">retired</option>
             </select>

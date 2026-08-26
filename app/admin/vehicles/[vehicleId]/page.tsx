@@ -276,7 +276,8 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <select defaultValue={record.status === "booked" || record.status === "borrowed" ? "available" : record.status} name="status" required>
                   <option value="available">available</option><option value="in_transit">in transit</option>
                   <option value="repair">repair</option><option value="maintenance">maintenance</option>
-                  <option value="suspended">suspended</option><option value="sold">sold</option><option value="retired">retired</option>
+                  <option value="suspended">suspended</option><option value="employee_car">employee car</option>
+                  <option value="sold">sold</option><option value="retired">retired</option>
                 </select>
               )}
             </label>

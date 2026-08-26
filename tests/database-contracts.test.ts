@@ -15,6 +15,7 @@ const privateAllowlistMigration = readFileSync(resolve(process.cwd(), "supabase/
 const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-reminders/route.ts"), "utf8");
 const fleetFieldsMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-25_fleet_fields_rls_and_constraints.sql"), "utf8");
 const externalApprovalMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-26_external_driver_approval_and_rego_reminders.sql"), "utf8");
+const employeeCarStatusMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-28_add_employee_car_status.sql"), "utf8");
 const regoReminderRoute = readFileSync(resolve(process.cwd(), "app/api/vehicle-expiry-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -127,6 +128,12 @@ describe("admin database transaction contracts", () => {
     expect(fleetFieldsMigration).toContain("vehicle_bookings_external_approval_check");
     expect(fleetFieldsMigration).toContain("pickup_energy_percent between 0 and 100");
     expect(fleetFieldsMigration).toContain("fleet_require_operational_vehicle");
+  });
+
+  it("makes employee cars a valid but non-bookable vehicle status", () => {
+    expect(employeeCarStatusMigration).toContain("'employee_car'");
+    expect(employeeCarStatusMigration).toContain("fleet_require_operational_vehicle");
+    expect(employeeCarStatusMigration).toContain("not available for booking or borrowing");
   });
 
   it("prevents unapproved external drivers from collecting a key", () => {

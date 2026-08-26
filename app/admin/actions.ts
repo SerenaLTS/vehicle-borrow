@@ -13,7 +13,7 @@ import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 import { getVehicleOptionalFieldPayload, getVehicleOptionalFieldSupport } from "@/lib/vehicle-schema";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
-type AdminVehicleStatus = "available" | "in_transit" | "repair" | "maintenance" | "suspended" | "sold" | "retired";
+type AdminVehicleStatus = "available" | "in_transit" | "repair" | "maintenance" | "suspended" | "employee_car" | "sold" | "retired";
 
 function adminActionError(error: unknown, action: string) {
   return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `admin:${action}`);
@@ -70,7 +70,7 @@ function revalidateVehicleLoanViews(vehicleId: string) {
 }
 
 function isEditableStatus(value: string): value is AdminVehicleStatus {
-  return ["available", "in_transit", "repair", "maintenance", "suspended", "sold", "retired"].includes(value);
+  return ["available", "in_transit", "repair", "maintenance", "suspended", "employee_car", "sold", "retired"].includes(value);
 }
 
 function getFleetDetails(formData: FormData) {

@@ -47,7 +47,7 @@ export default async function FleetPage() {
             hasCurrentHolder: Boolean(vehicle.current_holder_user_id),
             hasActiveBooking,
           });
-          const canReserve = !["retired", "sold", "maintenance", "repair", "suspended", "in_transit"].includes(vehicle.status);
+          const canReserve = !["retired", "sold", "maintenance", "repair", "suspended", "employee_car", "in_transit"].includes(vehicle.status);
 
           return (
             <article

@@ -31,7 +31,7 @@ export type Vehicle = {
   inspection_expires_on: string | null;
   usage_restrictions: string | null;
   reminder_days: number;
-  status: "available" | "booked" | "borrowed" | "in_transit" | "repair" | "maintenance" | "suspended" | "sold" | "retired";
+  status: "available" | "booked" | "borrowed" | "in_transit" | "repair" | "maintenance" | "suspended" | "employee_car" | "sold" | "retired";
   comments: string | null;
   current_holder_user_id: string | null;
 };

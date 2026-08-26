@@ -37,7 +37,7 @@ export async function validateVehicleBookingWindow(
     return "Vehicle not found.";
   }
 
-  if (["retired", "sold", "maintenance", "repair", "suspended", "in_transit"].includes(vehicle.status)) {
+  if (["retired", "sold", "maintenance", "repair", "suspended", "employee_car", "in_transit"].includes(vehicle.status)) {
     return "This vehicle cannot be booked in its current status.";
   }
 

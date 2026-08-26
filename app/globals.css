@@ -1048,6 +1048,7 @@ textarea {
   color: var(--danger);
 }
 
+.pill-employee_car,
 .pill-retired {
   background: rgba(76, 84, 102, 0.14);
   color: #4c5466;
