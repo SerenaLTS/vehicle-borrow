@@ -29,8 +29,14 @@ function sanitizeMonth(value: string | undefined) {
   return value;
 }
 
-function buildVehicleCalendarHref(vehicleId: string, month: string, from: string, reserve: boolean) {
-  return `/vehicle-calendar/${vehicleId}?month=${encodeURIComponent(month)}&from=${encodeURIComponent(from)}${reserve ? "&action=reserve" : ""}`;
+type VehicleAction = "borrow" | "reserve" | null;
+
+function sanitizeAction(value: string | string[] | undefined): VehicleAction {
+  return value === "borrow" || value === "reserve" ? value : null;
+}
+
+function buildVehicleCalendarHref(vehicleId: string, month: string, from: string, action: VehicleAction) {
+  return `/vehicle-calendar/${vehicleId}?month=${encodeURIComponent(month)}&from=${encodeURIComponent(from)}${action ? `&action=${action}` : ""}`;
 }
 
 export default async function VehicleCalendarPage({ params, searchParams }: VehicleCalendarPageProps) {
@@ -48,7 +54,7 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
   const backHref = sanitizeBackPath(typeof pageParams.from === "string" ? pageParams.from : null);
   const requestedMonth = sanitizeMonth(typeof pageParams.month === "string" ? pageParams.month : undefined);
   const requestedYear = Number((requestedMonth ?? `${new Date().getFullYear()}-01`).slice(0, 4));
-  const showReserveAction = pageParams.action === "reserve";
+  const vehicleAction = sanitizeAction(pageParams.action);
   const [isAdmin, calendarSnapshot, { data: loanData, error: loanError }] = await Promise.all([
     getIsAdmin(supabase, user.id),
     getVehicleCalendarSnapshotForYear(supabase, vehicleId, requestedYear),
@@ -56,8 +62,7 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
       .from("vehicle_loans")
       .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
       .eq("vehicle_id", vehicleId)
-      .order("borrowed_at", { ascending: false })
-      .limit(100),
+      .order("borrowed_at", { ascending: false }),
   ]);
   const vehicle = calendarSnapshot.vehicle;
 
@@ -93,14 +98,16 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
             <h2>{vehicle.plate_number}</h2>
             <p className="muted">{vehicle.model}</p>
           </div>
-          {showReserveAction ? (
+          {vehicleAction === "reserve" ? (
             <LoadingLink className="primaryButton" href={`/book?vehicleId=${encodeURIComponent(vehicleId)}`}>Reserve this vehicle</LoadingLink>
+          ) : vehicleAction === "borrow" ? (
+            <LoadingLink className="primaryButton" href={`/borrow?vehicleId=${encodeURIComponent(vehicleId)}`}>Borrow this vehicle</LoadingLink>
           ) : null}
         </div>
 
         <VehicleMonthlyCalendar
-          crossYearNextHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year + 1}-01`, backHref, showReserveAction)}
-          crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref, showReserveAction)}
+          crossYearNextHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year + 1}-01`, backHref, vehicleAction)}
+          crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref, vehicleAction)}
           events={events}
           initialMonth={initialMonth}
           loadedYear={calendarSnapshot.year}
