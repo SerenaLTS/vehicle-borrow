@@ -111,16 +111,18 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       kind: "booked" as const,
       actor: booking.booked_by_email,
       startAt: booking.starts_at,
-      endAt: booking.ends_at,
+      endAt: booking.is_long_term ? new Date(Date.UTC(loadedYear + 1, 0, 1) - 1).toISOString() : booking.ends_at,
       notes: booking.comments ?? null,
+      isLongTerm: booking.is_long_term,
     })),
     ...history.map((loan) => ({
       id: loan.id,
       kind: "borrowed" as const,
       actor: loan.borrower_email,
       startAt: loan.borrowed_at,
-      endAt: getLoanCalendarEndAt(loan),
+      endAt: loan.is_long_term && !loan.returned_at ? new Date(Date.UTC(loadedYear + 1, 0, 1) - 1).toISOString() : getLoanCalendarEndAt(loan),
       notes: loan.purpose || loan.borrow_notes || null,
+      isLongTerm: loan.is_long_term,
     })),
   ].filter((event) => {
     const eventYearStart = Number(event.startAt.slice(0, 4));

@@ -8,6 +8,7 @@ export type VehicleCalendarEvent = {
   startAt: string;
   endAt: string | null;
   notes: string | null;
+  isLongTerm?: boolean;
 };
 
 type VehicleCalendarSnapshot = {
@@ -119,6 +120,9 @@ export async function getVehicleCalendarSnapshotForYear(
     const loans = ((loanData ?? []) as RawLoanRow[])
       .map(normalizeLoan)
       .filter((loan) => {
+        if (loan.is_long_term && !loan.returned_at) {
+          return true;
+        }
         const loanEnd = getLoanCalendarEndAt(loan);
         return loanEnd >= yearStartIso;
       });
@@ -128,16 +132,18 @@ export async function getVehicleCalendarSnapshotForYear(
         kind: "booked" as const,
         actor: booking.booked_by_email,
         startAt: booking.starts_at,
-        endAt: booking.ends_at,
+        endAt: booking.is_long_term ? new Date(Date.UTC(year + 1, 0, 1) - 1).toISOString() : booking.ends_at,
         notes: booking.comments ?? null,
+        isLongTerm: booking.is_long_term,
       })),
       ...loans.map((loan) => ({
         id: loan.id,
         kind: "borrowed" as const,
         actor: loan.borrower_email,
         startAt: loan.borrowed_at,
-        endAt: getLoanCalendarEndAt(loan),
+        endAt: loan.is_long_term && !loan.returned_at ? new Date(Date.UTC(year + 1, 0, 1) - 1).toISOString() : getLoanCalendarEndAt(loan),
         notes: loan.purpose || loan.borrow_notes || null,
+        isLongTerm: loan.is_long_term,
       })),
     ]);
 

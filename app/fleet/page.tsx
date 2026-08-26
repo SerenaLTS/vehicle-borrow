@@ -88,7 +88,7 @@ export default async function FleetPage() {
                   <LoadingLink className="primaryButton" href={`/borrow?vehicleId=${encodeURIComponent(vehicle.id)}`}>Borrow</LoadingLink>
                 ) : null}
                 {canReserve ? (
-                  <LoadingLink className="secondaryButton" href={`/book?vehicleId=${encodeURIComponent(vehicle.id)}`}>Reserve</LoadingLink>
+                  <LoadingLink className="secondaryButton" href={`/vehicle-calendar/${encodeURIComponent(vehicle.id)}?from=%2Ffleet&action=reserve`}>Reserve</LoadingLink>
                 ) : null}
               </div>
             </article>

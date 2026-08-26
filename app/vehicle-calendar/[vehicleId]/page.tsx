@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
+import { LoadingLink } from "@/components/loading-link";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
 import { formatDisplayName } from "@/lib/utils";
@@ -27,8 +28,8 @@ function sanitizeMonth(value: string | undefined) {
   return value;
 }
 
-function buildVehicleCalendarHref(vehicleId: string, month: string, from: string) {
-  return `/vehicle-calendar/${vehicleId}?month=${encodeURIComponent(month)}&from=${encodeURIComponent(from)}`;
+function buildVehicleCalendarHref(vehicleId: string, month: string, from: string, reserve: boolean) {
+  return `/vehicle-calendar/${vehicleId}?month=${encodeURIComponent(month)}&from=${encodeURIComponent(from)}${reserve ? "&action=reserve" : ""}`;
 }
 
 export default async function VehicleCalendarPage({ params, searchParams }: VehicleCalendarPageProps) {
@@ -46,6 +47,7 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
   const backHref = sanitizeBackPath(typeof pageParams.from === "string" ? pageParams.from : null);
   const requestedMonth = sanitizeMonth(typeof pageParams.month === "string" ? pageParams.month : undefined);
   const requestedYear = Number((requestedMonth ?? `${new Date().getFullYear()}-01`).slice(0, 4));
+  const showReserveAction = pageParams.action === "reserve";
   const [isAdmin, calendarSnapshot] = await Promise.all([
     getIsAdmin(supabase, user.id),
     getVehicleCalendarSnapshotForYear(supabase, vehicleId, requestedYear),
@@ -78,11 +80,14 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
             <h2>{vehicle.plate_number}</h2>
             <p className="muted">{vehicle.model}</p>
           </div>
+          {showReserveAction ? (
+            <LoadingLink className="primaryButton" href={`/book?vehicleId=${encodeURIComponent(vehicleId)}`}>Reserve this vehicle</LoadingLink>
+          ) : null}
         </div>
 
         <VehicleMonthlyCalendar
-          crossYearNextHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year + 1}-01`, backHref)}
-          crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref)}
+          crossYearNextHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year + 1}-01`, backHref, showReserveAction)}
+          crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref, showReserveAction)}
           events={events}
           initialMonth={initialMonth}
           loadedYear={calendarSnapshot.year}

@@ -308,9 +308,9 @@ export function VehicleMonthlyCalendar({
                             className={`calendarEvent calendarEvent-${segment.kind}`}
                             key={`${segment.kind}-${segment.id}-${resolvedMonth}-${weekIndex}`}
                             style={{ gridColumn: `${segment.startColumn} / ${segment.endColumn + 1}` }}
-                            title={`${segment.kind === "booked" ? "Booked" : "Borrowed"} • ${segment.actor}`}
+                            title={`${segment.kind === "booked" ? "Booked" : "Borrowed"} • ${segment.actor}${segment.isLongTerm ? " • Long term" : ""}`}
                           >
-                            <span>{segment.actor}</span>
+                            <span>{segment.actor}{segment.isLongTerm ? " • Long term" : ""}</span>
                           </div>
                         ))}
                       </div>
