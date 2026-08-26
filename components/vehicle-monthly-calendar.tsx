@@ -97,38 +97,9 @@ function addMonth(monthKey: string, delta: number) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-function buildInitialMonth(events: VehicleCalendarEvent[]) {
+function buildCurrentMonth() {
   const today = getZonedParts(new Date());
-  const todayKey = `${today.year}-${String(today.month).padStart(2, "0")}`;
-
-  if (events.length === 0) {
-    return todayKey;
-  }
-
-  const coveredMonths = new Set<string>();
-
-  for (const event of events) {
-    const start = getZonedParts(event.startAt);
-    const end = getZonedParts(event.endAt ?? event.startAt);
-    let year = start.year;
-    let month = start.month;
-
-    while (year < end.year || (year === end.year && month <= end.month)) {
-      coveredMonths.add(`${year}-${String(month).padStart(2, "0")}`);
-      month += 1;
-
-      if (month === 13) {
-        month = 1;
-        year += 1;
-      }
-    }
-  }
-
-  if (coveredMonths.has(todayKey)) {
-    return todayKey;
-  }
-
-  return Array.from(coveredMonths).sort()[0] ?? todayKey;
+  return `${today.year}-${String(today.month).padStart(2, "0")}`;
 }
 
 function getWeekSegments(
@@ -207,7 +178,7 @@ export function VehicleMonthlyCalendar({
   loadedYear,
 }: VehicleMonthlyCalendarProps) {
   const router = useRouter();
-  const [currentMonth, setCurrentMonth] = useState(initialMonth ?? buildInitialMonth(events));
+  const [currentMonth, setCurrentMonth] = useState(initialMonth ?? buildCurrentMonth());
   const resolvedMonth = currentMonth;
   const [yearText, monthText] = resolvedMonth.split("-");
   const year = Number(yearText);
@@ -223,7 +194,7 @@ export function VehicleMonthlyCalendar({
       })),
     [events],
   );
-  const effectiveLoadedYear = loadedYear ?? Number((initialMonth ?? buildInitialMonth(events)).slice(0, 4));
+  const effectiveLoadedYear = loadedYear ?? Number((initialMonth ?? buildCurrentMonth()).slice(0, 4));
 
   function moveMonth(delta: number) {
     const targetMonth = addMonth(resolvedMonth, delta);

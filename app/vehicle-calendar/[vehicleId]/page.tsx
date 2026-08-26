@@ -4,8 +4,9 @@ import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
 import { LoadingLink } from "@/components/loading-link";
 import { createClient } from "@/lib/supabase/server";
 import { getIsAdmin } from "@/lib/user-roles";
-import { formatDisplayName } from "@/lib/utils";
+import { formatDateTime, formatDisplayName } from "@/lib/utils";
 import { getVehicleCalendarSnapshotForYear } from "@/lib/vehicle-calendar-cache";
+import { normalizeLoan, type RawLoanRow } from "@/lib/types";
 
 type VehicleCalendarPageProps = {
   params: Promise<{ vehicleId: string }>;
@@ -48,15 +49,27 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
   const requestedMonth = sanitizeMonth(typeof pageParams.month === "string" ? pageParams.month : undefined);
   const requestedYear = Number((requestedMonth ?? `${new Date().getFullYear()}-01`).slice(0, 4));
   const showReserveAction = pageParams.action === "reserve";
-  const [isAdmin, calendarSnapshot] = await Promise.all([
+  const [isAdmin, calendarSnapshot, { data: loanData, error: loanError }] = await Promise.all([
     getIsAdmin(supabase, user.id),
     getVehicleCalendarSnapshotForYear(supabase, vehicleId, requestedYear),
+    supabase
+      .from("vehicle_loans")
+      .select("id, vehicle_id, borrowed_by_user_id, borrower_email, driver_name, purpose, start_odometer, end_odometer, borrow_notes, return_notes, borrowed_at, expected_return_at, is_long_term, returned_at, vehicle:vehicles!vehicle_loans_vehicle_id_fkey(plate_number, model)")
+      .eq("vehicle_id", vehicleId)
+      .order("borrowed_at", { ascending: false })
+      .limit(100),
   ]);
   const vehicle = calendarSnapshot.vehicle;
 
   if (!vehicle) {
     redirect(sanitizeBackPath(typeof pageParams.from === "string" ? pageParams.from : null));
   }
+
+  if (loanError) {
+    redirect(`${backHref}?error=${encodeURIComponent("Unable to load vehicle borrow history.")}`);
+  }
+
+  const loans = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
 
   const events = calendarSnapshot.events.map((event) => ({
     ...event,
@@ -92,6 +105,45 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
           initialMonth={initialMonth}
           loadedYear={calendarSnapshot.year}
         />
+      </section>
+
+      <section className="panel">
+        <div className="sectionHeader">
+          <div>
+            <h2>Borrow history</h2>
+            <p className="muted">Read-only records for this vehicle.</p>
+          </div>
+        </div>
+
+        {loans.length === 0 ? (
+          <div className="emptyState">This vehicle has no borrow records yet.</div>
+        ) : (
+          <div className="cardsGrid">
+            {loans.map((loan) => (
+              <article className="vehicleCard" key={loan.id}>
+                <div className="vehicleCardHeader">
+                  <div>
+                    <h3>{loan.driver_name || loan.borrower_email}</h3>
+                    <p className="muted">Borrowed by {loan.borrower_email}</p>
+                  </div>
+                  <span className={`pill ${loan.returned_at ? "pill-available" : "pill-borrowed"}`}>
+                    {loan.returned_at ? "returned" : loan.is_long_term ? "long term" : "active"}
+                  </span>
+                </div>
+                <div className="vehicleMeta">
+                  <span><strong>Purpose</strong>{loan.purpose || "-"}</span>
+                  <span><strong>Borrowed at</strong>{formatDateTime(loan.borrowed_at)}</span>
+                  <span><strong>Expected return</strong>{loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
+                  <span><strong>Returned at</strong>{formatDateTime(loan.returned_at)}</span>
+                  <span><strong>Start odometer</strong>{loan.start_odometer === null ? "-" : `${loan.start_odometer.toLocaleString()} km`}</span>
+                  <span><strong>End odometer</strong>{loan.end_odometer === null ? "-" : `${loan.end_odometer.toLocaleString()} km`}</span>
+                  <span><strong>Borrow notes</strong>{loan.borrow_notes || "-"}</span>
+                  <span><strong>Return notes</strong>{loan.return_notes || "-"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </AppShell>
   );
