@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { isJwtIssuedInFutureError } from "@/lib/auth-session-errors";
 
 export async function updateSession(request: NextRequest) {
   const { supabaseAnonKey, supabaseUrl } = getSupabaseEnv();
@@ -23,7 +24,23 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  try {
+    const { error } = await supabase.auth.getUser();
+
+    if (isJwtIssuedInFutureError(error)) {
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) console.warn("[auth:clock-skew] Unable to refresh the session.");
+    }
+  } catch (error) {
+    if (!isJwtIssuedInFutureError(error)) throw error;
+
+    try {
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) console.warn("[auth:clock-skew] Unable to refresh the session.");
+    } catch {
+      console.warn("[auth:clock-skew] Session refresh failed.");
+    }
+  }
 
   return response;
 }

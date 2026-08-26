@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isJwtIssuedInFutureError } from "@/lib/auth-session-errors";
 import { sanitizeInternalPath } from "../lib/navigation";
 import { escapeHtml, isCompanyEmail } from "../lib/utils";
 import { getSafeActionErrorMessage } from "../lib/action-errors";
@@ -32,5 +33,12 @@ describe("security helpers", () => {
     } finally {
       console.error = consoleError;
     }
+  });
+
+  it("recognizes only the recoverable JWT clock-skew error", () => {
+    expect(isJwtIssuedInFutureError(new Error("JWT issued at future"))).toBe(true);
+    expect(isJwtIssuedInFutureError({ message: "jwt issued in the future" })).toBe(true);
+    expect(isJwtIssuedInFutureError(new Error("invalid signature"))).toBe(false);
+    expect(isJwtIssuedInFutureError(null)).toBe(false);
   });
 });
