@@ -41,7 +41,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       .eq("extended_by_user_id", user.id)
       .order("created_at", { ascending: false }),
   ]);
-  const vehicles = snapshot.vehicles.filter((vehicle) => !["retired", "sold", "maintenance", "repair", "suspended", "employee_car", "in_transit"].includes(vehicle.status));
+  const vehicles = snapshot.vehicles.filter((vehicle) => !["retired", "sold", "deregistered", "maintenance", "repair", "suspended", "employee_car", "in_transit"].includes(vehicle.status));
   const activeLoans = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const extensionsByLoanId = ((extensionData ?? []) as LoanExtension[]).reduce<Map<string, LoanExtension[]>>((grouped, extension) => {
     const existing = grouped.get(extension.loan_id) ?? [];

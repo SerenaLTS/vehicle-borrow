@@ -14,7 +14,7 @@ export function VehicleDetailsFields({ vehicle }: { vehicle?: Vehicle }) {
         <label className="fieldLabel">Current location<input defaultValue={vehicle?.current_location_name ?? vehicle?.location ?? ""} name="currentLocationName" /></label>
         <label className="fieldLabel">Current location address<input defaultValue={vehicle?.current_location_address ?? ""} name="currentLocationAddress" /></label>
         <label className="fieldLabel">Location source<select defaultValue={vehicle?.location_source ?? ""} name="locationSource"><option value="">Not set</option><option value="manual">Manual update</option><option value="booking">Borrow record</option><option value="gps">GPS</option><option value="admin_confirmed">Admin confirmed</option></select></label>
-        <label className="fieldLabel">Current custodian<input defaultValue={vehicle?.current_custodian_name ?? ""} name="currentCustodianName" /></label>
+        <label className="fieldLabel">Custodian<input defaultValue={vehicle?.current_custodian_name ?? ""} name="currentCustodianName" placeholder="Person or team responsible" /></label>
         <label className="fieldLabel">Current key holder<input defaultValue={vehicle?.current_key_holder_name ?? ""} name="currentKeyHolderName" /></label>
         <label className="fieldLabel">Expected return / arrival<input defaultValue={vehicle?.expected_return_or_arrival_at?.slice(0, 16) ?? ""} name="expectedReturnOrArrivalAt" type="datetime-local" /></label>
       </div>

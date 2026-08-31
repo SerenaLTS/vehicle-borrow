@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { adminReturnVehicle, adminStartReservationBorrow, createVehicle, decideExternalBooking, retireVehicle, updateVehicleSummary } from "@/app/admin/actions";
+import { adminReturnVehicle, adminStartReservationBorrow, decideExternalBooking, retireVehicle, updateVehicleSummary } from "@/app/admin/actions";
 import { ApprovedEmailManager, type ApprovedEmailEntry } from "@/components/approved-email-manager";
 import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
-import { VehicleDetailsFields } from "@/components/vehicle-details-fields";
 import { createClient } from "@/lib/supabase/server";
 import { getVehicleOptionalFieldSupport, getVehicleSelectClause } from "@/lib/vehicle-schema";
 import { getIsAdmin, type UserRole } from "@/lib/user-roles";
@@ -309,68 +308,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       {activeTab === "fleet" ? (
         <>
-      <section className="panel">
-        <h2>Add vehicle</h2>
-        <form action={createVehicle}>
-          <div className="formGrid">
-            <label className="fieldLabel">
-              Plate number
-              <input name="plateNumber" placeholder="ABC123" required />
-            </label>
-            <label className="fieldLabel">
-              Model
-              <input name="model" placeholder="T9 PHEV" required />
-            </label>
-            {optionalFieldSupport.enabled ? (
-              <>
-                <label className="fieldLabel">
-                  VIN
-                  <input name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
-                </label>
-                <label className="fieldLabel">
-                  Color
-                  <input name="color" placeholder="White" />
-                </label>
-              </>
-            ) : null}
-          </div>
-
-          {!optionalFieldSupport.enabled ? (
-            <p className="muted">VIN, color, and location fields will appear after those columns are added to the vehicles table.</p>
-          ) : null}
-
-          <VehicleDetailsFields />
-
-          <label className="fieldLabel">
-            Status
-            <select defaultValue="available" name="status" required>
-              <option value="available">available</option>
-              <option value="in_transit">in transit</option>
-              <option value="repair">repair</option>
-              <option value="maintenance">maintenance</option>
-              <option value="suspended">suspended</option>
-              <option value="employee_car">employee car</option>
-              <option value="sold">sold</option>
-              <option value="retired">retired</option>
-            </select>
-          </label>
-
-          <label className="fieldLabel">
-            Comments
-            <textarea name="comments" placeholder="Booked for next week, service notes, or anything the team should know" />
-          </label>
-
-          <SubmitButton className="primaryButton" idleLabel="Add vehicle" pendingLabel="Adding..." />
-        </form>
-      </section>
-
-      <section className="sectionHeader">
-        <div>
-          <h2>Fleet manager</h2>
-          <p className="muted">Edit vehicle details here. Reservation windows are managed from each vehicle record page.</p>
-        </div>
-      </section>
-
       <AdminFleetSearch totalCount={fleet.length}>
         {fleet.map((vehicle) => {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
@@ -409,6 +346,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 vehicle.vehicle_type,
                 vehicle.department,
                 vehicle.fuel_type,
+                vehicle.current_custodian_name,
                 vehicle.registration_state,
                 vehicle.comments,
                 activeLoan?.borrower_email,
@@ -423,6 +361,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <h3>{vehicle.plate_number}</h3>
                   <p className="muted">VIN: {vehicle.vin || "-"}</p>
                   <p className="muted">Colour: {vehicle.color || "-"}</p>
+                  <p className="muted">Custodian: {vehicle.current_custodian_name || "-"}</p>
                 </LoadingLink>
                 <LoadingLink className="secondaryButton" href={`/admin/vehicles/${vehicle.id}`}>
                   View records

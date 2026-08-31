@@ -13,7 +13,7 @@ import { validateVehicleBookingWindow } from "@/lib/vehicle-bookings";
 import { getVehicleOptionalFieldPayload, getVehicleOptionalFieldSupport } from "@/lib/vehicle-schema";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
-type AdminVehicleStatus = "available" | "in_transit" | "repair" | "maintenance" | "suspended" | "employee_car" | "sold" | "retired";
+type AdminVehicleStatus = "available" | "in_transit" | "repair" | "maintenance" | "suspended" | "employee_car" | "deregistered" | "sold" | "retired";
 
 function adminActionError(error: unknown, action: string) {
   return getSafeActionErrorMessage(error, `Unable to ${action}. Please try again.`, `admin:${action}`);
@@ -70,7 +70,7 @@ function revalidateVehicleLoanViews(vehicleId: string) {
 }
 
 function isEditableStatus(value: string): value is AdminVehicleStatus {
-  return ["available", "in_transit", "repair", "maintenance", "suspended", "employee_car", "sold", "retired"].includes(value);
+  return ["available", "in_transit", "repair", "maintenance", "suspended", "employee_car", "deregistered", "sold", "retired"].includes(value);
 }
 
 function getFleetDetails(formData: FormData) {
@@ -159,11 +159,12 @@ export async function createVehicle(formData: FormData) {
   const status = String(formData.get("status") ?? "").trim();
   const comments = String(formData.get("comments") ?? "").trim() || null;
   const fleetDetails = getFleetDetails(formData);
+  const errorPath = formData.get("returnTo") === "new" ? "/admin/vehicles/new" : "/admin";
 
   if (!plateNumber || !model || !isEditableStatus(status)) {
-    redirect("/admin?error=Please complete all vehicle fields.");
+    redirect(`${errorPath}?error=Please complete all vehicle fields.`);
   }
-  if (!fleetDetails.ok) redirect(`/admin?error=${encodeURIComponent(fleetDetails.error)}`);
+  if (!fleetDetails.ok) redirect(`${errorPath}?error=${encodeURIComponent(fleetDetails.error)}`);
 
   const supabase = await requireAdmin();
   const optionalFieldSupport = await getVehicleOptionalFieldSupport(supabase);
@@ -178,7 +179,7 @@ export async function createVehicle(formData: FormData) {
   const { error } = await supabase.from("vehicles").insert(insertPayload);
 
   if (error) {
-    redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "add the vehicle"))}`);
+    redirect(`${errorPath}?error=${encodeURIComponent(adminActionError(error, "add the vehicle"))}`);
   }
 
   clearFleetSnapshotCache();

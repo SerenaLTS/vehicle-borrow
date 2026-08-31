@@ -16,6 +16,7 @@ const reminderRoute = readFileSync(resolve(process.cwd(), "app/api/booking-key-r
 const fleetFieldsMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-25_fleet_fields_rls_and_constraints.sql"), "utf8");
 const externalApprovalMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-26_external_driver_approval_and_rego_reminders.sql"), "utf8");
 const employeeCarStatusMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-28_add_employee_car_status.sql"), "utf8");
+const deregisteredStatusMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-31_add_deregistered_vehicle_status.sql"), "utf8");
 const regoReminderRoute = readFileSync(resolve(process.cwd(), "app/api/vehicle-expiry-reminders/route.ts"), "utf8");
 
 describe("admin database transaction contracts", () => {
@@ -134,6 +135,12 @@ describe("admin database transaction contracts", () => {
     expect(employeeCarStatusMigration).toContain("'employee_car'");
     expect(employeeCarStatusMigration).toContain("fleet_require_operational_vehicle");
     expect(employeeCarStatusMigration).toContain("not available for booking or borrowing");
+  });
+
+  it("makes deregistered vehicles valid but non-bookable", () => {
+    expect(deregisteredStatusMigration).toContain("'deregistered'");
+    expect(deregisteredStatusMigration).toContain("fleet_require_operational_vehicle");
+    expect(deregisteredStatusMigration).toContain("not available for booking or borrowing");
   });
 
   it("prevents unapproved external drivers from collecting a key", () => {
