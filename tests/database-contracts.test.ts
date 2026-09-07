@@ -18,6 +18,8 @@ const externalApprovalMigration = readFileSync(resolve(process.cwd(), "supabase/
 const employeeCarStatusMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-28_add_employee_car_status.sql"), "utf8");
 const deregisteredStatusMigration = readFileSync(resolve(process.cwd(), "supabase/2026-08-31_add_deregistered_vehicle_status.sql"), "utf8");
 const regoReminderRoute = readFileSync(resolve(process.cwd(), "app/api/vehicle-expiry-reminders/route.ts"), "utf8");
+const adminActions = readFileSync(resolve(process.cwd(), "app/admin/actions.ts"), "utf8");
+const adminReturnTimeoutMigration = readFileSync(resolve(process.cwd(), "supabase/2026-09-07_admin_return_timeouts.sql"), "utf8");
 
 describe("admin database transaction contracts", () => {
   it("keeps booking conversion in one database function with an audit write", () => {
@@ -31,6 +33,12 @@ describe("admin database transaction contracts", () => {
     expect(migration).toContain("function public.admin_return_vehicle");
     expect(migration).toContain("'vehicle_returned'");
     expect(migration).toContain("Admins can read admin action audits");
+  });
+
+  it("does not let an admin return remain pending indefinitely", () => {
+    expect(adminActions).toContain("AbortSignal.timeout(20_000)");
+    expect(adminReturnTimeoutMigration).toContain("set lock_timeout = '8s'");
+    expect(adminReturnTimeoutMigration).toContain("set statement_timeout = '15s'");
   });
 
   it("does not expose either admin function publicly", () => {

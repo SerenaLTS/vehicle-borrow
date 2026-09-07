@@ -292,15 +292,24 @@ export async function adminReturnVehicle(formData: FormData) {
   }
 
   const supabase = await requireAdmin();
-  const { error } = await supabase.rpc("admin_return_vehicle", {
-    p_loan_id: loanId,
-    p_vehicle_id: vehicleId,
-    p_end_odometer: endOdometer,
-    p_return_notes: returnNotes,
-    p_vehicle_location: vehicleLocation,
-  });
+  const { error } = await supabase
+    .rpc("admin_return_vehicle", {
+      p_loan_id: loanId,
+      p_vehicle_id: vehicleId,
+      p_end_odometer: endOdometer,
+      p_return_notes: returnNotes,
+      p_vehicle_location: vehicleLocation,
+    })
+    // Do not leave the admin form pending forever if PostgREST or a database
+    // lock stops responding. The database function is atomic, so an aborted
+    // request either completes in full or is rolled back.
+    .abortSignal(AbortSignal.timeout(20_000));
 
   if (error) {
+    const timedOut = error.message.includes("AbortError") || error.hint?.includes("aborted");
+    if (timedOut) {
+      redirect("/admin?error=The return request timed out. Please refresh to check the vehicle status, then try again if it is still borrowed.");
+    }
     redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "return the vehicle"))}`);
   }
 
