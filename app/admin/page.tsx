@@ -440,8 +440,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               ) : null}
               <form action={updateVehicleSummary}>
                 <input name="vehicleId" type="hidden" value={vehicle.id} />
-                {optionalFieldSupport.enabled ? (
-                  <div className="formGrid">
+                <div className="formGrid">
+                  <label className="fieldLabel">
+                    Rego
+                    <input defaultValue={vehicle.plate_number} name="plateNumber" placeholder="ABC123" required />
+                  </label>
+                  {optionalFieldSupport.enabled ? (
+                    <>
                     <label className="fieldLabel">
                       VIN
                       <input defaultValue={vehicle.vin ?? ""} name="vin" placeholder="LGWXXXXXXXXXXXXXX" />
@@ -451,11 +456,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       Color
                       <input defaultValue={vehicle.color ?? ""} name="color" placeholder="White" />
                     </label>
-
-                  </div>
-                ) : null}
+                    </>
+                  ) : null}
+                </div>
                 <div className="actionsRow">
-                  <SubmitButton className="primaryButton" idleLabel="Save VIN / colour" pendingLabel="Saving..." />
+                  <SubmitButton className="primaryButton" idleLabel="Save rego / VIN / colour" pendingLabel="Saving..." />
                 </div>
               </form>
 

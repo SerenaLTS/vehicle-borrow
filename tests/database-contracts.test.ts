@@ -41,6 +41,12 @@ describe("admin database transaction contracts", () => {
     expect(adminReturnTimeoutMigration).toContain("set statement_timeout = '15s'");
   });
 
+  it("allows admins to update a vehicle's rego as well as its VIN", () => {
+    expect(adminActions).toContain('const plateNumber = String(formData.get("plateNumber")');
+    expect(adminActions).toContain("plate_number: plateNumber");
+    expect(adminActions).toContain("Rego, VIN and colour updated successfully.");
+  });
+
   it("does not expose either admin function publicly", () => {
     expect(migration).toContain("revoke all on function public.admin_start_booking_borrow");
     expect(migration).toContain("revoke all on function public.admin_return_vehicle");

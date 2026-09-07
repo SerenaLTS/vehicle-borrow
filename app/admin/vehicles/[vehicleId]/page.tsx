@@ -262,6 +262,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           <form action={updateVehicle} className="extensionForm">
             <input name="vehicleId" type="hidden" value={record.id} />
             <input name="returnTo" type="hidden" value="detail" />
+            <label className="fieldLabel">Rego<input defaultValue={record.plate_number} name="plateNumber" required /></label>
             <label className="fieldLabel">Model<input defaultValue={record.model} name="model" required /></label>
             {optionalFieldSupport.enabled ? (
               <div className="formGrid">

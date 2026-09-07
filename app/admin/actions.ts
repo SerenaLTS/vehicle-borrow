@@ -192,6 +192,7 @@ export async function createVehicle(formData: FormData) {
 
 export async function updateVehicle(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const plateNumber = String(formData.get("plateNumber") ?? "").trim().toUpperCase();
   const model = String(formData.get("model") ?? "").trim();
   const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
   const color = String(formData.get("color") ?? "").trim() || null;
@@ -200,7 +201,7 @@ export async function updateVehicle(formData: FormData) {
   const comments = String(formData.get("comments") ?? "").trim() || null;
   const fleetDetails = getFleetDetails(formData);
 
-  if (!vehicleId || !model) {
+  if (!vehicleId || !plateNumber || !model) {
     redirect("/admin?error=Please complete all vehicle fields before saving.");
   }
   if (!fleetDetails.ok) redirect(`/admin?error=${encodeURIComponent(fleetDetails.error)}`);
@@ -232,8 +233,9 @@ export async function updateVehicle(formData: FormData) {
 
   const updatePayload =
     isActivelyBorrowed
-      ? { model, comments, ...fleetDetails.values, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }) }
+      ? { plate_number: plateNumber, model, comments, ...fleetDetails.values, ...getVehicleOptionalFieldPayload(optionalFieldSupport, { vin, color, location }) }
       : {
+          plate_number: plateNumber,
           model,
           status,
           comments,
@@ -260,23 +262,26 @@ export async function updateVehicle(formData: FormData) {
 
 export async function updateVehicleSummary(formData: FormData) {
   const vehicleId = String(formData.get("vehicleId") ?? "").trim();
+  const plateNumber = String(formData.get("plateNumber") ?? "").trim().toUpperCase();
   const vin = String(formData.get("vin") ?? "").trim().toUpperCase() || null;
   const color = String(formData.get("color") ?? "").trim() || null;
   if (!vehicleId) redirect("/admin?error=Vehicle not found.");
+  if (!plateNumber) redirect("/admin?error=Please enter the rego.");
 
   const supabase = await requireAdmin();
   const support = await getVehicleOptionalFieldSupport(supabase);
   const payload = {
+    plate_number: plateNumber,
     ...(support.vinColumn ? { [support.vinColumn]: vin } : {}),
     ...(support.colorColumn ? { [support.colorColumn]: color } : {}),
   };
   const { error } = await supabase.from("vehicles").update(payload).eq("id", vehicleId);
-  if (error) redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "update VIN and colour"))}`);
+  if (error) redirect(`/admin?error=${encodeURIComponent(adminActionError(error, "update rego, VIN and colour"))}`);
 
   clearFleetSnapshotCache(); clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin"); revalidatePath(`/admin/vehicles/${vehicleId}`);
   revalidatePath("/book"); revalidatePath("/borrow"); revalidatePath("/dashboard");
-  redirect("/admin?message=VIN and colour updated successfully.");
+  redirect("/admin?message=Rego, VIN and colour updated successfully.");
 }
 
 export async function adminReturnVehicle(formData: FormData) {
