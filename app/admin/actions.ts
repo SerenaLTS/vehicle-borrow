@@ -321,12 +321,14 @@ export async function adminReturnVehicle(formData: FormData) {
   clearFleetSnapshotCache();
   clearVehicleCalendarCache(vehicleId);
   revalidatePath("/admin");
+  revalidatePath("/fleet");
   revalidatePath("/dashboard");
   revalidatePath("/borrow");
   revalidatePath("/book");
   revalidatePath("/return");
   revalidatePath("/history");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
+  revalidatePath(`/vehicle-calendar/${vehicleId}`);
   redirect("/admin?message=Vehicle returned by admin successfully.");
 }
 

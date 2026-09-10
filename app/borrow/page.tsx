@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusPill } from "@/components/status-pill";
@@ -137,6 +138,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
                     </div>
                   ) : null}
 
+                  {isAdmin ? <AdminLoanReturn loan={loan} /> : null}
                   <details className="extensionDisclosure">
                     <summary>Extend</summary>
                     <form action={extendVehicleLoan} className="extensionForm">

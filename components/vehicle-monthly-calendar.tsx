@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminLoanReturn, type ReturnableLoan } from "@/components/admin-loan-return";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { APP_TIME_ZONE } from "@/lib/datetime";
@@ -8,6 +9,7 @@ import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
 
 type VehicleMonthlyCalendarProps = {
   initialMonth?: string;
+  adminActiveLoans?: ReturnableLoan[];
   events: VehicleCalendarEvent[];
   crossYearNextHref?: string;
   crossYearPreviousHref?: string;
@@ -174,6 +176,7 @@ function getWeekSegments(
 
 export function VehicleMonthlyCalendar({
   initialMonth,
+  adminActiveLoans = [],
   events,
   crossYearNextHref,
   crossYearPreviousHref,
@@ -182,6 +185,7 @@ export function VehicleMonthlyCalendar({
   fineDates = [],
 }: VehicleMonthlyCalendarProps) {
   const router = useRouter();
+  const returnableLoans = new Map(adminActiveLoans.map((loan) => [loan.id, loan]));
   const [currentMonth, setCurrentMonth] = useState(initialMonth ?? buildCurrentMonth());
   const resolvedMonth = currentMonth;
   const [yearText, monthText] = resolvedMonth.split("-");
@@ -289,6 +293,7 @@ export function VehicleMonthlyCalendar({
                             title={`${segment.kind === "booked" ? "Booked" : "Borrowed"} • ${segment.actor}${segment.isLongTerm ? " • Long term" : ""}`}
                           >
                             <span>{segment.actor}{segment.isLongTerm ? " • Long term" : ""}</span>
+                            {segment.kind === "borrowed" && returnableLoans.has(segment.id) ? <AdminLoanReturn loan={returnableLoans.get(segment.id)!} compact label={`${segment.actor} · ${segment.startKey}`} /> : null}
                           </div>
                         ))}
                       </div>

@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -147,7 +148,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         <p className="message error">{loadError}</p>
       ) : (
         <>
-          <HistoryBorrowCalendar query={query} from={from} to={to} status={status} />
+          <HistoryBorrowCalendar isAdmin={isAdmin} query={query} from={from} to={to} status={status} />
 
           {filteredHistory.length === 0 ? (
             <div className="emptyState">No borrowing history matches the current filters on this page.</div>
@@ -178,6 +179,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
                       <th>Status</th>
                       <th>Start KM</th>
                       <th>End KM</th>
+                      {isAdmin ? <th>Admin actions</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -195,6 +197,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
                         <td>{loan.returned_at ? "Returned" : "Active"}</td>
                         <td>{loan.start_odometer?.toLocaleString() ?? "-"}</td>
                         <td>{loan.end_odometer?.toLocaleString() ?? "-"}</td>
+                        {isAdmin ? <td>{loan.returned_at ? "—" : <AdminLoanReturn loan={loan} />}</td> : null}
                       </tr>
                     ))}
                   </tbody>

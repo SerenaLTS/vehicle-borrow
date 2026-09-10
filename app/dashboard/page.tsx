@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -126,6 +127,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <span>{loan.vehicle?.model ?? "Vehicle"}</span>
                   <span>Expected return: {formatDateTime(loan.expected_return_at)}</span>
                 </div>
+                {isAdmin ? <AdminLoanReturn loan={loan} /> : null}
                 <div className="actionsRow">
                   <Link className="primaryButton urgentButton" href="/return">
                     Return vehicle
@@ -225,6 +227,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     ))}
                   </div>
                 ) : null}
+                {isAdmin ? <AdminLoanReturn loan={loan} /> : null}
                 <details className="extensionDisclosure">
                   <summary>Extend</summary>
                   <form action={extendVehicleLoan} className="extensionForm">

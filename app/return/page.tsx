@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
@@ -112,6 +113,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
                   <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                   <span>Start odometer: {loan.start_odometer?.toLocaleString() ?? "-"}{loan.start_odometer !== null ? " km" : ""}</span>
                 </div>
+                {isAdmin ? <AdminLoanReturn loan={loan} /> : null}
               </article>
             ))}
           </div>

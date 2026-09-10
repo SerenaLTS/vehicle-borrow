@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
@@ -19,6 +20,10 @@ export default async function FleetPage() {
 
   const [snapshot, isAdmin] = await Promise.all([getFleetSnapshot(supabase), getIsAdmin(supabase, user.id)]);
 
+  const activeLoanResult = isAdmin ? await supabase.from("vehicle_loans")
+    .select("id, vehicle_id, start_odometer, returned_at").is("returned_at", null) : null;
+  const activeLoans = new Map((activeLoanResult?.data ?? []).map((loan) => [loan.vehicle_id, loan]));
+
   return (
     <AppShell
       title="Fleet"
@@ -31,12 +36,14 @@ export default async function FleetPage() {
       <section className="sectionHeader">
         <div>
           <h2>All vehicles</h2>
-          <p className="muted">This page is read-only. Contact an administrator if vehicle information needs updating.</p>
+          <p className="muted">{isAdmin ? "View the fleet and return active loans as an admin." : "This page is read-only. Contact an administrator if vehicle information needs updating."}</p>
         </div>
       </section>
 
+      {activeLoanResult?.error ? <p className="message error">Unable to load active loans. Refresh to use admin return.</p> : null}
       <AdminFleetSearch totalCount={snapshot.vehicles.length}>
         {snapshot.vehicles.map((vehicle) => {
+          const activeLoan = activeLoans.get(vehicle.id);
           const nextBooking = snapshot.nextBookingByVehicleId.get(vehicle.id);
           const now = Date.now();
           const hasActiveBooking = Boolean(nextBooking && new Date(nextBooking.starts_at).getTime() <= now &&
@@ -83,6 +90,7 @@ export default async function FleetPage() {
                 <span><strong>Usage restrictions</strong>{text(vehicle.usage_restrictions)}</span>
                 <span><strong>Comments</strong>{text(vehicle.comments)}</span>
               </div>
+              {isAdmin && activeLoan ? <AdminLoanReturn loan={activeLoan} /> : null}
               <div className="actionsRow">
                 {status === "available" ? (
                   <LoadingLink className="primaryButton" href={`/vehicle-calendar/${encodeURIComponent(vehicle.id)}?from=%2Ffleet&action=borrow`}>Borrow</LoadingLink>

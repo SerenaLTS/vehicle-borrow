@@ -1,7 +1,8 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { redirect } from "next/navigation";
 import { AdminFleetSearch } from "@/components/admin-fleet-search";
 import { AppShell } from "@/components/app-shell";
-import { adminReturnVehicle, adminStartReservationBorrow, decideExternalBooking, retireVehicle, updateVehicleSummary } from "@/app/admin/actions";
+import { adminStartReservationBorrow, decideExternalBooking, retireVehicle, updateVehicleSummary } from "@/app/admin/actions";
 import { ApprovedEmailManager, type ApprovedEmailEntry } from "@/components/approved-email-manager";
 import { ConfirmForm } from "@/components/confirm-form";
 import { LoadingLink } from "@/components/loading-link";
@@ -390,36 +391,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </span>
                   </div>
 
-                  <details className="extensionDisclosure adminReturnDisclosure">
-                    <summary>Admin return</summary>
-                    <ConfirmForm
-                      action={adminReturnVehicle}
-                      className="extensionForm"
-                      confirmMessage="Confirm admin return? This will close the active borrow record and make the vehicle available."
-                    >
-                      <input name="vehicleId" type="hidden" value={vehicle.id} />
-                      <input name="loanId" type="hidden" value={activeLoan.id} />
-                      <label className="fieldLabel">
-                        Return odometer
-                        <input
-                          min={activeLoan.start_odometer ?? 0}
-                          name="endOdometer"
-                          placeholder={activeLoan.start_odometer !== null ? `${activeLoan.start_odometer}` : "Optional"}
-                          type="number"
-                        />
-                      </label>
-                      <label className="fieldLabel">
-                        Current vehicle location
-                        <input name="vehicleLocation" placeholder="e.g. P4-276" required />
-                        <span className="fieldHint">If parked at the office, use the P4-276 format.</span>
-                      </label>
-                      <label className="fieldLabel">
-                        Admin return note
-                        <textarea name="returnNotes" placeholder="Borrower forgot to return in system, confirmed key/vehicle returned..." required />
-                      </label>
-                      <SubmitButton className="primaryButton" idleLabel="Return vehicle" pendingLabel="Returning..." />
-                    </ConfirmForm>
-                  </details>
+                  <AdminLoanReturn loan={activeLoan} />
                 </>
               ) : null}
 
@@ -661,6 +633,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>{loan.borrower_email}</span>
                       <span>Expected: {formatDateTime(loan.expected_return_at)}</span>
                     </div>
+                    <AdminLoanReturn loan={loan} />
                     <LoadingLink className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
                       Open vehicle
                     </LoadingLink>
@@ -696,6 +669,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>Expected return: {loan.is_long_term ? "Long term" : formatDateTime(loan.expected_return_at)}</span>
                       <span>Purpose: {loan.purpose}</span>
                     </div>
+                    <AdminLoanReturn loan={loan} />
                     <LoadingLink className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
                       Manage
                     </LoadingLink>
@@ -724,6 +698,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <span>Borrowed: {formatDateTime(loan.borrowed_at)}</span>
                       <span>Purpose: {loan.purpose}</span>
                     </div>
+                    <AdminLoanReturn loan={loan} />
                     <LoadingLink className="secondaryButton" href={`/admin/vehicles/${loan.vehicle_id}`}>
                       Manage
                     </LoadingLink>

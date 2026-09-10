@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmForm } from "@/components/confirm-form";
@@ -171,6 +172,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           crossYearPreviousHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(`${loadedYear - 1}-12`)}`}
           fineNoticeBaseHref={fineSnapshot.error ? undefined : `/admin/vehicles/${record.id}/fines/new`}
           fineDates={fineSnapshot.fines.map((fine) => formatUtcIsoForDateTimeLocalInput(fine.occurred_at).slice(0, 10))}
+          adminActiveLoans={history.filter((loan) => !loan.returned_at)}
           events={calendarEvents}
           initialMonth={initialMonth}
           loadedYear={loadedYear}
@@ -266,6 +268,8 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
             <span>{record.comments || "-"}</span>
           </div>
         </div>
+
+        {currentLoan ? <AdminLoanReturn loan={currentLoan} /> : null}
 
         <details className="extensionDisclosure">
           <summary>Edit full vehicle details</summary>
@@ -542,6 +546,8 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                 <span>Start KM: {loan.start_odometer?.toLocaleString() ?? "-"}</span>
                 <span>End KM: {loan.end_odometer?.toLocaleString() ?? "-"}</span>
               </div>
+
+              <AdminLoanReturn loan={loan} />
 
               <details className="extensionDisclosure">
                 <summary>Edit borrow record</summary>

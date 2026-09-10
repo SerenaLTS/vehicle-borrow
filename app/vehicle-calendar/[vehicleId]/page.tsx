@@ -1,3 +1,4 @@
+import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { loadVehicleFines } from "@/lib/fine-notice-server";
 import { FineNoticeHistory } from "@/components/fine-notice-history";
 import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
@@ -117,6 +118,7 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
           crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref, vehicleAction)}
           fineNoticeBaseHref={isAdmin && !fineSnapshot?.error ? `/admin/vehicles/${vehicleId}/fines/new` : undefined}
           fineDates={fineSnapshot?.fines.map((fine) => formatUtcIsoForDateTimeLocalInput(fine.occurred_at).slice(0, 10))}
+          adminActiveLoans={isAdmin ? loans.filter((loan) => !loan.returned_at) : []}
           events={events}
           initialMonth={initialMonth}
           loadedYear={calendarSnapshot.year}
@@ -129,7 +131,7 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
         <div className="sectionHeader">
           <div>
             <h2>Borrow history</h2>
-            <p className="muted">Read-only records for this vehicle.</p>
+            <p className="muted">{isAdmin ? "Loan records for this vehicle. Active loans can be returned by an admin." : "Read-only records for this vehicle."}</p>
           </div>
         </div>
 
@@ -158,6 +160,7 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
                   <span><strong>Borrow notes</strong>{loan.borrow_notes || "-"}</span>
                   <span><strong>Return notes</strong>{loan.return_notes || "-"}</span>
                 </div>
+                {isAdmin ? <AdminLoanReturn loan={loan} /> : null}
               </article>
             ))}
           </div>

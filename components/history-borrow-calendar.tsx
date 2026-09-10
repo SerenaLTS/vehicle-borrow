@@ -1,11 +1,14 @@
 "use client";
 
+import { AdminLoanReturn } from "@/components/admin-loan-return";
+
 import { useEffect, useMemo, useState } from "react";
 import { APP_TIME_ZONE } from "@/lib/datetime";
 import { formatDateTime } from "@/lib/utils";
 import type { LoanRow } from "@/lib/types";
 
 type HistoryBorrowCalendarProps = {
+  isAdmin?: boolean;
   query: string;
   from: string;
   to: string;
@@ -143,7 +146,7 @@ function groupLoansByVehicle(loans: LoanRow[]) {
     .sort((first, second) => first.vehicleLabel.localeCompare(second.vehicleLabel));
 }
 
-export function HistoryBorrowCalendar({ query, from, to, status }: HistoryBorrowCalendarProps) {
+export function HistoryBorrowCalendar({ isAdmin = false, query, from, to, status }: HistoryBorrowCalendarProps) {
   const todayMonth = getMonthKey(new Date());
   const [currentMonth, setCurrentMonth] = useState(todayMonth);
   const [selectedDay, setSelectedDay] = useState(getTodayKey());
@@ -290,6 +293,7 @@ export function HistoryBorrowCalendar({ query, from, to, status }: HistoryBorrow
                         <span>Returned: {loan.returned_at ? formatDateTime(loan.returned_at) : "Not returned yet"}</span>
                       </div>
                       <span className="historyLoanPurpose">{loan.purpose}</span>
+                      {isAdmin ? <AdminLoanReturn loan={loan} /> : null}
                     </div>
                   ))}
                 </div>
