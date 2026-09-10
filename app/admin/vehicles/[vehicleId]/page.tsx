@@ -16,6 +16,7 @@ import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicl
 import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
 import { getLoanCalendarEndAt } from "@/lib/loan-calendar";
+import { EXPIRY_REMINDER_EXCLUDED_STATUSES } from "@/lib/vehicle-reminders";
 
 function vehicleRecordLoadError(error: unknown, area: string) {
   return getSafeActionErrorMessage(error, "Unable to load the vehicle record. Please try again.", `admin:vehicle record ${area}`);
@@ -287,7 +288,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
           </form>
         </details>
 
-        {record.registration_expires_on && !record.registration_reminder_acknowledged_at &&
+        {!EXPIRY_REMINDER_EXCLUDED_STATUSES.includes(record.status) && record.registration_expires_on && !record.registration_reminder_acknowledged_at &&
         new Date(`${record.registration_expires_on}T00:00:00`).getTime() - Date.now() <= record.reminder_days * 86_400_000 ? (
           <ConfirmForm action={acknowledgeRegistrationReminder} confirmMessage="Confirm this registration expiry has been handled? Daily reminders will stop.">
             <input name="vehicleId" type="hidden" value={record.id} />

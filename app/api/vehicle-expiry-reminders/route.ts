@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sendRegistrationExpiryReminderEmail } from "@/lib/booking-notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { EXPIRY_REMINDER_EXCLUDED_STATUSES } from "@/lib/vehicle-reminders";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
     .from("vehicles")
     .select("id, plate_number, model, registration_state, registration_expires_on, reminder_days, registration_reminder_last_sent_on")
     .not("registration_expires_on", "is", null)
+    .not("status", "in", `(${EXPIRY_REMINDER_EXCLUDED_STATUSES.join(",")})`)
     .is("registration_reminder_acknowledged_at", null);
 
   if (error) {
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
     const { data: claimed, error: claimError } = await supabase.from("vehicles")
       .update({ registration_reminder_last_sent_on: today })
       .eq("id", vehicle.id)
+      .not("status", "in", `(${EXPIRY_REMINDER_EXCLUDED_STATUSES.join(",")})`)
       .is("registration_reminder_acknowledged_at", null)
       .or(`registration_reminder_last_sent_on.is.null,registration_reminder_last_sent_on.neq.${today}`)
       .select("id")
