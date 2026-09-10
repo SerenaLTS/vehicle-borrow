@@ -116,7 +116,7 @@ export async function sendFineNotice(form: FormData) {
     attachment = { filename: fine.attachment_name ?? "fine-notice.pdf", content: Buffer.from(await pdf!.arrayBuffer()) };
   }
   const started = new Date().toISOString();
-  let claim = admin.from("vehicle_fine_notices").update({ status: "sending", send_started_at: started, sent_by: user.id }).eq("id", id).eq("status", fine.status).eq("driver_email", fine.driver_email).eq("email_body", fine.email_body);
+  let claim = admin.from("vehicle_fine_notices").update({ status: "sending", send_started_at: started, sent_by: user.id }).eq("id", id).eq("status", fine.status).eq("driver_email", fine.driver_email).eq("email_body", fine.email_body).eq("email_subject", fine.email_subject);
   claim = fine.send_started_at ? claim.eq("send_started_at", fine.send_started_at) : claim.is("send_started_at", null);
   const { data: claimed, error: claimError } = await claim.select("id").maybeSingle();
   if (claimError || !claimed) finish("Another request is handling this notice. Refresh to see its status.");
@@ -136,7 +136,7 @@ export async function sendFineNotice(form: FormData) {
   finish(statusError ? "The delivery status could not be saved. Check mail logs before retrying." : outcome === "sent" ? "Fine notice email sent." : outcome === "failed" ? "Email was not sent. Check SMTP configuration and try again." : "Delivery could not be confirmed. Check mail logs before retrying to avoid a duplicate email.");
 }
 
-export async function updateFineRecipient(form: FormData) {
+export async function updateFineDraft(form: FormData) {
   const { supabase } = await requireFineAdmin();
   const id = String(form.get("fineId") ?? "");
   const vehicleId = String(form.get("vehicleId") ?? "");
@@ -145,13 +145,15 @@ export async function updateFineRecipient(form: FormData) {
   const name = String(form.get("driverName") ?? "").trim();
   const email = String(form.get("driverEmail") ?? "").trim().toLowerCase();
   const licence = String(form.get("licence") ?? "");
+  const subject = String(form.get("emailSubject") ?? "").trim();
+  const body = String(form.get("emailBody") ?? "");
+  if (!subject || subject.length > 200 || /[\r\n]/.test(subject) || !body.trim() || body.length > 20000) redirect(`${href}?message=Enter a subject (up to 200 characters) and email text (up to 20000 characters).`);
   if (!name || name.length > 200 || !isSingleEmail(email) || !["required", "on_file"].includes(licence)) redirect(`${href}?message=Enter a driver name, valid email and licence choice.`);
   const { data } = await supabase.from("vehicle_fine_notices").select("*").eq("id", id).eq("vehicle_id", vehicleId).eq("status", "draft").maybeSingle();
   if (!data) redirect(`${href}?message=Only unsent drafts can be edited.`);
   const fine = data as FineNotice;
   const changes = { driver_name: name, driver_email: email, requires_licence: licence === "required" };
-  const message = buildFineEmail({ ...fine, ...changes }, Boolean(fine.attachment_path));
-  const { data: updated, error } = await createAdminClient().from("vehicle_fine_notices").update({ ...changes, email_subject: message.subject, email_body: message.text }).eq("id", id).eq("status", "draft").select("id").maybeSingle();
+  const { data: updated, error } = await createAdminClient().from("vehicle_fine_notices").update({ ...changes, email_subject: subject, email_body: body }).eq("id", id).eq("status", "draft").eq("email_subject", fine.email_subject).eq("email_body", fine.email_body).eq("driver_email", fine.driver_email).select("id").maybeSingle();
   revalidatePath(href);
-  redirect(`${href}?message=${encodeURIComponent(error || !updated ? "Unable to update. Sending may already have started." : "Recipient and email preview updated.")}`);
+  redirect(`${href}?message=${encodeURIComponent(error || !updated ? "Unable to update. The draft may have changed or sending may already have started." : "Draft saved. Review the saved email below before sending.")}`);
 }

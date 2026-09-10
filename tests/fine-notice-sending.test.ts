@@ -7,7 +7,7 @@ vi.mock("@/lib/booking-notifications", () => ({ sendFineNoticeEmail: mocks.send 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(`REDIRECT:${url}`); } }));
 vi.mock("@/lib/vehicle-calendar-cache", () => ({ clearVehicleCalendarCache: vi.fn() }));
-import { sendFineNotice } from "@/app/admin/fine-actions";
+import { sendFineNotice, updateFineDraft } from "@/app/admin/fine-actions";
 
 function query(result: unknown) {
   const q = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), maybeSingle: vi.fn().mockResolvedValue(result), then: (resolve: (value: unknown) => void) => Promise.resolve(result).then(resolve) };
@@ -87,5 +87,44 @@ describe("fine email send workflow (mail transport mocked)", () => {
     setup({ status: "sending", send_started_at: new Date(Date.now() - 6 * 60_000).toISOString() });
     await expect(sendFineNotice(form(true))).rejects.toThrow("email%20sent");
     expect(mocks.send).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("fine email draft editing", () => {
+  function draftForm() {
+    const value = form();
+    value.set("driverName", "Actual Driver");
+    value.set("driverEmail", "contact@external.example");
+    value.set("licence", "required");
+    value.set("emailSubject", "Please identify the driver");
+    value.set("emailBody", "Hello team,\n\nCould you forward this notice to the driver?\n  Reference: ABC\n");
+    return value;
+  }
+  it("preserves custom text and line breaks when changing to an external contact", async () => {
+    const { update, claim } = setup();
+    const value = draftForm();
+    await expect(updateFineDraft(value)).rejects.toThrow("Draft%20saved");
+    expect(update).toHaveBeenCalledWith({ driver_name: "Actual Driver", driver_email: "contact@external.example", requires_licence: true, email_subject: "Please identify the driver", email_body: value.get("emailBody") });
+    expect(claim.eq).toHaveBeenCalledWith("status", "draft");
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+  it("rejects empty text and subject header injection before updating", async () => {
+    const { update } = setup();
+    const blank = draftForm(); blank.set("emailBody", "  \n");
+    await expect(updateFineDraft(blank)).rejects.toThrow("Enter a subject");
+    const injected = draftForm(); injected.set("emailSubject", "Hello\r\nBcc: other@example.test");
+    await expect(updateFineDraft(injected)).rejects.toThrow("Enter a subject");
+    expect(update).not.toHaveBeenCalled();
+  });
+  it("keeps a draft unchanged when sending starts during editing", async () => {
+    setup({}, false);
+    await expect(updateFineDraft(draftForm())).rejects.toThrow("Unable%20to%20update");
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+  it("sends the edited text and subject to the external contact exactly as saved", async () => {
+    setup({ driver_email: "contact@external.example", email_subject: "Please identify the driver", email_body: "Hello team,\n\nPlease forward this notice.\n" });
+    await expect(sendFineNotice(form())).rejects.toThrow("email%20sent");
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ to: "contact@external.example", subject: "Please identify the driver", text: "Hello team,\n\nPlease forward this notice.\n" }));
   });
 });

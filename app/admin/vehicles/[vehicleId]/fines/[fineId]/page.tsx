@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmForm } from "@/components/confirm-form";
 import { SubmitButton } from "@/components/submit-button";
-import { sendFineNotice, updateFineRecipient } from "@/app/admin/fine-actions";
+import { sendFineNotice, updateFineDraft } from "@/app/admin/fine-actions";
 import { fineDeliveryFingerprint, requireFineAdmin } from "@/lib/fine-notice-server";
 import type { FineNotice } from "@/lib/fine-notices";
 import { formatDateTime } from "@/lib/utils";
@@ -22,26 +22,31 @@ export default async function FinePage({ params, searchParams }: { params: Promi
     <section className="panel">
       <h2>{fine.status === "sent" ? "Sent email" : "Email preview"}</h2>
       <div className="detailList">
-        <div><strong>To</strong><span>{fine.driver_name} · {fine.driver_email}</span></div>
+        <div><strong>Driver</strong><span>{fine.driver_name}</span></div>
+        <div><strong>To</strong><span>{fine.driver_email}</span></div>
         <div><strong>Subject</strong><span>{fine.email_subject}</span></div>
         <div><strong>Status</strong><span>{fine.status.replaceAll("_", " ")}{fine.sent_at ? ` · ${formatDateTime(fine.sent_at)}` : ""}</span></div>
         <div><strong>PDF attachment</strong><span>{fine.attachment_path ? <a href={`/admin/vehicles/${vehicleId}/fines/${fine.id}/attachment`}>{fine.attachment_name}</a> : "No attachment"}</span></div>
       </div>
       {fine.status === "draft" ? <details>
-        <summary>Edit recipient or licence request</summary>
-        <form action={updateFineRecipient} className="formGrid">
+        <summary>Edit email draft</summary>
+        <form action={updateFineDraft} className="formGrid">
           <input name="vehicleId" type="hidden" value={vehicleId} /><input name="fineId" type="hidden" value={fine.id} />
           <label className="fieldLabel">Driver name<input name="driverName" defaultValue={fine.driver_name} required maxLength={200} /></label>
-          <label className="fieldLabel">Driver email<input name="driverEmail" type="email" defaultValue={fine.driver_email} required maxLength={254} /></label>
+          <label className="fieldLabel">Recipient email (driver or relevant contact)<input name="driverEmail" type="email" defaultValue={fine.driver_email} required maxLength={254} /></label>
           <label className="fieldLabel">Driver licence<select name="licence" defaultValue={fine.requires_licence ? "required" : "on_file"}><option value="required">Request a licence copy</option><option value="on_file">We already have the licence</option></select></label>
-          <SubmitButton className="secondaryButton" idleLabel="Update preview" pendingLabel="Updating…" />
+          <label className="fieldLabel" style={{ gridColumn: "1 / -1" }}>Email subject<input name="emailSubject" defaultValue={fine.email_subject} required maxLength={200} /></label>
+          <label className="fieldLabel" style={{ gridColumn: "1 / -1" }}>Email body (plain text)<textarea name="emailBody" defaultValue={fine.email_body} required maxLength={20000} rows={18} /></label>
+          <p className="muted" style={{ gridColumn: "1 / -1" }}>You can address this email to an external driver or a relevant contact. Save your changes before sending. If you change the licence choice, update the wording in the email too; your text will be kept as written.</p>
+          <SubmitButton className="secondaryButton" idleLabel="Save draft" pendingLabel="Updating…" />
         </form>
       </details> : null}
+      <h3>Saved email text</h3>
       <div className="fineEmailPreview">{fine.email_body}</div>
       {inProgress ? <p className="message">Sending is in progress. Refresh this page to check the result.</p> : fine.status !== "sent" ? <ConfirmForm action={sendFineNotice} confirmMessage={`Send this fine notice to ${fine.driver_email}${fine.attachment_path ? " with the PDF attached" : ""}?`}>
         <input type="hidden" name="vehicleId" value={vehicleId} /><input type="hidden" name="fineId" value={fine.id} /><input type="hidden" name="emailFingerprint" value={fineDeliveryFingerprint(fine)} />
         {uncertain ? <label className="checkboxRow"><input type="checkbox" name="confirmRetry" required />I have checked mail logs or the recipient’s mailbox. I understand retrying may send a duplicate.</label> : null}
-        <SubmitButton className="primaryButton" idleLabel={fine.status === "draft" ? "Send email to driver" : "Retry email"} pendingLabel="Sending…" />
+        <SubmitButton className="primaryButton" idleLabel={fine.status === "draft" ? "Send email to recipient" : "Retry email"} pendingLabel="Sending…" />
       </ConfirmForm> : null}
     </section>
   </AppShell>;
