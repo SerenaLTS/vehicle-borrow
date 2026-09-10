@@ -184,3 +184,8 @@ Choose whether to request a driver licence copy, optionally attach the PDF, then
 
 
 Fine notice tests: `npm test` mocks mail delivery and does not send real messages. The SQL regression test can be run in a fresh, disposable PostgreSQL cluster with `psql -v ON_ERROR_STOP=1 -f tests/fixtures/fine-notices-schema.sql -f supabase/2026-09-10_vehicle_fine_notices.sql -f tests/fine-notices.integration.sql`. The fixture creates minimal Supabase roles and tables; never run it against an application database.
+
+
+## Admin borrowing for an employee
+
+Apply `supabase/2026-09-10_z_admin_assign_borrow.sql` before deploying. In Admin → Fleet, open **Borrow / assign to employee**, or go to **Borrow now**, and select an existing company employee under **Borrowing as**. The employee owns the loan and current vehicle assignment, sees it on their dashboard and return page, and can extend or return it through the existing workflow. Confirmation emails use the selected employee's address. `assigned_by_admin_user_id` records the administrator separately. Self-service borrowing remains unchanged.

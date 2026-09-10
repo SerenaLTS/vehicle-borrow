@@ -8,7 +8,7 @@ import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { getFleetSnapshot } from "@/lib/fleet-cache";
 import { getIsAdmin } from "@/lib/user-roles";
 import { normalizeLoan, type LoanExtension, type RawLoanRow } from "@/lib/types";
-import { formatDateTime, formatDisplayName, getVehicleDisplayStatus } from "@/lib/utils";
+import { formatDateTime, formatDisplayName, getVehicleDisplayStatus, isCompanyEmail } from "@/lib/utils";
 import { borrowVehicle, extendVehicleLoan } from "@/app/borrow/actions";
 
 type BorrowPageProps = {
@@ -41,6 +41,10 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       .eq("extended_by_user_id", user.id)
       .order("created_at", { ascending: false }),
   ]);
+  const employeeResult = isAdmin
+    ? await supabase.from("user_roles").select("user_id, email").order("email")
+    : null;
+  const employees = (employeeResult?.data ?? []).filter((employee) => isCompanyEmail(employee.email, process.env.COMPANY_EMAIL_DOMAIN ?? ""));
   const vehicles = snapshot.vehicles.filter((vehicle) => !["retired", "sold", "deregistered", "maintenance", "repair", "suspended", "employee_car", "in_transit"].includes(vehicle.status));
   const activeLoans = ((loanData ?? []) as RawLoanRow[]).map(normalizeLoan);
   const extensionsByLoanId = ((extensionData ?? []) as LoanExtension[]).reduce<Map<string, LoanExtension[]>>((grouped, extension) => {
@@ -166,8 +170,17 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
           <form action={borrowVehicle}>
             <label className="fieldLabel">
               Borrowing as
-              <input defaultValue={user.email ?? ""} disabled />
-              <span className="fieldHint">Immediate borrowing is only for the signed-in employee. To let an external person drive, create a reservation and wait for Serena or JD approval.</span>
+              {isAdmin ? <>
+                <select name="borrowerUserId" defaultValue={user.id} required>
+                  <option value={user.id}>Myself · {user.email}</option>
+                  {employees.filter((employee) => employee.user_id !== user.id).map((employee) => <option key={employee.user_id} value={employee.user_id}>{formatDisplayName(employee.email)} · {employee.email}</option>)}
+                </select>
+                <span className="fieldHint">Assign this borrow to a company employee. They will see it in their dashboard and can return or extend it. Employees need an existing account.</span>
+                {employeeResult?.error ? <span className="message error">Unable to load employees. Reload to assign a borrow.</span> : null}
+              </> : <>
+                <input defaultValue={user.email ?? ""} disabled />
+                <span className="fieldHint">Immediate borrowing is only for the signed-in employee. To let an external person drive, create a reservation and wait for Serena or JD approval.</span>
+              </>}
             </label>
 
             <label className="fieldLabel">

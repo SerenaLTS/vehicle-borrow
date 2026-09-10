@@ -7,6 +7,8 @@ import { clearFleetSnapshotCache } from "@/lib/fleet-cache";
 import { clearVehicleCalendarCache } from "@/lib/vehicle-calendar-cache";
 import { sendBorrowConfirmationEmail, sendLongTermBorrowAdminNotificationEmail } from "@/lib/booking-notifications";
 import { createClient } from "@/lib/supabase/server";
+import { getIsAdmin } from "@/lib/user-roles";
+import { isCompanyEmail } from "@/lib/utils";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
 
 function borrowError(error: unknown, action: string) {
@@ -48,15 +50,24 @@ export async function borrowVehicle(formData: FormData) {
   }
 
   const profileName = typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "";
-  const driverName = profileName || user.email || "";
+  let driverName = profileName || user.email || "";
+  let borrowerEmail = user.email ?? "";
+  const borrowerUserId = String(formData.get("borrowerUserId") ?? "").trim() || user.id;
+  const assigningEmployee = borrowerUserId !== user.id;
+  if (assigningEmployee) {
+    if (!(await getIsAdmin(supabase, user.id))) redirect("/borrow?error=Admin access required to assign an employee.");
+    const { data: employee, error: employeeError } = await supabase.from("user_roles").select("user_id, email").eq("user_id", borrowerUserId).maybeSingle();
+    if (employeeError || !employee || !isCompanyEmail(employee.email, process.env.COMPANY_EMAIL_DOMAIN ?? "")) redirect("/borrow?error=Please select an existing company employee account.");
+    borrowerEmail = employee.email;
+  }
 
   if (!driverName) {
     redirect("/borrow?error=Unable to detect the signed-in email address.");
   }
 
-  const { error } = await supabase.rpc("borrow_vehicle", {
+  const { data: loan, error } = await supabase.rpc(assigningEmployee ? "admin_borrow_vehicle" : "borrow_vehicle", {
     p_vehicle_id: vehicleId,
-    p_driver_name: driverName,
+    ...(assigningEmployee ? { p_borrower_user_id: borrowerUserId } : { p_driver_name: driverName }),
     p_purpose: purpose,
     p_start_odometer: startOdometer,
     p_borrow_notes: borrowNotes,
@@ -68,10 +79,15 @@ export async function borrowVehicle(formData: FormData) {
     redirect(`/borrow?error=${encodeURIComponent(borrowError(error, "borrow the vehicle"))}`);
   }
 
+  if (assigningEmployee && loan) {
+    driverName = loan.driver_name;
+    borrowerEmail = loan.borrower_email;
+  }
+
   try {
     await sendBorrowConfirmationEmail({
       supabase,
-      borrowerEmail: user.email ?? "",
+      borrowerEmail,
       vehicleId,
       driverName,
       purpose,
@@ -88,7 +104,7 @@ export async function borrowVehicle(formData: FormData) {
     try {
       await sendLongTermBorrowAdminNotificationEmail({
         supabase,
-        borrowerEmail: user.email ?? "",
+        borrowerEmail,
         vehicleId,
         driverName,
         purpose,
@@ -108,7 +124,7 @@ export async function borrowVehicle(formData: FormData) {
   revalidatePath("/history");
   revalidatePath("/admin");
   revalidatePath(`/admin/vehicles/${vehicleId}`);
-  redirect("/dashboard?message=Vehicle borrowed successfully.");
+  redirect(assigningEmployee ? "/borrow?message=Vehicle assigned successfully. The employee can now view this borrow in their dashboard." : "/dashboard?message=Vehicle borrowed successfully.");
 }
 
 export async function extendVehicleLoan(formData: FormData) {

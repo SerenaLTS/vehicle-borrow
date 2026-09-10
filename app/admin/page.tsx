@@ -308,6 +308,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       {activeTab === "fleet" ? (
         <>
+      <LoadingLink className="primaryButton" href="/borrow">Borrow / assign to employee</LoadingLink>
       <AdminFleetSearch totalCount={fleet.length}>
         {fleet.map((vehicle) => {
           const activeLoan = activeLoanByVehicleId.get(vehicle.id);
