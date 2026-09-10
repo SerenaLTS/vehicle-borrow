@@ -753,3 +753,32 @@ export async function sendImmediateKeyCollectionReminderIfDue({
 
   return true;
 }
+
+export async function sendFineNoticeEmail(params: {
+  to: string;
+  subject: string;
+  text: string;
+  noticeId: string;
+  attachment?: { filename: string; content: Buffer };
+}): Promise<{ sent: boolean; messageId?: string }> {
+  const config = getMailConfig();
+  if (!config) return { sent: false };
+  const transporter = createMailTransporter(config);
+  try {
+    const result = await transporter.sendMail({
+      from: config.from,
+      to: { address: params.to, name: "" },
+      replyTo: config.from,
+      subject: params.subject,
+      text: params.text,
+      html: `<div style="white-space:pre-wrap">${escapeHtml(params.text)}</div>`,
+      messageId: `<fine-${params.noticeId}@${getEmailAddress(config.from).split("@")[1]}>`,
+      attachments: params.attachment ? [{ ...params.attachment, contentType: "application/pdf" }] : [],
+      disableFileAccess: true,
+      disableUrlAccess: true,
+    });
+    return { sent: result.accepted.length > 0, messageId: result.messageId };
+  } finally {
+    transporter.close();
+  }
+}

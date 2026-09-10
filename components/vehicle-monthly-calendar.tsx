@@ -12,6 +12,8 @@ type VehicleMonthlyCalendarProps = {
   crossYearNextHref?: string;
   crossYearPreviousHref?: string;
   loadedYear?: number;
+  fineNoticeBaseHref?: string;
+  fineDates?: string[];
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -176,6 +178,8 @@ export function VehicleMonthlyCalendar({
   crossYearNextHref,
   crossYearPreviousHref,
   loadedYear,
+  fineNoticeBaseHref,
+  fineDates = [],
 }: VehicleMonthlyCalendarProps) {
   const router = useRouter();
   const [currentMonth, setCurrentMonth] = useState(initialMonth ?? buildCurrentMonth());
@@ -262,7 +266,10 @@ export function VehicleMonthlyCalendar({
                   {week.map((cell, index) =>
                     cell ? (
                       <div className="calendarCell" key={cell.key}>
-                        <span className="calendarDayNumber">{cell.day}</span>
+                        {fineNoticeBaseHref ? <a className="calendarFineDayLink" href={`${fineNoticeBaseHref}?date=${cell.key}`} aria-label={`Register fine notice for ${cell.key}`}>
+                          <span className="calendarDayNumber">{cell.day}</span>
+                          <span className="calendarFineLabel">{fineDates.includes(cell.key) ? "Fine on record · Add" : "+ Fine"}</span>
+                        </a> : <span className="calendarDayNumber">{cell.day}</span>}
                       </div>
                     ) : (
                       <div className="calendarCell calendarCell-empty" key={`${resolvedMonth}-empty-${weekIndex}-${index}`} />

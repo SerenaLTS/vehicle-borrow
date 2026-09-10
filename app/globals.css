@@ -1740,3 +1740,17 @@ th {
     padding-top: 18px;
   }
 }
+
+.calendarFineDayLink {
+  display: flex;
+  min-height: 64px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  text-decoration: none;
+}
+.calendarFineDayLink:hover, .calendarFineDayLink:focus-visible { background: rgba(40, 90, 160, 0.08); border-radius: 4px; }
+.calendarFineLabel { font-size: 0.7rem; }
+.fineFieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 18px; grid-column: 1 / -1; }
+.fineEmailPreview { white-space: pre-wrap; overflow-wrap: anywhere; padding: 20px; margin: 20px 0; border: 1px solid var(--line); border-radius: 10px; line-height: 1.6; }

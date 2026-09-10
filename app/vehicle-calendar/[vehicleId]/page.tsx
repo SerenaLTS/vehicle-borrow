@@ -1,3 +1,6 @@
+import { loadVehicleFines } from "@/lib/fine-notice-server";
+import { FineNoticeHistory } from "@/components/fine-notice-history";
+import { formatUtcIsoForDateTimeLocalInput } from "@/lib/datetime";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { VehicleMonthlyCalendar } from "@/components/vehicle-monthly-calendar";
@@ -80,6 +83,10 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
     ...event,
     notes: event.notes ?? null,
   }));
+  const fineSnapshot = isAdmin ? await loadVehicleFines(supabase, vehicleId) : null;
+  for (const record of fineSnapshot?.history ?? []) {
+    events.push({ id: `history-${record.id}`, kind: "borrowed", actor: record.driver_name, startAt: record.starts_at, endAt: record.ends_at, notes: "Admin-confirmed driving period" });
+  }
   const initialMonth = requestedMonth;
 
   return (
@@ -108,11 +115,15 @@ export default async function VehicleCalendarPage({ params, searchParams }: Vehi
         <VehicleMonthlyCalendar
           crossYearNextHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year + 1}-01`, backHref, vehicleAction)}
           crossYearPreviousHref={buildVehicleCalendarHref(vehicleId, `${calendarSnapshot.year - 1}-12`, backHref, vehicleAction)}
+          fineNoticeBaseHref={isAdmin && !fineSnapshot?.error ? `/admin/vehicles/${vehicleId}/fines/new` : undefined}
+          fineDates={fineSnapshot?.fines.map((fine) => formatUtcIsoForDateTimeLocalInput(fine.occurred_at).slice(0, 10))}
           events={events}
           initialMonth={initialMonth}
           loadedYear={calendarSnapshot.year}
         />
       </section>
+
+      {fineSnapshot ? <FineNoticeHistory vehicleId={vehicleId} fines={fineSnapshot.fines} history={fineSnapshot.history} unavailable={Boolean(fineSnapshot.error)} /> : null}
 
       <section className="panel">
         <div className="sectionHeader">

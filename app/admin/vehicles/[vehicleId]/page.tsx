@@ -16,6 +16,8 @@ import { normalizeLoan, normalizeVehicleBooking, type RawLoanRow, type RawVehicl
 import type { VehicleCalendarEvent } from "@/lib/vehicle-calendar-cache";
 import { getSafeActionErrorMessage } from "@/lib/action-errors";
 import { getLoanCalendarEndAt } from "@/lib/loan-calendar";
+import { loadVehicleFines } from "@/lib/fine-notice-server";
+import { FineNoticeHistory } from "@/components/fine-notice-history";
 import { EXPIRY_REMINDER_EXCLUDED_STATUSES } from "@/lib/vehicle-reminders";
 
 function vehicleRecordLoadError(error: unknown, area: string) {
@@ -52,6 +54,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     { data: loanData, error: loansError },
     { data: bookingData, error: bookingError },
     { data: roleData, error: rolesError },
+    fineSnapshot,
   ] = await Promise.all([
     supabase
       .from("admin_vehicle_details")
@@ -71,6 +74,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
       .eq("vehicle_id", vehicleId)
       .order("starts_at", { ascending: true }),
     supabase.from("user_roles").select("user_id, email, is_admin, created_at, updated_at").order("email"),
+    loadVehicleFines(supabase, vehicleId),
   ]);
 
   if (vehicleError) {
@@ -107,6 +111,7 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
     bookings.find((booking) => new Date(booking.starts_at).getTime() <= now && (booking.is_long_term || (booking.ends_at ? new Date(booking.ends_at).getTime() > now : false))) ?? null;
   const nextUpcomingBooking = bookings.find((booking) => new Date(booking.starts_at).getTime() > now) ?? null;
   const calendarEvents: VehicleCalendarEvent[] = [
+    ...fineSnapshot.history.map((record) => ({ id: `history-${record.id}`, kind: "borrowed" as const, actor: record.driver_name, startAt: record.starts_at, endAt: record.ends_at, notes: "Admin-confirmed driving period" })),
     ...bookings.map((booking) => ({
       id: booking.id,
       kind: "booked" as const,
@@ -164,11 +169,15 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
         <VehicleMonthlyCalendar
           crossYearNextHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(`${loadedYear + 1}-01`)}`}
           crossYearPreviousHref={`/admin/vehicles/${record.id}?month=${encodeURIComponent(`${loadedYear - 1}-12`)}`}
+          fineNoticeBaseHref={fineSnapshot.error ? undefined : `/admin/vehicles/${record.id}/fines/new`}
+          fineDates={fineSnapshot.fines.map((fine) => formatUtcIsoForDateTimeLocalInput(fine.occurred_at).slice(0, 10))}
           events={calendarEvents}
           initialMonth={initialMonth}
           loadedYear={loadedYear}
         />
       </section>
+
+      <FineNoticeHistory vehicleId={record.id} fines={fineSnapshot.fines} history={fineSnapshot.history} unavailable={Boolean(fineSnapshot.error)} />
 
       <section className="panel">
         <div className="sectionHeader compactSectionHeader">

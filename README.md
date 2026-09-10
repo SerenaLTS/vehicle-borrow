@@ -161,7 +161,7 @@ npm test
 
 ## Production migrations
 
-For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The current latest migration is:
+For an existing Supabase project, run new dated files in `supabase/` in filename order before deploying the application code that depends on them. The auth-hook migration is:
 
 ```text
 supabase/2026-08-16_auth_rate_limits_and_private_allowlist.sql
@@ -170,3 +170,17 @@ supabase/2026-08-16_auth_rate_limits_and_private_allowlist.sql
 It makes allowlist checks private and adds database-backed login and signup rate limiting. Run all earlier dated migrations first.
 
 In Supabase Dashboard, also enable the **Before User Created** Auth Hook and select `public.hook_require_allowed_user_email`. The server performs the same private check, while the hook remains the final database-level safeguard.
+
+
+## Fine notices
+
+Run `supabase/2026-09-10_vehicle_fine_notices.sql` after earlier migrations and before deploying this feature. It creates admin-only fine notices and historical driving periods, an atomic save function, and a private `fine-notices` PDF bucket. Fresh installs include this in the schema files.
+
+Use the existing `SUPABASE_SERVICE_ROLE_KEY` and `SMTP_*` environment variables. No additional mail provider is required. The attachment limit is 3 MB (PDF only); the server action request limit is 4 MB.
+
+In either admin vehicle calendar, select the offence date, enter its exact Sydney time and notice details, and confirm the driver and email address. Actual loan records and previously added driving periods are matched at that instant; reservations alone are not evidence of driving. When no record matches, enter the driver's name/email and a completed driving period containing the offence. That period is saved atomically with the notice and appears in the admin calendars and Added driving history, including for drivers without user accounts. It does not change the vehicle's current loan or status.
+
+Choose whether to request a driver licence copy, optionally attach the PDF, then save and preview. Review the recipient, message and PDF before pressing Send email to driver. Notice numbers are unique per vehicle; repeated submissions or send clicks cannot create a second notice or claim the same send. Sent means the SMTP server accepted the email, not proof of inbox delivery. Failed or uncertain deliveries remain recorded; check mail logs before explicitly retrying an uncertain send. A send interrupted before status persistence can be reviewed and retried after five minutes. PDFs can only be downloaded through an authenticated admin route.
+
+
+Fine notice tests: `npm test` mocks mail delivery and does not send real messages. The SQL regression test can be run in a fresh, disposable PostgreSQL cluster with `psql -v ON_ERROR_STOP=1 -f tests/fixtures/fine-notices-schema.sql -f supabase/2026-09-10_vehicle_fine_notices.sql -f tests/fine-notices.integration.sql`. The fixture creates minimal Supabase roles and tables; never run it against an application database.
