@@ -1,3 +1,5 @@
+import { BorrowForm } from "@/components/borrow-form";
+import { ErrorDialog } from "@/components/error-dialog";
 import { AdminLoanReturn } from "@/components/admin-loan-return";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -102,6 +104,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
       helpHref="/user-guide#borrow"
     >
       {message ? <p className="message">{message}</p> : null}
+      {error ? <ErrorDialog key={`${error}-${Date.now()}`} message={error} /> : null}
 
       {activeLoans.length > 0 ? (
         <>
@@ -169,7 +172,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
         {availableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles are available right now.</div>
         ) : (
-          <form action={borrowVehicle}>
+          <BorrowForm action={borrowVehicle}>
             <label className="fieldLabel">
               Borrowing as
               {isAdmin ? <>
@@ -231,7 +234,7 @@ export default async function BorrowPage({ searchParams }: BorrowPageProps) {
             </label>
 
             <SubmitButton className="primaryButton" idleLabel="Confirm borrow" pendingLabel="Saving..." />
-          </form>
+          </BorrowForm>
         )}
 
         {error ? <p className="message error">{error}</p> : null}

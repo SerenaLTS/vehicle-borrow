@@ -1,5 +1,6 @@
 "use server";
 
+import { validateBorrowForm } from "@/lib/borrow-validation";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseDateTimeLocalToUtcIso } from "@/lib/datetime";
@@ -31,14 +32,8 @@ export async function borrowVehicle(formData: FormData) {
   const expectedReturnAt = !isLongTerm && expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const borrowNotes = String(formData.get("borrowNotes") ?? "").trim() || null;
 
-  if (
-    !vehicleId ||
-    !purpose ||
-    (!isLongTerm && !expectedReturnAt) ||
-    (startOdometer !== null && (Number.isNaN(startOdometer) || startOdometer < 0))
-  ) {
-    redirect("/borrow?error=Please complete all required fields.");
-  }
+  const issues = validateBorrowForm(formData);
+  if (issues.length) return { error: issues.map((issue) => issue.message).join("\n\n"), field: issues[0].field };
 
   const supabase = await createClient();
   const {
@@ -55,14 +50,14 @@ export async function borrowVehicle(formData: FormData) {
   const borrowerUserId = String(formData.get("borrowerUserId") ?? "").trim() || user.id;
   const assigningEmployee = borrowerUserId !== user.id;
   if (assigningEmployee) {
-    if (!(await getIsAdmin(supabase, user.id))) redirect("/borrow?error=Admin access required to assign an employee.");
+    if (!(await getIsAdmin(supabase, user.id))) return { error: "Admin access required to assign an employee.", field: "borrowerUserId" };
     const { data: employee, error: employeeError } = await supabase.from("user_roles").select("user_id, email").eq("user_id", borrowerUserId).maybeSingle();
-    if (employeeError || !employee || !isCompanyEmail(employee.email, process.env.COMPANY_EMAIL_DOMAIN ?? "")) redirect("/borrow?error=Please select an existing company employee account.");
+    if (employeeError || !employee || !isCompanyEmail(employee.email, process.env.COMPANY_EMAIL_DOMAIN ?? "")) return { error: "Please select an existing company employee account.", field: "borrowerUserId" };
     borrowerEmail = employee.email;
   }
 
   if (!driverName) {
-    redirect("/borrow?error=Unable to detect the signed-in email address.");
+    return { error: "Unable to detect the signed-in email address. Please sign in again." };
   }
 
   const { data: loan, error } = await supabase.rpc(assigningEmployee ? "admin_borrow_vehicle" : "borrow_vehicle", {
@@ -76,7 +71,7 @@ export async function borrowVehicle(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/borrow?error=${encodeURIComponent(borrowError(error, "borrow the vehicle"))}`);
+    return { error: borrowError(error, "borrow the vehicle") };
   }
 
   if (assigningEmployee && loan) {

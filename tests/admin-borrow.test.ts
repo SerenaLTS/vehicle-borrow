@@ -31,12 +31,12 @@ describe("admin employee borrowing", () => {
   });
   it("rejects a forged employee selection from a non-admin", async () => {
     const client = setup(); mocks.isAdmin.mockResolvedValue(false);
-    await expect(borrowVehicle(form())).rejects.toThrow("Admin access required");
+    await expect(borrowVehicle(form())).resolves.toMatchObject({ error: expect.stringContaining("Admin access required") });
     expect(client.rpc).not.toHaveBeenCalled(); expect(client.from).not.toHaveBeenCalled(); expect(mocks.confirm).not.toHaveBeenCalled();
   });
   it("rejects external accounts", async () => {
     const client = setup("external@other.test");
-    await expect(borrowVehicle(form())).rejects.toThrow("company employee account");
+    await expect(borrowVehicle(form())).resolves.toMatchObject({ error: expect.stringContaining("company employee account") });
     expect(client.rpc).not.toHaveBeenCalled();
   });
   it("keeps self-service borrowing unchanged", async () => {
@@ -48,7 +48,7 @@ describe("admin employee borrowing", () => {
   it("does not notify anyone if the vehicle cannot be assigned", async () => {
     const client = setup(); client.rpc.mockResolvedValue({ data: null, error: { message: "Booked" } } as never);
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    await expect(borrowVehicle(form())).rejects.toThrow("/borrow?error=");
+    await expect(borrowVehicle(form())).resolves.toMatchObject({ error: expect.any(String) });
     expect(mocks.confirm).not.toHaveBeenCalled(); expect(mocks.longTerm).not.toHaveBeenCalled(); log.mockRestore();
   });
 });
