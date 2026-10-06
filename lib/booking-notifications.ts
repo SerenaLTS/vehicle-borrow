@@ -430,6 +430,56 @@ export async function sendBorrowConfirmationEmail({
   });
 }
 
+async function notifyCurrentBorrowersOfBooking({
+  supabase, action, booking, vehicleLabel, mailConfig,
+}: {
+  supabase: unknown;
+  action: BookingNotificationAction;
+  booking: BookingNotificationSnapshot;
+  vehicleLabel: string;
+  mailConfig: MailConfig;
+}) {
+  const client = supabase as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          is: (column: string, value: null) => Promise<{
+            data: { borrower_email: string; borrowed_at: string; expected_return_at: string | null; is_long_term: boolean }[] | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+  };
+  const { data: loans, error } = await client.from("vehicle_loans")
+    .select("borrower_email, borrowed_at, expected_return_at, is_long_term")
+    .eq("vehicle_id", booking.vehicleId).is("returned_at", null);
+  if (error) throw new Error(error.message);
+  const recipients = Array.from(new Set((loans ?? []).map((loan) => loan.borrower_email.trim().toLowerCase())))
+    .filter((email) => email && email !== booking.bookedByEmail.trim().toLowerCase());
+  if (recipients.length === 0) return;
+  const transporter = createMailTransporter(mailConfig);
+  await Promise.all(recipients.map((recipient) => transporter.sendMail({
+    from: mailConfig.from,
+    to: recipient,
+    subject: `Reservation ${action === "created" ? "created" : getActionLabel(action)} for your borrowed vehicle: ${vehicleLabel}`,
+    text: [
+      `A reservation for the vehicle you are currently borrowing has been ${action === "created" ? "created" : getActionLabel(action)}.`,
+      "",
+      `Vehicle: ${vehicleLabel}`,
+      `Reserved by: ${booking.bookedByEmail}`,
+      `Reservation start: ${formatDateTime(booking.startsAt)}`,
+      `Reservation end: ${booking.isLongTerm ? "Long term" : formatDateTime(booking.endsAt)}`,
+      `Comments: ${booking.comments || "-"}`,
+      "",
+      action === "cancelled"
+        ? "This reservation no longer requires a handover."
+        : "Please coordinate availability and key handover with the person who reserved the vehicle. If the reservation overlaps your borrow period, contact them to agree on arrangements.",
+      `Open ${APP_NAME} to check the reservation and register the return when you return the vehicle.`,
+    ].join("\n"),
+  })));
+}
+
 export async function sendBookingNotificationEmail({
   supabase,
   action,
@@ -462,7 +512,7 @@ export async function sendBookingNotificationEmail({
 
   const transporter = createMailTransporter(mailConfig);
 
-  await transporter.sendMail({
+  const results = await Promise.allSettled([transporter.sendMail({
     from: mailConfig.from,
     to: toList.join(", "),
     subject: buildSubject(action, vehicleLabel),
@@ -473,7 +523,9 @@ export async function sendBookingNotificationEmail({
       previousBooking,
       vehicleLabel,
     }),
-  });
+  }), notifyCurrentBorrowersOfBooking({ supabase, action, booking, vehicleLabel, mailConfig })]);
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason;
 }
 
 export async function sendBorrowOverdueReminderEmail({

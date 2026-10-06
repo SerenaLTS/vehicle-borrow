@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { BookingVehicleSelect } from "@/components/booking-vehicle-select";
 import { ConfirmForm } from "@/components/confirm-form";
 import { StatusPill } from "@/components/status-pill";
 import { SubmitButton } from "@/components/submit-button";
@@ -26,7 +27,13 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     redirect("/");
   }
 
-  const [isAdmin, snapshot] = await Promise.all([getIsAdmin(supabase, user.id), getFleetSnapshot(supabase)]);
+  const [isAdmin, snapshot, activeLoanResult] = await Promise.all([
+    getIsAdmin(supabase, user.id),
+    getFleetSnapshot(supabase),
+    supabase.from("vehicle_loans")
+      .select("vehicle_id, borrower_email, borrowed_at, expected_return_at, is_long_term")
+      .is("returned_at", null),
+  ]);
   const fleet = snapshot.vehicles;
   const upcomingBookings = snapshot.upcomingBookings;
   const activeLoanVehicleIds = snapshot.activeLoanVehicleIds;
@@ -53,7 +60,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
       <section className="panel">
         <h2>Reserve a vehicle</h2>
-        <p className="muted">Reservations hold a time slot. Vehicles that are currently borrowed can still be reserved for later; if the previous borrower has not returned it by your reservation time, both people will be notified to coordinate.</p>
+        <p className="muted">Reservations hold a time slot. Vehicles that are currently borrowed can still be reserved, including during the borrow period; if the previous borrower has not returned it by your reservation time, both people will be notified to coordinate.</p>
 
         {bookableVehicles.length === 0 ? (
           <div className="emptyState">No vehicles can be booked right now.</div>
@@ -71,23 +78,20 @@ export default async function BookPage({ searchParams }: BookPageProps) {
               <span className="fieldHint">Booking for an external person requires Serena or JD approval.</span>
             </label>
 
-            <label className="fieldLabel">
-              Vehicle
-              <select name="vehicleId" required defaultValue={requestedVehicleId}>
-                <option disabled value="">
-                  Select a vehicle
-                </option>
-                {bookableVehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.plate_number} • {vehicle.model}
-                    {activeLoanVehicleIds.has(vehicle.id) ? " • currently borrowed" : ""}
-                    {vehicle.color ? ` • ${vehicle.color}` : ""}
-                    {vehicle.location ? ` • ${vehicle.location}` : ""}
-                    {vehicle.vin ? ` • VIN ${vehicle.vin}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <BookingVehicleSelect
+              defaultVehicleId={requestedVehicleId}
+              activeLoans={activeLoanResult.data ?? []}
+              vehicles={bookableVehicles.map((vehicle) => ({
+                id: vehicle.id,
+                borrowed: activeLoanVehicleIds.has(vehicle.id) || vehicle.status === "borrowed" || Boolean(vehicle.current_holder_user_id),
+                label: [
+                  vehicle.plate_number, vehicle.model,
+                  activeLoanVehicleIds.has(vehicle.id) || vehicle.status === "borrowed" || vehicle.current_holder_user_id ? "currently borrowed" : null,
+                  vehicle.color, vehicle.location, vehicle.vin ? `VIN ${vehicle.vin}` : null,
+                ].filter(Boolean).join(" • "),
+              }))}
+            />
+            {activeLoanResult.error ? <p className="message error">Unable to load current borrow periods. Please confirm availability with the borrower before reserving.</p> : null}
 
             <div className="formGrid">
               <div className="timeFieldGroup">
