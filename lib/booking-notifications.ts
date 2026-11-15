@@ -54,7 +54,7 @@ export type ActiveLoanForBookingConflictSnapshot = {
   isLongTerm: boolean;
 };
 
-type BookingNotificationAction = "created" | "updated" | "cancelled";
+type BookingNotificationAction = "created" | "updated" | "cancelled" | "approval_requested";
 
 type LongTermBorrowNotificationParams = {
   supabase: unknown;
@@ -104,6 +104,7 @@ type BookingNotificationParams = {
   booking: BookingNotificationSnapshot;
   previousBooking?: Pick<BookingNotificationSnapshot, "startsAt" | "endsAt" | "isLongTerm" | "comments"> | null;
   notifyAdmins?: boolean;
+  notifyApprovers?: boolean;
 };
 
 type MailConfig = {
@@ -231,6 +232,10 @@ function shouldSendImmediateKeyCollectionReminder(startsAt: string) {
 }
 
 function getActionLabel(action: BookingNotificationAction) {
+  if (action === "approval_requested") {
+    return "requires approval";
+  }
+
   if (action === "created") {
     return "confirmed";
   }
@@ -290,7 +295,16 @@ async function getAdminEmails(supabase: unknown) {
 }
 
 function buildSubject(action: BookingNotificationAction, vehicleLabel: string) {
-  return `Vehicle booking ${getActionLabel(action)}: ${vehicleLabel}`;
+  return action === "approval_requested"
+    ? `Approval required · External driver · ${vehicleLabel}`
+    : `Vehicle booking ${getActionLabel(action)}: ${vehicleLabel}`;
+}
+
+function getConfiguredApproverEmails() {
+  return (process.env.BOOKING_APPROVER_EMAILS ?? "")
+    .split(/[;,]/)
+    .map((email) => email.trim().toLowerCase())
+    .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
 }
 
 function isLongTermBooking(booking: BookingNotificationSnapshot) {
@@ -311,7 +325,9 @@ function buildTextBody({
   vehicleLabel: string;
 }) {
   const lines = [
-    `Your vehicle booking has been ${getActionLabel(action)}.`,
+    action === "approval_requested"
+      ? "An external driver vehicle booking requires approval."
+      : `Your vehicle booking has been ${getActionLabel(action)}.`,
     "",
     `Vehicle: ${vehicleLabel}`,
     `Booked for: ${booking.bookedByEmail}`,
@@ -487,6 +503,7 @@ export async function sendBookingNotificationEmail({
   booking,
   previousBooking = null,
   notifyAdmins = false,
+  notifyApprovers = false,
 }: BookingNotificationParams) {
   const mailConfig = getMailConfig();
 
@@ -503,6 +520,9 @@ export async function sendBookingNotificationEmail({
   const recipients = new Set<string>([booking.bookedByEmail.trim().toLowerCase()]);
 
   adminEmails.forEach((email) => recipients.add(email));
+  if (notifyApprovers) {
+    getConfiguredApproverEmails().forEach((email) => recipients.add(email));
+  }
 
   const toList = Array.from(recipients).filter(Boolean);
 

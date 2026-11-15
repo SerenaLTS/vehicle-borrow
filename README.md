@@ -97,6 +97,7 @@ npm run dev
    - `SMTP_USER`
    - `SMTP_PASS`
    - `SMTP_FROM`
+   - `BOOKING_APPROVER_EMAILS` (comma- or semicolon-separated email addresses that should always receive external-driver approval requests)
 5. Click deploy.
 6. After deployment finishes, copy the production domain.
 7. Go back to Supabase `Authentication -> URL Configuration`.
@@ -142,6 +143,7 @@ New auth users are synced into `user_roles` automatically.
 - Vehicles in `maintenance` do not appear in the borrow page.
 - Vehicles in `retired` do not appear in the borrow page and should be used instead of deleting vehicles that already have history.
 - If SMTP is configured, booking create, update, and cancel actions send email notifications. Admin-triggered booking changes notify the booked user plus all admins.
+- External-driver booking requests and edits send an **Approval required** email to all admins and the addresses configured in `BOOKING_APPROVER_EMAILS`.
 
 ## Email notes
 

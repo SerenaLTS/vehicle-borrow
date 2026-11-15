@@ -72,7 +72,7 @@ export async function createBooking(formData: FormData) {
   try {
     await sendBookingNotificationEmail({
       supabase,
-      action: "created",
+      action: isExternal ? "approval_requested" : "created",
       actorEmail: user.email ?? "",
       booking: {
         bookingId: createdBooking.id,
@@ -84,6 +84,7 @@ export async function createBooking(formData: FormData) {
         comments: createdBooking.comments,
       },
       notifyAdmins: createdBooking.is_long_term || isExternal,
+      notifyApprovers: isExternal,
     });
   } catch (notificationError) {
     console.error("Failed to send booking confirmation email.", notificationError);
@@ -199,7 +200,7 @@ export async function updateOwnBooking(formData: FormData) {
   try {
     await sendBookingNotificationEmail({
       supabase,
-      action: "updated",
+      action: isExternal ? "approval_requested" : "updated",
       actorEmail: user.email ?? "",
       booking: {
         bookingId,
@@ -216,6 +217,8 @@ export async function updateOwnBooking(formData: FormData) {
         isLongTerm: booking.is_long_term,
         comments: booking.comments,
       },
+      notifyAdmins: isExternal,
+      notifyApprovers: isExternal,
     });
   } catch (notificationError) {
     console.error("Failed to send booking update email.", notificationError);
