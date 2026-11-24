@@ -482,14 +482,14 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                   <input name="isLongTerm" type="checkbox" />
                   <span>Long term</span>
                 </label>
-                <p className="fieldHint">Long term borrow records do not need an expected return time.</p>
+                <p className="fieldHint">Leave Returned time blank while the vehicle is still in use. If there is no expected return date either, the record is saved as long term.</p>
               </div>
               <label className="fieldLabel longTermHidden">
                 Expected return
                 <input name="expectedReturnAt" type="datetime-local" />
               </label>
               <label className="fieldLabel">
-                Returned time
+                Returned time (leave blank if still in use)
                 <input name="returnedAt" type="datetime-local" />
               </label>
             </div>
@@ -587,14 +587,14 @@ export default async function VehicleRecordPage({ params, searchParams }: Vehicl
                           <input defaultChecked={loan.is_long_term} name="isLongTerm" type="checkbox" />
                           <span>Long term</span>
                         </label>
-                        <p className="fieldHint">Long term borrow records do not need an expected return time.</p>
+                        <p className="fieldHint">Leave Returned time blank while the vehicle is still in use. If there is no expected return date either, the record is saved as long term.</p>
                       </div>
                       <label className="fieldLabel longTermHidden">
                         Expected return
                         <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.expected_return_at)} name="expectedReturnAt" type="datetime-local" />
                       </label>
                       <label className="fieldLabel">
-                        Returned time
+                        Returned time (leave blank if still in use)
                         <input defaultValue={formatUtcIsoForDateTimeLocalInput(loan.returned_at)} name="returnedAt" type="datetime-local" />
                       </label>
                     </div>

@@ -746,9 +746,10 @@ export async function createHistoricalLoan(formData: FormData) {
   const endOdometer = parseOptionalNonNegativeInteger(formData.get("endOdometer"));
   const borrowedAtValue = String(formData.get("borrowedAt") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
-  const isLongTerm = formData.get("isLongTerm") === "on";
+  const requestedLongTerm = formData.get("isLongTerm") === "on";
   const returnedAtValue = String(formData.get("returnedAt") ?? "").trim();
   const borrowedAt = borrowedAtValue ? parseDateTimeLocalToUtcIso(borrowedAtValue) : null;
+  const isLongTerm = requestedLongTerm || (!returnedAtValue && !expectedReturnAtValue);
   const expectedReturnAt = !isLongTerm && expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
 
@@ -858,9 +859,10 @@ export async function updateHistoricalLoan(formData: FormData) {
   const endOdometer = parseOptionalNonNegativeInteger(formData.get("endOdometer"));
   const borrowedAtValue = String(formData.get("borrowedAt") ?? "").trim();
   const expectedReturnAtValue = String(formData.get("expectedReturnAt") ?? "").trim();
-  const isLongTerm = formData.get("isLongTerm") === "on";
+  const requestedLongTerm = formData.get("isLongTerm") === "on";
   const returnedAtValue = String(formData.get("returnedAt") ?? "").trim();
   const borrowedAt = borrowedAtValue ? parseDateTimeLocalToUtcIso(borrowedAtValue) : null;
+  const isLongTerm = requestedLongTerm || (!returnedAtValue && !expectedReturnAtValue);
   const expectedReturnAt = !isLongTerm && expectedReturnAtValue ? parseDateTimeLocalToUtcIso(expectedReturnAtValue) : null;
   const returnedAt = returnedAtValue ? parseDateTimeLocalToUtcIso(returnedAtValue) : null;
 

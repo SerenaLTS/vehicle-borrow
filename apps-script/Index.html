@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font:15px Arial,sans-serif;max-width:980px;margin:32px auto;padding:0 16px;color:#172b4d;background:#f7f9fb}h1{font-size:26px}.bar,.card{background:#fff;border:1px solid #d9e0e8;border-radius:10px;padding:18px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}label{display:block;font-weight:600;margin:12px 0 5px}input,select,textarea,button{font:inherit;width:100%;box-sizing:border-box;padding:10px;border:1px solid #b8c4d1;border-radius:6px}button{background:#174ea6;color:#fff;border:0;font-weight:700;cursor:pointer;margin-top:14px}button:disabled{opacity:.55}small,.muted{color:#5f6b7a}.vehicle{padding:12px 0;border-bottom:1px solid #e8edf2}.status{float:right;color:#16794b}.error{color:#b3261e;white-space:pre-wrap}.ok{color:#16794b}.hidden{display:none}
+  </style>
+</head>
+<body>
+  <h1>Vehicle Management</h1>
+  <div class="bar"><span id="welcome">Loading…</span> <span id="notice" class="muted"></span></div>
+  <div id="error" class="error"></div>
+  <div class="grid">
+    <section class="card"><h2>Available vehicles</h2><div id="vehicles">Loading…</div></section>
+    <section class="card"><h2>Borrow a vehicle</h2>
+      <form id="borrowForm">
+        <label for="vehicleId">Vehicle</label><select name="vehicleId" id="vehicleId" required></select>
+        <label>Driver name</label><input name="driverName" required>
+        <label>Purpose</label><input name="purpose" required>
+        <label>Expected return</label><input name="expectedReturnAt" type="datetime-local" required>
+        <label>Start odometer (optional)</label><input name="startOdometer" type="number" min="0">
+        <label>Notes</label><textarea name="borrowNotes" rows="2"></textarea>
+        <button>Record borrow</button>
+      </form>
+    </section>
+  </div>
+  <section class="card"><h2>Active loans</h2><div id="loans">Loading…</div></section>
+  <script>
+    let state;
+    function showError(err){document.getElementById('error').textContent=err&&err.message||String(err);}
+    function run(fn, value){document.getElementById('error').textContent='';document.getElementById('notice').textContent='Saving…';google.script.run.withSuccessHandler(render).withFailureHandler(showError)[fn](value);}
+    function render(data){state=data;document.getElementById('welcome').textContent=`Signed in as ${data.user.name} (${data.user.role})`;document.getElementById('notice').textContent='';
+      const available=data.vehicles.filter(v=>v.status==='available');
+      document.getElementById('vehicles').innerHTML=available.length?available.map(v=>`<div class="vehicle"><strong>${esc(v.plate_number)}</strong> · ${esc(v.make||'')} ${esc(v.model||'')} <span class="status">Available</span><br><small>${esc(v.current_location||'Location not set')}</small></div>`).join(''):'<p class="muted">No vehicles are available.</p>';
+      document.getElementById('vehicleId').innerHTML='<option value="">Select a vehicle</option>'+available.map(v=>`<option value="${esc(v.vehicle_id)}">${esc(v.plate_number)} · ${esc((v.make||'')+' '+(v.model||''))}</option>`).join('');
+      document.getElementById('loans').innerHTML=data.loans.length?data.loans.map(l=>`<div class="vehicle"><strong>${esc(l.vehicle&&l.vehicle.plate_number||l.vehicle_id)}</strong> · ${esc(l.driver_name)} · ${esc(l.purpose)}<br><small>Borrower: ${esc(l.borrowed_by_email)} · Expected: ${esc(fmt(l.expected_return_at))}</small>${(l.borrowed_by_email===data.user.email||data.user.role==='admin')?`<form onsubmit="returnLoan(event,'${esc(l.loan_id)}')"><label>Return odometer (optional)</label><input name="endOdometer" type="number" min="0"><label>Return notes</label><input name="returnNotes"><button>Record return</button></form>`:''}</div>`).join(''):'<p class="muted">No active loans.</p>';
+    }
+    function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    function fmt(v){if(!v)return '—';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleString();}
+    document.getElementById('borrowForm').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);const data=Object.fromEntries(f.entries());if(data.expectedReturnAt)data.expectedReturnAt=new Date(data.expectedReturnAt).toISOString();run('borrowVehicle',data);e.target.reset();});
+    function returnLoan(e,id){e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());data.loanId=id;run('returnVehicle',data);}
+    google.script.run.withSuccessHandler(render).withFailureHandler(showError).getBootstrapData();
+  </script>
+</body>
+</html>
